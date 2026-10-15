@@ -267,11 +267,11 @@ var LEVELS = [
     spawn: [70, 380],
     goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 430, h: 70, kind: 'solid' },
-      { x: 430, y: 470, w: 80, h: 70, kind: 'fake' },     // 被它顶上去，就塌
-      { x: 510, y: 470, w: 490, h: 70, kind: 'solid' },
-      // 从背后追上来的墙：比玩家跑得快，追上来后把人一路顶到那块假地板上
-      { x: 140, y: 350, w: 36, h: 120, kind: 'appear', triggerX: 250, moveV: 420, moveTo: 700 }
+      { x: 0, y: 470, w: 490, h: 70, kind: 'solid' },
+      { x: 640, y: 470, w: 360, h: 70, kind: 'solid' },
+      // 从背后追上来的墙：比玩家快，贴上来后把人一路顶进前面的坑里。
+      // triggerX 必须早、间距必须小，否则玩家在墙贴上之前就跑过坑了。
+      { x: 100, y: 350, w: 36, h: 120, kind: 'appear', triggerX: 180, moveV: 420, moveTo: 490 }
     ],
     spikes: [], arrows: []
   },
