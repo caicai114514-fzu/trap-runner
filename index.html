@@ -227,16 +227,17 @@ var LEVELS = [
   },
   {
     name: '第四关 · 天降正义',
-    hint: '跑得快，也要看得远。',
+    hint: '这一关……你好像跳不高。',
     width: 960,
+    jump: 830,                 // ← 本关跳跃力调低：容错只剩 ~35px，初见必吃一次
     spawn: [70, 380],
     goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
       { x: 0, y: 470, w: 1000, h: 70, kind: 'solid' }
     ],
     spikes: [
-      { x: 380, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 250, dir: 'up' },
-      { x: 680, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 550, dir: 'up' }
+      { x: 380, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 310, dir: 'up' },
+      { x: 680, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 610, dir: 'up' }
     ],
     arrows: []
   },
@@ -270,17 +271,18 @@ var LEVELS = [
   },
   {
     name: '第七关 · 荆棘地板',
-    hint: '走路要看脚下。',
+    hint: '走路要看脚下。而且这一关，你跳得更矮。',
     width: 960,
+    jump: 800,                 // ← 三连刺 + 更矮的跳跃，容错进一步压缩
     spawn: [70, 380],
     goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
       { x: 0, y: 470, w: 1000, h: 70, kind: 'solid' }
     ],
     spikes: [
-      { x: 240, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 140, dir: 'up' },
-      { x: 490, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 390, dir: 'up' },
-      { x: 730, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 630, dir: 'up' }
+      { x: 240, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 160, dir: 'up' },
+      { x: 490, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 410, dir: 'up' },
+      { x: 730, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 650, dir: 'up' }
     ],
     arrows: []
   },
@@ -514,17 +516,22 @@ function update(dt) {
   if (right) { p.vx = MOVE; p.face = 1; }
 
   // 跳跃（土狼时间 + 输入缓冲 0.12s + 按住连跳）
+  // 跳跃力是「每关」的：关卡数据里的 jump 覆盖默认值。
+  // 这本身就是一种关卡设计手段 —— 跳得矮 = 容错小 = 能初见杀；
+  // 反过来调高还能做"跳太高反而撞上天花板尖刺"的坑。
+  var jumpV = LEVELS[game.li].jump || JUMP_V;
   var wantJump = keys['jump'];
   if (p.onGround) game.coyote = 0.1; else game.coyote = Math.max(0, game.coyote - dt);
   if (jumpPressed) game.jumpBuf = 0.12; else game.jumpBuf = Math.max(0, game.jumpBuf - dt);
   if (wantJump) game.jumpBuf = Math.max(game.jumpBuf, 0.08);
   if (game.jumpBuf > 0 && game.coyote > 0) {
-    p.vy = -JUMP_V; p.onGround = false; game.coyote = 0; game.jumpBuf = 0; p.sq = 0.72;
+    p.vy = -jumpV; p.onGround = false; game.coyote = 0; game.jumpBuf = 0; p.sq = 0.72;
     Sound.sfxJump();
   }
   jumpPressed = false;
-  // 短按小跳（松开跳跃键时截断上升，轻点≈80px，按住≈170px）
-  if (p.vy < -600 && !wantJump) p.vy = -600;
+  // 短按小跳：松开跳跃键时截断上升（约按住时的 45% 高）
+  var hopV = jumpV * 0.63;
+  if (p.vy < -hopV && !wantJump) p.vy = -hopV;
 
   // 水平移动 + 碰撞（单向薄平台不参与，避免跳跃时被平台边缘卡死）
   p.x += p.vx * dt;
