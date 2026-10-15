@@ -6,11 +6,11 @@
 <title>坑爹跑酷 · Trap Runner</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{height:100%;overflow:hidden;background:#0b0e14;
+  html,body{height:100%;overflow:hidden;background:#241f16;
     font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
   #wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-  canvas{display:block;background:#151b26;border-radius:12px;
-    box-shadow:0 24px 70px rgba(0,0,0,.7);max-width:100%;max-height:100%}
+  canvas{display:block;background:#f4e6bd;border-radius:14px;
+    box-shadow:0 0 0 4px #3b2a12,0 24px 70px rgba(0,0,0,.6);max-width:100%;max-height:100%}
 </style>
 </head>
 <body>
@@ -230,8 +230,8 @@ var LEVELS = [
       { x: 0, y: 470, w: 1600, h: 80, kind: 'solid' }
     ],
     spikes: [
-      { x: 920, y: 470 - 90, w: 130, h: 90, hidden: true, triggerX: 700, dir: 'up' },
-      { x: 1300, y: 0, w: 130, h: 90, hidden: true, triggerX: 1080, dir: 'down' }
+      { x: 920, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 700, dir: 'up' },
+      { x: 1300, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 1080, dir: 'up' }
     ],
     arrows: []
   },
@@ -259,7 +259,7 @@ var LEVELS = [
     goal: { x: 1560, y: 400, w: 46, h: 70 },
     platforms: [
       { x: 0, y: 470, w: 700, h: 80, kind: 'solid' },
-      { x: 880, y: 470, w: 820, h: 80, kind: 'solid' },
+      { x: 850, y: 470, w: 850, h: 80, kind: 'solid' },
       { x: 1150, y: 350, w: 36, h: 120, kind: 'appear', triggerX: 980 }
     ],
     spikes: [], arrows: []
@@ -274,9 +274,9 @@ var LEVELS = [
       { x: 0, y: 470, w: 1650, h: 80, kind: 'solid' }
     ],
     spikes: [
-      { x: 560, y: 470 - 80, w: 110, h: 80, hidden: true, triggerX: 420, dir: 'up' },
-      { x: 940, y: 470 - 80, w: 110, h: 80, hidden: true, triggerX: 800, dir: 'up' },
-      { x: 1300, y: 470 - 80, w: 110, h: 80, hidden: true, triggerX: 1160, dir: 'up' }
+      { x: 560, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 420, dir: 'up' },
+      { x: 940, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 800, dir: 'up' },
+      { x: 1300, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 1160, dir: 'up' }
     ],
     arrows: []
   },
@@ -297,7 +297,7 @@ var LEVELS = [
       { x: 1250, y: 350, w: 36, h: 120, kind: 'appear', triggerX: 1120 }
     ],
     spikes: [
-      { x: 700, y: 470 - 80, w: 110, h: 80, hidden: true, triggerX: 560, dir: 'up' }
+      { x: 700, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 560, dir: 'up' }
     ],
     arrows: []
   }
@@ -306,7 +306,7 @@ var LEVELS = [
 /* ==================================================================
    游戏状态与物理
    ================================================================== */
-var GRAVITY = 2400, MOVE = 315, JUMP_V = 905, MAX_FALL = 1500;
+var GRAVITY = 2400, MOVE = 315, JUMP_V = 950, MAX_FALL = 1500;
 
 var TAUNTS = ['就这？', '再来一次', '差一点点', '你被坑了', '哈哈哈哈哈',
               '这也信？', '再想想', '手别抖', '别急', '熟悉的味道'];
@@ -626,40 +626,95 @@ function roundRect(x, y, w, h, r) {
   ctx.closePath();
 }
 
+/* ---------------- 美术：暖橙卡通 + 一点点诡异 ----------------
+   参考 Level Devil：平涂色块 + 粗描边 + 明亮得有点不自然的白天。
+   诡异感来自细节：天上那个"太阳"有张脸，会盯着你，偶尔眨一下眼。 */
+var PAL = {
+  skyA: '#cfe4bb', skyB: '#f2e3ba', skyC: '#f8efd6',
+  sun: '#fcf5d2', sunFace: '#d8c493',
+  cloud: '#ffffff',
+  hillFar: '#c6dcaa', hillNear: '#b3d194',
+  gnd: '#e9a13b', gndTop: '#f7c069', gndEdge: '#7c4a1c',
+  gndShade: '#c9862a', gndLine: 'rgba(124,74,28,0.32)',
+  fake: '#df9a3a', fakeTop: '#eeb257',
+  vanish: '#cdba95', vanishTop: '#e2d1ab', vanishLine: '#9c8659',
+  player: '#ffc63c', playerEdge: '#3b2a12',
+  eye: '#ffffff', pupil: '#2b2011',
+  spike: '#d8412f', spikeEdge: '#7d1d12',
+  door: '#3fb56e', doorDark: '#227a49', knob: '#f2d06b',
+  ink: '#3b2a12', text: '#5a472c', dim: '#8a7550', warn: '#d8412f'
+};
+
+function inkStroke(x, y, w, h, r, lw) {
+  ctx.strokeStyle = PAL.ink;
+  ctx.lineWidth = lw || 3;
+  roundRect(x, y, w, h, r);
+  ctx.stroke();
+}
+
+function cloudShape(cx, cy, s) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, 25 * s, 0, Math.PI * 2);
+  ctx.arc(cx + 27 * s, cy + 5 * s, 19 * s, 0, Math.PI * 2);
+  ctx.arc(cx - 27 * s, cy + 7 * s, 16 * s, 0, Math.PI * 2);
+  ctx.arc(cx + 5 * s, cy - 15 * s, 19 * s, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function drawBackground() {
+  var t = performance.now() / 1000;
   var g = ctx.createLinearGradient(0, 0, 0, VH);
-  g.addColorStop(0, '#1a2233');
-  g.addColorStop(1, '#0f1420');
+  g.addColorStop(0, PAL.skyA);
+  g.addColorStop(0.55, PAL.skyB);
+  g.addColorStop(1, PAL.skyC);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, VW, VH);
 
-  // 远景视差
+  // 天上那张脸（很淡，看久了才发现）
+  var mx = VW * 0.74 - game.cam * 0.04;
+  var my = 98;
   ctx.save();
-  ctx.globalAlpha = 0.5;
-  var off = -game.cam * 0.25;
-  for (var i = 0; i < 8; i++) {
-    var x = ((i * 320 + off) % (VW + 700)) - 200;
-    ctx.fillStyle = '#151d2b';
-    ctx.beginPath();
-    ctx.moveTo(x, VH);
-    ctx.lineTo(x + 150, 300);
-    ctx.lineTo(x + 300, VH);
-    ctx.closePath();
-    ctx.fill();
+  ctx.globalAlpha = 0.8;
+  ctx.fillStyle = PAL.sun;
+  ctx.beginPath(); ctx.arc(mx, my, 58, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = PAL.sunFace;
+  var blink = Math.sin(t * 0.9) > 0.975;
+  if (!blink) {
+    ctx.beginPath(); ctx.arc(mx - 19, my - 7, 6.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(mx + 19, my - 7, 6.5, 0, Math.PI * 2); ctx.fill();
+  } else {
+    ctx.fillRect(mx - 26, my - 8, 14, 3.2);
+    ctx.fillRect(mx + 12, my - 8, 14, 3.2);
+  }
+  ctx.strokeStyle = PAL.sunFace;
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(mx, my + 5, 24, 0.16 * Math.PI, 0.84 * Math.PI); ctx.stroke();
+  ctx.restore();
+
+  // 云（缓慢飘动）
+  var co = -game.cam * 0.15 + t * 7;
+  ctx.save();
+  ctx.fillStyle = PAL.cloud;
+  ctx.globalAlpha = 0.92;
+  for (var i = 0; i < 6; i++) {
+    var cx = ((i * 430 + co) % (VW + 1000)) - 300;
+    cloudShape(cx, 64 + (i % 3) * 54, 0.85 + (i % 2) * 0.35);
   }
   ctx.restore();
 
-  // 网格
+  // 远处的小山
   ctx.save();
-  ctx.globalAlpha = 0.06;
-  ctx.strokeStyle = '#8fb4ff';
-  ctx.lineWidth = 1;
-  var gx = -(game.cam % 60);
-  for (var a = gx; a < VW; a += 60) {
-    ctx.beginPath(); ctx.moveTo(a, 0); ctx.lineTo(a, VH); ctx.stroke();
-  }
-  for (var b = 0; b < VH; b += 60) {
-    ctx.beginPath(); ctx.moveTo(0, b); ctx.lineTo(VW, b); ctx.stroke();
+  ctx.fillStyle = PAL.hillFar;
+  var ho = -game.cam * 0.3;
+  for (var j = 0; j < 9; j++) {
+    var hx = ((j * 300 + ho) % (VW + 760)) - 240;
+    ctx.beginPath();
+    ctx.moveTo(hx - 60, VH);
+    ctx.quadraticCurveTo(hx + 80, 296, hx + 220, VH);
+    ctx.closePath();
+    ctx.fill();
   }
   ctx.restore();
 }
@@ -669,29 +724,57 @@ function drawPlatforms() {
     var p = game.plats[i];
     if (p.state === 'hidden') continue;
     if (p.state === 'gone') continue;
-    var appear = p.appeared > 0 ? 1 - p.appeared / 0.18 : 1;
+    var grow = p.appeared > 0 ? 1 - p.appeared / 0.18 : 1;
+    var r = p.h > 40 ? 8 : 6;
     ctx.save();
-    if (p.appeared > 0) ctx.globalAlpha = 0.4 + 0.6 * appear;
+    if (p.appeared > 0) ctx.globalAlpha = 0.35 + 0.65 * grow;
 
-    if (p.kind === 'appear') {
-      ctx.fillStyle = '#ff9f43';
-      roundRect(p.x, p.y, p.w, p.h, 5);
-      ctx.fill();
-      ctx.strokeStyle = '#ffd08a'; ctx.lineWidth = 2; ctx.stroke();
-    } else if (p.kind === 'vanish') {
-      ctx.fillStyle = '#3d4a60';
-      roundRect(p.x, p.y, p.w, p.h, 6);
-      ctx.fill();
-      ctx.setLineDash([6, 5]);
-      ctx.strokeStyle = '#7d8ea8'; ctx.lineWidth = 1.5; ctx.stroke();
+    if (p.kind === 'vanish') {
+      // 一触即碎：干裂的旧木板
+      ctx.fillStyle = PAL.vanish;
+      roundRect(p.x, p.y, p.w, p.h, r); ctx.fill();
+      ctx.fillStyle = PAL.vanishTop;
+      roundRect(p.x + 2, p.y + 2, p.w - 4, Math.max(4, Math.min(7, p.h - 4)), 3); ctx.fill();
+      ctx.strokeStyle = PAL.vanishLine;
+      ctx.lineWidth = 1.6;
+      for (var vx = p.x + 15; vx < p.x + p.w - 6; vx += 21) {
+        ctx.beginPath();
+        ctx.moveTo(vx, p.y + 3);
+        ctx.lineTo(vx + 5, p.y + p.h - 3);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = PAL.ink;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([8, 6]);
+      roundRect(p.x + 1, p.y + 1, p.w - 2, p.h - 2, r);
+      ctx.stroke();
       ctx.setLineDash([]);
     } else {
-      ctx.fillStyle = p.kind === 'fake' ? '#333e51' : '#2e3949';
-      roundRect(p.x, p.y, p.w, p.h, p.h > 40 ? 8 : 6);
-      ctx.fill();
-      ctx.fillStyle = p.kind === 'fake' ? '#3d4960' : '#3a4759';
-      roundRect(p.x + 3, p.y + 3, p.w - 6, Math.min(6, p.h - 6), 3);
-      ctx.fill();
+      var body = PAL.gnd, top = PAL.gndTop;
+      if (p.kind === 'fake') { body = PAL.fake; top = PAL.fakeTop; }
+      if (p.kind === 'appear') { body = '#f0872c'; top = '#ffb762'; }
+      // 底部阴影
+      ctx.fillStyle = PAL.gndShade;
+      roundRect(p.x, p.y + 3, p.w, Math.max(4, p.h - 3), r); ctx.fill();
+      // 主体
+      ctx.fillStyle = body;
+      roundRect(p.x, p.y, p.w, Math.max(4, p.h - 3), r); ctx.fill();
+      // 顶部亮面
+      ctx.fillStyle = top;
+      roundRect(p.x + 2, p.y + 2, p.w - 4, Math.max(4, Math.min(9, p.h - 5)), 4); ctx.fill();
+      // 粗描边
+      inkStroke(p.x + 1.5, p.y + 1.5, p.w - 3, Math.max(4, p.h - 4), r, 3);
+      // 大块地面加砖缝
+      if (p.h > 50) {
+        ctx.strokeStyle = PAL.gndLine;
+        ctx.lineWidth = 2;
+        for (var bx = p.x + 44; bx < p.x + p.w - 24; bx += 54) {
+          ctx.beginPath();
+          ctx.moveTo(bx, p.y + 13);
+          ctx.lineTo(bx, p.y + p.h - 8);
+          ctx.stroke();
+        }
+      }
     }
     ctx.restore();
   }
@@ -702,30 +785,40 @@ function drawSpikes() {
     var sp = game.spikes[i];
     if (!sp.shown) continue;
     var box = spikeBox(sp);
-    var n = Math.max(2, Math.round(box.w / 24));
+    var n = Math.max(2, Math.round(box.w / 26));
     var step = box.w / n;
     ctx.save();
-    ctx.fillStyle = '#ff4d6d';
-    ctx.beginPath();
-    if (sp.dir === 'down') {
-      for (var a = 0; a < n; a++) {
-        var x0 = sp.x + a * step;
+    for (var a = 0; a < n; a++) {
+      var x0 = sp.x + a * step;
+      ctx.beginPath();
+      if (sp.dir === 'down') {
         ctx.moveTo(x0, box.y);
         ctx.lineTo(x0 + step / 2, box.y + box.h);
         ctx.lineTo(x0 + step, box.y);
-        ctx.closePath();
+      } else {
+        ctx.moveTo(x0, box.y + box.h);
+        ctx.lineTo(x0 + step / 2, box.y);
+        ctx.lineTo(x0 + step, box.y + box.h);
       }
-    } else {
-      for (var b = 0; b < n; b++) {
-        var x1 = sp.x + b * step;
-        ctx.moveTo(x1, box.y + box.h);
-        ctx.lineTo(x1 + step / 2, box.y);
-        ctx.lineTo(x1 + step, box.y + box.h);
-        ctx.closePath();
+      ctx.closePath();
+      ctx.fillStyle = PAL.spike;
+      ctx.fill();
+      ctx.strokeStyle = PAL.spikeEdge;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      // 一点高光，让它看着更"卡通"
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (sp.dir === 'down') {
+        ctx.moveTo(x0 + step / 2, box.y + 4);
+        ctx.lineTo(x0 + step * 0.32, box.y + box.h * 0.62);
+      } else {
+        ctx.moveTo(x0 + step / 2, box.y + box.h - 4);
+        ctx.lineTo(x0 + step * 0.32, box.y + box.h * 0.38);
       }
+      ctx.stroke();
     }
-    ctx.fill();
-    ctx.strokeStyle = '#ff8fa3'; ctx.lineWidth = 1.5; ctx.stroke();
     ctx.restore();
   }
 }
@@ -733,20 +826,33 @@ function drawSpikes() {
 function drawGoal() {
   var g = LEVELS[game.li].goal;
   var t = performance.now() / 1000;
+  var r = 6;
   ctx.save();
-  ctx.shadowColor = '#5ee6a8';
-  ctx.shadowBlur = 16 + Math.sin(t * 3) * 6;
-  ctx.fillStyle = '#5ee6a8';
-  roundRect(g.x, g.y, g.w, g.h, 6);
+  // 门后一点点"在呼吸"的光
+  ctx.globalAlpha = 0.22 + 0.16 * Math.sin(t * 3);
+  ctx.fillStyle = '#a8f0c0';
+  roundRect(g.x - 10, g.y - 10, g.w + 20, g.h + 20, 14);
   ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = '#0f1420';
-  roundRect(g.x + 7, g.y + 10, g.w - 14, g.h - 10, 4);
+  ctx.globalAlpha = 1;
+  // 门框（深色描边）
+  ctx.fillStyle = PAL.ink;
+  roundRect(g.x - 4, g.y - 4, g.w + 8, g.h + 8, 8);
   ctx.fill();
-  ctx.fillStyle = '#5ee6a8';
-  ctx.beginPath();
-  ctx.arc(g.x + g.w - 12, g.y + g.h / 2 + 4, 3, 0, Math.PI * 2);
+  // 门板
+  var gg = ctx.createLinearGradient(g.x, g.y, g.x, g.y + g.h);
+  gg.addColorStop(0, PAL.door);
+  gg.addColorStop(1, PAL.doorDark);
+  ctx.fillStyle = gg;
+  roundRect(g.x, g.y, g.w, g.h, r);
   ctx.fill();
+  // 门里的小窗
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  roundRect(g.x + 9, g.y + 10, g.w - 18, 16, 4);
+  ctx.fill();
+  // 门把手
+  ctx.fillStyle = PAL.knob;
+  ctx.beginPath(); ctx.arc(g.x + g.w - 13, g.y + g.h * 0.56, 4.6, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = PAL.ink; ctx.lineWidth = 2; ctx.stroke();
   ctx.restore();
 }
 
@@ -755,23 +861,25 @@ function drawArrows() {
   for (var i = 0; i < game.arrows.length; i++) {
     var a = game.arrows[i];
     ctx.save();
-    ctx.globalAlpha = 0.75;
-    ctx.fillStyle = '#ffd166';
     ctx.translate(a.x, a.y);
-    var s = 1;
     if (a.dir === 'left') ctx.rotate(Math.PI);
     if (a.dir === 'up') ctx.rotate(-Math.PI / 2);
     if (a.dir === 'down') ctx.rotate(Math.PI / 2);
     ctx.beginPath();
-    ctx.moveTo(34 * s, 0);
-    ctx.lineTo(-6 * s, -20 * s);
-    ctx.lineTo(2 * s, -9 * s);
-    ctx.lineTo(-30 * s, -9 * s);
-    ctx.lineTo(-30 * s, 9 * s);
-    ctx.lineTo(2 * s, 9 * s);
-    ctx.lineTo(-6 * s, 20 * s);
+    ctx.moveTo(34, 0);
+    ctx.lineTo(-6, -20);
+    ctx.lineTo(2, -9);
+    ctx.lineTo(-30, -9);
+    ctx.lineTo(-30, 9);
+    ctx.lineTo(2, 9);
+    ctx.lineTo(-6, 20);
     ctx.closePath();
+    ctx.fillStyle = '#f2b21c';
     ctx.fill();
+    ctx.strokeStyle = PAL.ink;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
     ctx.restore();
   }
   ctx.restore();
@@ -783,18 +891,28 @@ function drawPlayer() {
   var sq = p.sq;
   var w = p.w / sq, h = p.h * sq;
   var x = p.x + (p.w - w) / 2, y = p.y + (p.h - h);
+  var r = 7;
   ctx.save();
-  ctx.shadowColor = '#6ee7f0';
-  ctx.shadowBlur = 14;
-  ctx.fillStyle = '#6ee7f0';
-  roundRect(x, y, w, h, 7);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  // 眼睛
-  ctx.fillStyle = '#0f1420';
-  var ex = x + (p.face > 0 ? w * 0.56 : w * 0.24);
-  ctx.fillRect(ex, y + h * 0.3, 4, 6);
-  ctx.fillRect(ex + (p.face > 0 ? 8 : 8), y + h * 0.3, 4, 6);
+  // 身体
+  ctx.fillStyle = PAL.player;
+  roundRect(x, y, w, h, r); ctx.fill();
+  ctx.strokeStyle = PAL.playerEdge; ctx.lineWidth = 3;
+  roundRect(x, y, w, h, r); ctx.stroke();
+  // 大眼睛（眼珠会看向移动方向）
+  if (w > 14) {
+    var eyR = Math.min(6.2, w * 0.23);
+    var e1x = x + w * 0.33, e2x = x + w * 0.67, ey = y + h * 0.4;
+    var look = p.face * 1.9;
+    ctx.fillStyle = PAL.eye;
+    ctx.beginPath(); ctx.arc(e1x, ey, eyR, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(e2x, ey, eyR, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = PAL.playerEdge; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.arc(e1x, ey, eyR, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(e2x, ey, eyR, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = PAL.pupil;
+    ctx.beginPath(); ctx.arc(e1x + look, ey + 0.6, eyR * 0.46, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(e2x + look, ey + 0.6, eyR * 0.46, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -818,23 +936,25 @@ function text(str, x, y, size, color, align, bold) {
 
 function drawHUD() {
   var L = LEVELS[game.li];
-  text(L.name, 26, 30, 20, '#e8eefc', 'left', true);
-  text('死亡 ' + game.deaths, VW - 26, 30, 18, '#8b98ad', 'right');
-  text('第 ' + (game.li + 1) + ' / ' + LEVELS.length + ' 关', VW - 26, 56, 15, '#5d6a7e', 'right');
+  text(L.name, 26, 30, 20, PAL.ink, 'left', true);
+  text('死亡 ' + game.deaths, VW - 26, 30, 18, PAL.text, 'right', true);
+  text('第 ' + (game.li + 1) + ' / ' + LEVELS.length + ' 关', VW - 26, 56, 15, PAL.dim, 'right');
   if (game.tauntT > 0) {
-    var a = Math.min(1, game.tauntT / 0.4);
-    ctx.globalAlpha = a;
-    text(game.taunt, VW / 2, 92, 34, '#ff5a6e', 'center', true);
-    ctx.globalAlpha = 1;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, game.tauntT / 0.4);
+    ctx.translate(VW / 2, 92);
+    ctx.rotate((Math.random() - 0.5) * 0.05);
+    text(game.taunt, 0, 0, 36, PAL.warn, 'center', true);
+    ctx.restore();
   }
   // 底部提示：先教操作，死两次给思路，死八次给台阶
   if (game.state === 'play') {
     if (game.li === 0 && game.deaths === 0) {
-      text('← → / A D 移动　　空格 跳跃　　R 重来　　M 音乐', VW / 2, VH - 26, 15, '#5d6a7e', 'center');
+      text('← → / A D 移动　　空格 跳跃　　R 重来　　M 音乐', VW / 2, VH - 26, 15, PAL.dim, 'center');
     } else if (game.deaths >= 8) {
-      text('踩上会碎的板子别停，落地立刻按空格　　按 N 跳过本关', VW / 2, VH - 26, 15, '#5ee6a8', 'center');
+      text('踩上会碎的板子别停，落地立刻按空格　　按 N 跳过本关', VW / 2, VH - 26, 15, '#2f9e5f', 'center', true);
     } else if (game.deaths >= 2) {
-      text('提示：踩上会碎的板子别停留，落地立刻按空格跳走', VW / 2, VH - 26, 15, '#ffd166', 'center');
+      text('提示：踩上会碎的板子别停留，落地立刻按空格跳走', VW / 2, VH - 26, 15, '#b8792a', 'center', true);
     }
   }
 }
@@ -842,30 +962,51 @@ function drawHUD() {
 function drawTitle() {
   drawBackground();
   var t = performance.now() / 1000;
-  text('坑 爹 跑 酷', VW / 2, VH / 2 - 90, 66, '#6ee7f0', 'center', true);
-  text('TRAP  RUNNER', VW / 2, VH / 2 - 30, 20, '#4d5a70', 'center', true);
-  text('看起来很简单，直到你踩上去。', VW / 2, VH / 2 + 30, 20, '#8b98ad', 'center');
-  var a = 0.55 + 0.45 * Math.sin(t * 3);
+  ctx.save();
+  ctx.translate(VW / 2, VH / 2 - 92);
+  ctx.rotate(Math.sin(t * 1.3) * 0.012);
+  ctx.font = '700 68px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 9;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = PAL.ink;
+  ctx.strokeText('坑 爹 跑 酷', 0, 0);
+  ctx.fillStyle = PAL.player;
+  ctx.fillText('坑 爹 跑 酷', 0, 0);
+  ctx.restore();
+  text('TRAP  RUNNER', VW / 2, VH / 2 - 32, 20, PAL.dim, 'center', true);
+  text('看起来很简单，直到你踩上去。', VW / 2, VH / 2 + 26, 20, PAL.text, 'center');
+  var a = 0.5 + 0.5 * Math.sin(t * 3);
   ctx.globalAlpha = a;
-  text('按 空格 / 点击屏幕 开始', VW / 2, VH / 2 + 110, 24, '#5ee6a8', 'center', true);
+  text('按 空格 / 点击屏幕 开始', VW / 2, VH / 2 + 106, 25, '#2f9e5f', 'center', true);
   ctx.globalAlpha = 1;
-  text('8 关 · 全是坑 · 死了重来就好', VW / 2, VH - 46, 15, '#4d5a70', 'center');
+  text('8 关 · 全是坑 · 死了重来就好', VW / 2, VH - 46, 15, PAL.dim, 'center');
 }
 
 function drawComplete() {
   drawBackground();
   var t = performance.now() / 1000;
   ctx.save();
-  ctx.shadowColor = '#5ee6a8'; ctx.shadowBlur = 30;
-  text('全 部 通 关', VW / 2, VH / 2 - 70, 58, '#5ee6a8', 'center', true);
+  ctx.translate(VW / 2, VH / 2 - 74);
+  ctx.rotate(Math.sin(t * 1.6) * 0.01);
+  ctx.font = '700 58px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 9;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = PAL.ink;
+  ctx.strokeText('全 部 通 关', 0, 0);
+  ctx.fillStyle = PAL.door;
+  ctx.fillText('全 部 通 关', 0, 0);
   ctx.restore();
-  text('总死亡次数：' + game.totalDeaths + ' 次', VW / 2, VH / 2 + 6, 26, '#e8eefc', 'center', true);
+  text('总死亡次数：' + game.totalDeaths + ' 次', VW / 2, VH / 2 + 8, 26, PAL.ink, 'center', true);
   text(game.totalDeaths <= 15 ? '这身手，有点东西。' :
        game.totalDeaths <= 40 ? '坑是踩出来的，路是走出来的。' :
-       '……你和这个游戏，都挺倔的。', VW / 2, VH / 2 + 54, 18, '#8b98ad', 'center');
-  var a = 0.55 + 0.45 * Math.sin(t * 3);
+       '……你和这个游戏，都挺倔的。', VW / 2, VH / 2 + 56, 18, PAL.text, 'center');
+  var a = 0.5 + 0.5 * Math.sin(t * 3);
   ctx.globalAlpha = a;
-  text('按 空格 再玩一次', VW / 2, VH / 2 + 130, 22, '#6ee7f0', 'center', true);
+  text('按 空格 再玩一次', VW / 2, VH / 2 + 128, 23, '#2f9e5f', 'center', true);
   ctx.globalAlpha = 1;
 }
 
@@ -893,10 +1034,29 @@ function render() {
   ctx.restore();
   drawHUD();
 
-  if (game.state === 'win') {
-    ctx.fillStyle = 'rgba(15,20,32,' + Math.min(0.55, game.timer * 1.2) + ')';
+  // 陷阱触发 / 死亡时闪一下暖色——诡异感来源之一
+  if (game.shake > 0.5) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(0.22, game.shake / 70);
+    ctx.fillStyle = '#ff7a2f';
     ctx.fillRect(0, 0, VW, VH);
-    text('过 关 !', VW / 2, VH / 2, 60, '#5ee6a8', 'center', true);
+    ctx.restore();
+  }
+
+  if (game.state === 'win') {
+    ctx.fillStyle = 'rgba(247,237,210,' + Math.min(0.7, game.timer * 1.5) + ')';
+    ctx.fillRect(0, 0, VW, VH);
+    ctx.save();
+    ctx.font = '700 60px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 9;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = PAL.ink;
+    ctx.strokeText('过 关 !', VW / 2, VH / 2);
+    ctx.fillStyle = PAL.door;
+    ctx.fillText('过 关 !', VW / 2, VH / 2);
+    ctx.restore();
   }
 }
 
