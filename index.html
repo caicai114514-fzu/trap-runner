@@ -6,11 +6,11 @@
 <title>坑爹跑酷 · Trap Runner</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{height:100%;overflow:hidden;background:#241f16;
+  html,body{height:100%;overflow:hidden;background:#0d0409;
     font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
   #wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-  canvas{display:block;background:#f4e6bd;border-radius:14px;
-    box-shadow:0 0 0 4px #3b2a12,0 24px 70px rgba(0,0,0,.6);max-width:100%;max-height:100%}
+  canvas{display:block;background:#1a0a12;border-radius:14px;
+    box-shadow:0 0 46px rgba(255,110,40,.35),0 24px 70px rgba(0,0,0,.8);max-width:100%;max-height:100%}
 </style>
 </head>
 <body>
@@ -333,7 +333,8 @@ function loadLevel(i) {
   game.li = i;
   game.p = {
     x: L.spawn[0], y: L.spawn[1], vx: 0, vy: 0, w: 26, h: 28,
-    onGround: false, face: 1, alive: true, sq: 1, ground: null
+    onGround: false, face: 1, alive: true, sq: 1, ground: null,
+    anim: 0, animState: 'idle'
   };
   // 复制平台/尖刺的可变状态
   game.plats = L.platforms.map(function (p) {
@@ -571,6 +572,12 @@ function update(dt) {
   // 挤压回弹
   p.sq += (1 - p.sq) * Math.min(1, dt * 12);
 
+  // 火柴人的动画状态：走 / 跳 / 落 / 停
+  p.anim += dt;
+  if (!p.onGround) p.animState = (p.vy < 0) ? 'jump' : 'fall';
+  else if (Math.abs(p.vx) > 1) p.animState = 'walk';
+  else p.animState = 'idle';
+
   // 尖刺致死
   for (var s = 0; s < game.spikes.length; s++) {
     var sp2 = game.spikes[s];
@@ -626,23 +633,29 @@ function roundRect(x, y, w, h, r) {
   ctx.closePath();
 }
 
-/* ---------------- 美术：暖橙卡通 + 一点点诡异 ----------------
-   参考 Level Devil：平涂色块 + 粗描边 + 明亮得有点不自然的白天。
-   诡异感来自细节：天上那个"太阳"有张脸，会盯着你，偶尔眨一下眼。 */
+/* ---------------- 美术：火柴人 + 地狱背景 ----------------
+   背景是地狱：暗红天、火山剪影、岩浆辉光、往上飘的火星。
+   角色是一个火柴人（头 + 一根身体 + 四肢，全用线画），
+   亮黄色 + 外发光，在暗红地狱里是全画面最亮的东西，一眼就能找到自己。 */
 var PAL = {
-  skyA: '#cfe4bb', skyB: '#f2e3ba', skyC: '#f8efd6',
-  sun: '#fcf5d2', sunFace: '#d8c493',
-  cloud: '#ffffff',
-  hillFar: '#c6dcaa', hillNear: '#b3d194',
-  gnd: '#e9a13b', gndTop: '#f7c069', gndEdge: '#7c4a1c',
-  gndShade: '#c9862a', gndLine: 'rgba(124,74,28,0.32)',
-  fake: '#df9a3a', fakeTop: '#eeb257',
-  vanish: '#cdba95', vanishTop: '#e2d1ab', vanishLine: '#9c8659',
-  player: '#ffc63c', playerEdge: '#3b2a12',
-  eye: '#ffffff', pupil: '#2b2011',
-  spike: '#d8412f', spikeEdge: '#7d1d12',
-  door: '#3fb56e', doorDark: '#227a49', knob: '#f2d06b',
-  ink: '#3b2a12', text: '#5a472c', dim: '#8a7550', warn: '#d8412f'
+  // 地狱天空
+  skyA: '#120610', skyB: '#2e0b16', skyC: '#5c1414', skyD: '#8a2410',
+  rockSil: '#1b0810', ventGlow: 'rgba(255,120,40,0.55)',
+  emberHot: '#ffd166', ember: '#ff7a2f',
+  // 平台：焦黑石灰岩 + 岩浆裂纹
+  rock: '#5c3529', rockTop: '#8a5136', rockEdge: '#170a06',
+  rockShade: '#40251c', crack: '#ff8a3c',
+  fake: '#55301f', fakeTop: '#7d4629',
+  vanish: '#4c3a33', vanishTop: '#6d5449', vanishLine: '#2b1c16',
+  // 火柴人
+  player: '#ffd23f', playerGlow: 'rgba(255,180,60,0.9)',
+  pupil: '#2a1206',
+  // 危险
+  spike: '#ff3b2f', spikeEdge: '#6b0f08',
+  // 出口（地狱里唯一冷色）
+  door: '#3fd18a', doorDark: '#1f8a55', knob: '#ffe08a',
+  ink: '#170a06',
+  text: '#ffdcb0', dim: '#b08a6a', warn: '#ff5a3c', good: '#5ee6a8'
 };
 
 function inkStroke(x, y, w, h, r, lw) {
@@ -652,69 +665,54 @@ function inkStroke(x, y, w, h, r, lw) {
   ctx.stroke();
 }
 
-function cloudShape(cx, cy, s) {
-  ctx.beginPath();
-  ctx.arc(cx, cy, 25 * s, 0, Math.PI * 2);
-  ctx.arc(cx + 27 * s, cy + 5 * s, 19 * s, 0, Math.PI * 2);
-  ctx.arc(cx - 27 * s, cy + 7 * s, 16 * s, 0, Math.PI * 2);
-  ctx.arc(cx + 5 * s, cy - 15 * s, 19 * s, 0, Math.PI * 2);
-  ctx.fill();
-}
-
 function drawBackground() {
   var t = performance.now() / 1000;
+  // 地狱天空：黑紫 -> 暗红 -> 血红
   var g = ctx.createLinearGradient(0, 0, 0, VH);
   g.addColorStop(0, PAL.skyA);
-  g.addColorStop(0.55, PAL.skyB);
-  g.addColorStop(1, PAL.skyC);
+  g.addColorStop(0.42, PAL.skyB);
+  g.addColorStop(0.74, PAL.skyC);
+  g.addColorStop(1, PAL.skyD);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, VW, VH);
 
-  // 天上那张脸（很淡，看久了才发现）
-  var mx = VW * 0.74 - game.cam * 0.04;
-  var my = 98;
-  ctx.save();
-  ctx.globalAlpha = 0.8;
-  ctx.fillStyle = PAL.sun;
-  ctx.beginPath(); ctx.arc(mx, my, 58, 0, Math.PI * 2); ctx.fill();
-  ctx.globalAlpha = 0.55;
-  ctx.fillStyle = PAL.sunFace;
-  var blink = Math.sin(t * 0.9) > 0.975;
-  if (!blink) {
-    ctx.beginPath(); ctx.arc(mx - 19, my - 7, 6.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(mx + 19, my - 7, 6.5, 0, Math.PI * 2); ctx.fill();
-  } else {
-    ctx.fillRect(mx - 26, my - 8, 14, 3.2);
-    ctx.fillRect(mx + 12, my - 8, 14, 3.2);
-  }
-  ctx.strokeStyle = PAL.sunFace;
-  ctx.lineWidth = 4;
-  ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.arc(mx, my + 5, 24, 0.16 * Math.PI, 0.84 * Math.PI); ctx.stroke();
-  ctx.restore();
+  // 地平线附近的岩浆辉光
+  var lg = ctx.createLinearGradient(0, VH * 0.55, 0, VH);
+  lg.addColorStop(0, 'rgba(255,140,40,0)');
+  lg.addColorStop(1, 'rgba(255,150,50,0.4)');
+  ctx.fillStyle = lg;
+  ctx.fillRect(0, VH * 0.55, VW, VH * 0.45);
 
-  // 云（缓慢飘动）
-  var co = -game.cam * 0.15 + t * 7;
-  ctx.save();
-  ctx.fillStyle = PAL.cloud;
-  ctx.globalAlpha = 0.92;
-  for (var i = 0; i < 6; i++) {
-    var cx = ((i * 430 + co) % (VW + 1000)) - 300;
-    cloudShape(cx, 64 + (i % 3) * 54, 0.85 + (i % 2) * 0.35);
-  }
-  ctx.restore();
-
-  // 远处的小山
-  ctx.save();
-  ctx.fillStyle = PAL.hillFar;
-  var ho = -game.cam * 0.3;
-  for (var j = 0; j < 9; j++) {
-    var hx = ((j * 300 + ho) % (VW + 760)) - 240;
+  // 远处火山岩柱剪影（火山口有火光）
+  var ho = -game.cam * 0.22;
+  for (var j = 0; j < 11; j++) {
+    var hx = ((j * 262 + ho) % (VW + 700)) - 200;
+    var hh = 210 + (j % 3) * 74;
+    ctx.fillStyle = PAL.rockSil;
     ctx.beginPath();
-    ctx.moveTo(hx - 60, VH);
-    ctx.quadraticCurveTo(hx + 80, 296, hx + 220, VH);
+    ctx.moveTo(hx - 74, VH);
+    ctx.lineTo(hx - 12, VH - hh);
+    ctx.lineTo(hx + 14, VH - hh + 46);
+    ctx.lineTo(hx + 74, VH);
     ctx.closePath();
     ctx.fill();
+    ctx.fillStyle = PAL.ventGlow;
+    ctx.beginPath();
+    ctx.arc(hx + 1, VH - hh + 8, 9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 火星：一直往上飘
+  ctx.save();
+  for (var i = 0; i < 46; i++) {
+    var seed = i * 137.51;
+    var px = (seed * 3.13 - game.cam * 0.3) % (VW + 200);
+    if (px < 0) px += VW + 200;
+    px -= 100;
+    var py = VH - ((t * 24 + seed * 5.7) % (VH + 150));
+    ctx.globalAlpha = 0.18 + 0.55 * Math.abs(Math.sin(t * 2.2 + seed));
+    ctx.fillStyle = (i % 4 === 0) ? PAL.emberHot : PAL.ember;
+    ctx.fillRect(px, py, 3, 3);
   }
   ctx.restore();
 }
@@ -750,11 +748,11 @@ function drawPlatforms() {
       ctx.stroke();
       ctx.setLineDash([]);
     } else {
-      var body = PAL.gnd, top = PAL.gndTop;
+      var body = PAL.rock, top = PAL.rockTop;
       if (p.kind === 'fake') { body = PAL.fake; top = PAL.fakeTop; }
-      if (p.kind === 'appear') { body = '#f0872c'; top = '#ffb762'; }
+      if (p.kind === 'appear') { body = '#a8451f'; top = '#e0703a'; }
       // 底部阴影
-      ctx.fillStyle = PAL.gndShade;
+      ctx.fillStyle = PAL.rockShade;
       roundRect(p.x, p.y + 3, p.w, Math.max(4, p.h - 3), r); ctx.fill();
       // 主体
       ctx.fillStyle = body;
@@ -764,16 +762,19 @@ function drawPlatforms() {
       roundRect(p.x + 2, p.y + 2, p.w - 4, Math.max(4, Math.min(9, p.h - 5)), 4); ctx.fill();
       // 粗描边
       inkStroke(p.x + 1.5, p.y + 1.5, p.w - 3, Math.max(4, p.h - 4), r, 3);
-      // 大块地面加砖缝
+      // 大块地面：岩浆裂纹
       if (p.h > 50) {
-        ctx.strokeStyle = PAL.gndLine;
+        ctx.save();
+        ctx.strokeStyle = PAL.crack;
+        ctx.globalAlpha = 0.45;
         ctx.lineWidth = 2;
         for (var bx = p.x + 44; bx < p.x + p.w - 24; bx += 54) {
           ctx.beginPath();
           ctx.moveTo(bx, p.y + 13);
-          ctx.lineTo(bx, p.y + p.h - 8);
+          ctx.lineTo(bx + 4, p.y + p.h - 8);
           ctx.stroke();
         }
+        ctx.restore();
       }
     }
     ctx.restore();
@@ -885,35 +886,74 @@ function drawArrows() {
   ctx.restore();
 }
 
+/* 火柴人：头 + 一根身体 + 四肢，动作全靠关节摆动
+   走路 → 手脚交替摆；跳跃 → 蜷腿举臂；下落 → 张腿摊手；站着 → 轻微呼吸 */
 function drawPlayer() {
   if (game.state === 'dead') return;
   var p = game.p;
-  var sq = p.sq;
-  var w = p.w / sq, h = p.h * sq;
-  var x = p.x + (p.w - w) / 2, y = p.y + (p.h - h);
-  var r = 7;
-  ctx.save();
-  // 身体
-  ctx.fillStyle = PAL.player;
-  roundRect(x, y, w, h, r); ctx.fill();
-  ctx.strokeStyle = PAL.playerEdge; ctx.lineWidth = 3;
-  roundRect(x, y, w, h, r); ctx.stroke();
-  // 大眼睛（眼珠会看向移动方向）
-  if (w > 14) {
-    var eyR = Math.min(6.2, w * 0.23);
-    var e1x = x + w * 0.33, e2x = x + w * 0.67, ey = y + h * 0.4;
-    var look = p.face * 1.9;
-    ctx.fillStyle = PAL.eye;
-    ctx.beginPath(); ctx.arc(e1x, ey, eyR, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(e2x, ey, eyR, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = PAL.playerEdge; ctx.lineWidth = 1.8;
-    ctx.beginPath(); ctx.arc(e1x, ey, eyR, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(e2x, ey, eyR, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = PAL.pupil;
-    ctx.beginPath(); ctx.arc(e1x + look, ey + 0.6, eyR * 0.46, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(e2x + look, ey + 0.6, eyR * 0.46, 0, Math.PI * 2); ctx.fill();
+  var t = p.anim || 0;
+  var st = p.animState || 'idle';
+  var cx = p.x + p.w / 2;
+  var top = p.y, bottom = p.y + p.h;
+
+  var bob = 0, legA = 0, legB = 0, armA = 0, armB = 0;
+
+  if (st === 'walk') {
+    var sw = Math.sin(t * 13);
+    legA = sw * 6.5; legB = -sw * 6.5;
+    armA = -sw * 5.5; armB = sw * 5.5;
+    bob = -Math.abs(sw) * 1.6;
+  } else if (st === 'idle') {
+    bob = Math.sin(t * 2.6) * 1.2;
+    armA = 2; armB = -2;
+  } else if (st === 'jump') {
+    legA = -3; legB = 6; armA = -8; armB = 8;   // 蜷腿、举臂
+  } else {
+    legA = -7; legB = 7; armA = -6; armB = 6;   // 下落：张腿摊手
   }
+
+  var headR = 5.2;
+  var headY = top + headR + 1 + bob;
+  var neckY = headY + headR + 0.5;
+  var hipY = neckY + 8.5;
+  var shoulderY = neckY + 2;
+
+  ctx.save();
+  ctx.strokeStyle = PAL.player;
+  ctx.lineWidth = 3.4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.shadowColor = PAL.playerGlow;
+  ctx.shadowBlur = 11;
+
+  // 身体
+  ctx.beginPath();
+  ctx.moveTo(cx, neckY);
+  ctx.lineTo(cx, hipY);
+  ctx.stroke();
+  // 手臂
+  ctx.beginPath();
+  ctx.moveTo(cx, shoulderY); ctx.lineTo(cx + armA, shoulderY + 7.5);
+  ctx.moveTo(cx, shoulderY); ctx.lineTo(cx + armB, shoulderY + 7.5);
+  ctx.stroke();
+  // 腿
+  ctx.beginPath();
+  ctx.moveTo(cx, hipY); ctx.lineTo(cx + legA, bottom);
+  ctx.moveTo(cx, hipY); ctx.lineTo(cx + legB, bottom);
+  ctx.stroke();
+  // 头
+  ctx.beginPath();
+  ctx.arc(cx, headY, headR, 0, Math.PI * 2);
+  ctx.fillStyle = PAL.player;
+  ctx.fill();
+  ctx.stroke();
   ctx.restore();
+
+  // 两个小黑点当眼睛（不做五官）
+  var look = p.face * 0.9;
+  ctx.fillStyle = PAL.pupil;
+  ctx.beginPath(); ctx.arc(cx - 1.9 + look, headY - 0.6, 1.05, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 1.9 + look, headY - 0.6, 1.05, 0, Math.PI * 2); ctx.fill();
 }
 
 function drawParticles() {
@@ -936,7 +976,7 @@ function text(str, x, y, size, color, align, bold) {
 
 function drawHUD() {
   var L = LEVELS[game.li];
-  text(L.name, 26, 30, 20, PAL.ink, 'left', true);
+  text(L.name, 26, 30, 20, PAL.text, 'left', true);
   text('死亡 ' + game.deaths, VW - 26, 30, 18, PAL.text, 'right', true);
   text('第 ' + (game.li + 1) + ' / ' + LEVELS.length + ' 关', VW - 26, 56, 15, PAL.dim, 'right');
   if (game.tauntT > 0) {
@@ -952,9 +992,9 @@ function drawHUD() {
     if (game.li === 0 && game.deaths === 0) {
       text('← → / A D 移动　　空格 跳跃　　R 重来　　M 音乐', VW / 2, VH - 26, 15, PAL.dim, 'center');
     } else if (game.deaths >= 8) {
-      text('踩上会碎的板子别停，落地立刻按空格　　按 N 跳过本关', VW / 2, VH - 26, 15, '#2f9e5f', 'center', true);
+      text('踩上会碎的板子别停，落地立刻按空格　　按 N 跳过本关', VW / 2, VH - 26, 15, PAL.good, 'center', true);
     } else if (game.deaths >= 2) {
-      text('提示：踩上会碎的板子别停留，落地立刻按空格跳走', VW / 2, VH - 26, 15, '#b8792a', 'center', true);
+      text('提示：踩上会碎的板子别停留，落地立刻按空格跳走', VW / 2, VH - 26, 15, '#ffb347', 'center', true);
     }
   }
 }
@@ -979,7 +1019,7 @@ function drawTitle() {
   text('看起来很简单，直到你踩上去。', VW / 2, VH / 2 + 26, 20, PAL.text, 'center');
   var a = 0.5 + 0.5 * Math.sin(t * 3);
   ctx.globalAlpha = a;
-  text('按 空格 / 点击屏幕 开始', VW / 2, VH / 2 + 106, 25, '#2f9e5f', 'center', true);
+  text('按 空格 / 点击屏幕 开始', VW / 2, VH / 2 + 106, 25, PAL.good, 'center', true);
   ctx.globalAlpha = 1;
   text('8 关 · 全是坑 · 死了重来就好', VW / 2, VH - 46, 15, PAL.dim, 'center');
 }
@@ -1000,13 +1040,13 @@ function drawComplete() {
   ctx.fillStyle = PAL.door;
   ctx.fillText('全 部 通 关', 0, 0);
   ctx.restore();
-  text('总死亡次数：' + game.totalDeaths + ' 次', VW / 2, VH / 2 + 8, 26, PAL.ink, 'center', true);
+  text('总死亡次数：' + game.totalDeaths + ' 次', VW / 2, VH / 2 + 8, 26, PAL.text, 'center', true);
   text(game.totalDeaths <= 15 ? '这身手，有点东西。' :
        game.totalDeaths <= 40 ? '坑是踩出来的，路是走出来的。' :
        '……你和这个游戏，都挺倔的。', VW / 2, VH / 2 + 56, 18, PAL.text, 'center');
   var a = 0.5 + 0.5 * Math.sin(t * 3);
   ctx.globalAlpha = a;
-  text('按 空格 再玩一次', VW / 2, VH / 2 + 128, 23, '#2f9e5f', 'center', true);
+  text('按 空格 再玩一次', VW / 2, VH / 2 + 128, 23, PAL.good, 'center', true);
   ctx.globalAlpha = 1;
 }
 
@@ -1044,7 +1084,7 @@ function render() {
   }
 
   if (game.state === 'win') {
-    ctx.fillStyle = 'rgba(247,237,210,' + Math.min(0.7, game.timer * 1.5) + ')';
+    ctx.fillStyle = 'rgba(12,4,10,' + Math.min(0.72, game.timer * 1.5) + ')';
     ctx.fillRect(0, 0, VW, VH);
     ctx.save();
     ctx.font = '700 60px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
