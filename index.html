@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>坑爹跑酷 · Trap Runner</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#0b0e14;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+  #wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+  canvas{display:block;background:#151b26;border-radius:12px;
+    box-shadow:0 24px 70px rgba(0,0,0,.7);max-width:100%;max-height:100%}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c" width="960" height="540"></canvas></div>
+<script>
+(function () {
+'use strict';
+
+var canvas = document.getElementById('c');
+var ctx = canvas.getContext('2d');
+var VW = canvas.width, VH = canvas.height;
+
+/* ==================================================================
+   音频引擎：Web Audio 程序化芯片音乐 + 音效（不需要任何音频文件）
+   ================================================================== */
+var Sound = {
+  ac: null, master: null, bgmGain: null, sfxGain: null,
+  started: false, step: 0, nextTime: 0, timer: null,
+  bpm: 138,
+
+  init: function () {
+    if (this.ac) return;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    this.ac = new AC();
+    this.master = this.ac.createGain();
+    this.master.gain.value = 0.5;
+    this.master.connect(this.ac.destination);
+    this.bgmGain = this.ac.createGain();
+    this.bgmGain.gain.value = 0.28;
+    this.bgmGain.connect(this.master);
+    this.sfxGain = this.ac.createGain();
+    this.sfxGain.gain.value = 0.5;
+    this.sfxGain.connect(this.master);
+  },
+
+  freq: function (midi) { return 440 * Math.pow(2, (midi - 69) / 12); },
+
+  // 一个音符
+  note: function (midi, t, dur, type, vol, dest) {
+    if (!this.ac) return;
+    var o = this.ac.createOscillator();
+    var g = this.ac.createGain();
+    o.type = type || 'square';
+    o.frequency.setValueAtTime(this.freq(midi), t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol == null ? 0.3 : vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(dest || this.bgmGain);
+    o.start(t); o.stop(t + dur + 0.02);
+  },
+
+  noise: function (t, dur, vol) {
+    if (!this.ac) return;
+    var n = Math.floor(this.ac.sampleRate * dur);
+    var buf = this.ac.createBuffer(1, n, this.ac.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    var s = this.ac.createBufferSource(); s.buffer = buf;
+    var g = this.ac.createGain(); g.gain.value = vol == null ? 0.25 : vol;
+    var f = this.ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1400;
+    s.connect(f); f.connect(g); g.connect(this.sfxGain);
+    s.start(t);
+  },
+
+  sfxJump: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime, o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(320, t);
+    o.frequency.exponentialRampToValueAtTime(760, t + 0.09);
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.14);
+  },
+
+  sfxDeath: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime, o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(420, t);
+    o.frequency.exponentialRampToValueAtTime(60, t + 0.42);
+    g.gain.setValueAtTime(0.3, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.47);
+    this.noise(t, 0.3, 0.18);
+  },
+
+  sfxWin: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime, seq = [72, 76, 79, 84], self = this;
+    seq.forEach(function (m, i) { self.note(m, t + i * 0.09, 0.3, 'triangle', 0.3, self.sfxGain); });
+  },
+
+  sfxTrap: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime;
+    this.noise(t, 0.08, 0.2);
+    this.note(46, t, 0.12, 'square', 0.22, this.sfxGain);
+  },
+
+  sfxAllClear: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime, self = this;
+    [69, 72, 76, 81, 84, 88].forEach(function (m, i) {
+      self.note(m, t + i * 0.11, 0.5, 'triangle', 0.32, self.sfxGain);
+    });
+  },
+
+  // 芯片 BGM：Am - F - C - G 循环
+  progression: [
+    { bass: 45, arp: [57, 60, 64, 60] },  // Am
+    { bass: 41, arp: [53, 57, 60, 57] },  // F
+    { bass: 48, arp: [55, 60, 64, 60] },  // C
+    { bass: 43, arp: [55, 59, 62, 59] }   // G
+  ],
+
+  startBgm: function () {
+    if (!this.ac || this.started) return;
+    this.started = true;
+    this.nextTime = this.ac.currentTime + 0.08;
+    this.step = 0;
+    var self = this;
+    this.timer = setInterval(function () { self.schedule(); }, 25);
+  },
+
+  schedule: function () {
+    if (!this.ac) return;
+    var spb = 60 / this.bpm;      // 每拍秒数
+    var stepDur = spb / 4;        // 十六分音符
+    while (this.nextTime < this.ac.currentTime + 0.12) {
+      var s = this.step % 16;
+      var bar = Math.floor(this.step / 16) % 4;
+      var ch = this.progression[bar];
+      var t = this.nextTime;
+      // 低音：每拍一下
+      if (s % 4 === 0) this.note(ch.bass - 12, t, stepDur * 3.2, 'triangle', 0.42);
+      if (s % 4 === 2) this.note(ch.bass, t, stepDur * 1.6, 'triangle', 0.26);
+      // 琶音
+      if (s % 2 === 0) {
+        var n = ch.arp[(s / 2) % 4];
+        this.note(n + 12, t, stepDur * 1.5, 'square', 0.13);
+      }
+      // 偶尔加个高音点缀
+      if (s === 14) this.note(ch.arp[2] + 24, t, stepDur * 1.2, 'square', 0.08);
+      this.nextTime += stepDur;
+      this.step++;
+    }
+  },
+
+  toggle: function () {
+    if (!this.bgmGain) return;
+    var on = this.bgmGain.gain.value > 0.01;
+    this.bgmGain.gain.setTargetAtTime(on ? 0 : 0.28, this.ac.currentTime, 0.05);
+    return !on;
+  }
+};
+
+/* ==================================================================
+   关卡数据
+   kind: solid | fake（踩塌）| vanish（踩碎）| appear（突然出现）
+   spike: hidden=true 时，玩家 x 越过 triggerX 后弹出
+   ================================================================== */
+var LEVELS = [
+  {
+    name: '第一关 · 就这？',
+    hint: '走到右边的门就行，很简单的。',
+    width: 1500,
+    spawn: [70, 380],
+    goal: { x: 1360, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 640, h: 80, kind: 'solid' },
+      { x: 640, y: 470, w: 160, h: 80, kind: 'fake' },
+      { x: 800, y: 470, w: 700, h: 80, kind: 'solid' }
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '第二关 · 信任崩塌',
+    hint: '脚下的板子，不一定靠得住。',
+    width: 1700,
+    spawn: [70, 360],
+    goal: { x: 1560, y: 340, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 320, h: 80, kind: 'solid' },
+      { x: 420, y: 400, w: 140, h: 26, kind: 'solid' },
+      { x: 640, y: 330, w: 140, h: 26, kind: 'fake' },
+      { x: 860, y: 330, w: 140, h: 26, kind: 'solid' },
+      { x: 1080, y: 400, w: 140, h: 26, kind: 'vanish' },
+      { x: 1280, y: 410, w: 420, h: 140, kind: 'solid' }
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '第三关 · 别信箭头',
+    hint: '箭头说的……也不一定对。',
+    width: 1600,
+    spawn: [70, 380],
+    goal: { x: 1480, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 680, h: 80, kind: 'solid' },
+      { x: 940, y: 470, w: 660, h: 80, kind: 'solid' },
+      { x: 600, y: 350, w: 170, h: 24, kind: 'solid' },
+      { x: 840, y: 350, w: 170, h: 24, kind: 'solid' },
+      { x: 1080, y: 350, w: 180, h: 24, kind: 'solid' }
+    ],
+    spikes: [{ x: 680, y: 500, w: 260, h: 40, hidden: false, dir: 'up' }],
+    arrows: [{ x: 620, y: 420, dir: 'right' }]
+  },
+  {
+    name: '第四关 · 天降正义',
+    hint: '跑得快，也要看得远。',
+    width: 1600,
+    spawn: [70, 380],
+    goal: { x: 1460, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 1600, h: 80, kind: 'solid' }
+    ],
+    spikes: [
+      { x: 920, y: 470 - 90, w: 130, h: 90, hidden: true, triggerX: 700, dir: 'up' },
+      { x: 1300, y: 0, w: 130, h: 90, hidden: true, triggerX: 1080, dir: 'down' }
+    ],
+    arrows: []
+  },
+  {
+    name: '第五关 · 一触即碎',
+    hint: '别停，停下来就没了。',
+    width: 1700,
+    spawn: [70, 380],
+    goal: { x: 1520, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 300, h: 80, kind: 'solid' },
+      { x: 380, y: 400, w: 120, h: 24, kind: 'vanish' },
+      { x: 580, y: 400, w: 120, h: 24, kind: 'vanish' },
+      { x: 780, y: 400, w: 120, h: 24, kind: 'vanish' },
+      { x: 980, y: 400, w: 120, h: 24, kind: 'vanish' },
+      { x: 1180, y: 470, w: 520, h: 80, kind: 'solid' }
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '第六关 · 此路不通',
+    hint: '它不是一直长在那儿的。',
+    width: 1700,
+    spawn: [70, 380],
+    goal: { x: 1560, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 700, h: 80, kind: 'solid' },
+      { x: 880, y: 470, w: 820, h: 80, kind: 'solid' },
+      { x: 1150, y: 350, w: 36, h: 120, kind: 'appear', triggerX: 980 }
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '第七关 · 荆棘地板',
+    hint: '走路要看脚下。',
+    width: 1650,
+    spawn: [70, 380],
+    goal: { x: 1500, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 1650, h: 80, kind: 'solid' }
+    ],
+    spikes: [
+      { x: 560, y: 470 - 80, w: 110, h: 80, hidden: true, triggerX: 420, dir: 'up' },
+      { x: 940, y: 470 - 80, w: 110, h: 80, hidden: true, triggerX: 800, dir: 'up' },
+      { x: 1300, y: 470 - 80, w: 110, h: 80, hidden: true, triggerX: 1160, dir: 'up' }
+    ],
+    arrows: []
+  },
+  {
+    name: '第八关 · 终极考验',
+    hint: '前面学的，全都要用上。',
+    width: 2300,
+    spawn: [70, 380],
+    goal: { x: 2080, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 400, h: 80, kind: 'solid' },
+      { x: 560, y: 470, w: 340, h: 80, kind: 'solid' },
+      { x: 900, y: 470, w: 160, h: 80, kind: 'fake' },
+      { x: 1060, y: 470, w: 340, h: 80, kind: 'solid' },
+      { x: 1440, y: 400, w: 120, h: 24, kind: 'vanish' },
+      { x: 1640, y: 400, w: 120, h: 24, kind: 'vanish' },
+      { x: 1840, y: 470, w: 460, h: 80, kind: 'solid' },
+      { x: 1250, y: 350, w: 36, h: 120, kind: 'appear', triggerX: 1120 }
+    ],
+    spikes: [
+      { x: 700, y: 470 - 80, w: 110, h: 80, hidden: true, triggerX: 560, dir: 'up' }
+    ],
+    arrows: []
+  }
+];
+
+/* ==================================================================
+   游戏状态与物理
+   ================================================================== */
+var GRAVITY = 2400, MOVE = 315, JUMP_V = 905, MAX_FALL = 1500;
+
+var TAUNTS = ['就这？', '再来一次', '差一点点', '你被坑了', '哈哈哈哈哈',
+              '这也信？', '再想想', '手别抖', '别急', '熟悉的味道'];
+
+var game = {
+  li: 0,
+  p: null,
+  cam: 0,
+  deaths: 0,
+  totalDeaths: 0,
+  particles: [],
+  shake: 0,
+  state: 'title',       // title | play | dead | win | complete
+  timer: 0,
+  taunt: '',
+  tauntT: 0,
+  best: null,
+  coyote: 0,
+  jumpBuf: 0
+};
+
+function loadLevel(i) {
+  var L = LEVELS[i];
+  game.li = i;
+  game.p = {
+    x: L.spawn[0], y: L.spawn[1], vx: 0, vy: 0, w: 26, h: 28,
+    onGround: false, face: 1, alive: true, sq: 1, ground: null
+  };
+  // 复制平台/尖刺的可变状态
+  game.plats = L.platforms.map(function (p) {
+    return {
+      x: p.x, y: p.y, w: p.w, h: p.h, kind: p.kind,
+      state: p.kind === 'appear' ? 'hidden' : 'active',
+      triggerX: p.triggerX || 0, timer: 0, appeared: 0,
+      oneWay: p.h < 60          // 薄平台单向：可从下方穿过，不会被侧面卡住
+    };
+  });
+  game.spikes = L.spikes.map(function (s) {
+    return {
+      x: s.x, y: s.y, w: s.w, h: s.h, hidden: !!s.hidden,
+      triggerX: s.triggerX || 0, dir: s.dir || 'up',
+      shown: !s.hidden, anim: s.hidden ? 0 : 1
+    };
+  });
+  game.arrows = L.arrows || [];
+  game.cam = 0;
+  game.particles = [];
+  game.shake = 0;
+  game.state = 'play';
+  game.timer = 0;
+  game.tauntT = 0;
+  game.coyote = 0;
+}
+
+function die() {
+  if (game.state !== 'play') return;
+  game.state = 'dead';
+  game.timer = 0;
+  game.deaths++;
+  game.totalDeaths++;
+  game.taunt = TAUNTS[(Math.random() * TAUNTS.length) | 0];
+  game.tauntT = 1.4;
+  game.shake = 14;
+  Sound.sfxDeath();
+  var p = game.p;
+  for (var i = 0; i < 26; i++) {
+    game.particles.push({
+      x: p.x + p.w / 2, y: p.y + p.h / 2,
+      vx: (Math.random() - 0.5) * 520,
+      vy: (Math.random() - 0.9) * 520,
+      life: 0.6 + Math.random() * 0.4, max: 1,
+      c: ['#ff5a6e', '#ffd166', '#6ee7f0', '#a78bfa'][(Math.random() * 4) | 0]
+    });
+  }
+}
+
+function winLevel() {
+  if (game.state !== 'play') return;
+  Sound.sfxWin();
+  if (game.li + 1 >= LEVELS.length) {
+    game.state = 'complete';
+    Sound.sfxAllClear();
+  } else {
+    game.state = 'win';
+    game.timer = 0;
+  }
+}
+
+/* ---------------- 输入 ----------------
+   用「动作名」记录按键，并且优先读 e.code（物理键位）。
+   这样能绕开中文输入法、大小写、键盘布局导致的丢键，
+   也能保证「按住跳跃 + 同时按方向键」两者都生效、不互相打架。 */
+var keys = {};
+var ACT = {
+  Space: 'jump', ArrowUp: 'jump', KeyW: 'jump',
+  ArrowLeft: 'left', KeyA: 'left',
+  ArrowRight: 'right', KeyD: 'right',
+  ArrowDown: 'down', KeyS: 'down',
+  KeyR: 'restart', KeyM: 'music', KeyN: 'skip', Enter: 'enter'
+};
+function keyAction(e) {
+  if (e.code && ACT[e.code]) return ACT[e.code];
+  var k = (e.key || '').toLowerCase();
+  if (k === ' ' || k === 'spacebar') return 'jump';
+  if (k === 'arrowup' || k === 'w') return 'jump';
+  if (k === 'arrowleft' || k === 'a') return 'left';
+  if (k === 'arrowright' || k === 'd') return 'right';
+  if (k === 'arrowdown' || k === 's') return 'down';
+  if (k === 'r') return 'restart';
+  if (k === 'm') return 'music';
+  if (k === 'n') return 'skip';
+  if (k === 'enter') return 'enter';
+  return null;
+}
+function startGame() {
+  game.deaths = 0; game.totalDeaths = 0;
+  Sound.startBgm(); loadLevel(0);
+}
+function skipLevel() {
+  game.deaths = 0;
+  if (game.li + 1 >= LEVELS.length) { game.state = 'complete'; Sound.sfxAllClear(); }
+  else loadLevel(game.li + 1);
+}
+window.addEventListener('keydown', function (e) {
+  if (e.isComposing || e.keyCode === 229) return;        // 输入法组字中，忽略
+  var a = keyAction(e);
+  if (!a) return;
+  e.preventDefault();
+  if (!keys[a] && a === 'jump') jumpPressed = true;
+  keys[a] = true;
+  Sound.init();
+  if (Sound.ac && Sound.ac.state === 'suspended') Sound.ac.resume();
+  if ((game.state === 'title' || game.state === 'complete') && (a === 'jump' || a === 'enter')) startGame();
+  else if (a === 'music') Sound.toggle();
+  else if (a === 'restart' && game.state === 'play') loadLevel(game.li);
+  else if (a === 'skip' && game.state === 'play' && game.deaths >= 8) skipLevel();
+});
+window.addEventListener('keyup', function (e) {
+  var a = keyAction(e);
+  if (a) keys[a] = false;
+});
+window.addEventListener('blur', function () { keys = {}; });  // 切走窗口清键，防止"卡住一直跑/一直跳"
+canvas.addEventListener('mousedown', function () {
+  Sound.init();
+  if (Sound.ac && Sound.ac.state === 'suspended') Sound.ac.resume();
+  if (game.state === 'title' || game.state === 'complete') startGame();
+  else jumpPressed = true;
+});
+var jumpPressed = false;
+
+/* ---------------- 物理与更新 ---------------- */
+function aabb(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function update(dt) {
+  var p = game.p;
+
+  // 粒子
+  for (var i = game.particles.length - 1; i >= 0; i--) {
+    var q = game.particles[i];
+    q.vy += 1500 * dt;
+    q.x += q.vx * dt; q.y += q.vy * dt;
+    q.life -= dt;
+    if (q.life <= 0) game.particles.splice(i, 1);
+  }
+  if (game.shake > 0) game.shake = Math.max(0, game.shake - 60 * dt);
+  if (game.tauntT > 0) game.tauntT -= dt;
+
+  if (game.state === 'dead') {
+    game.timer += dt;
+    if (game.timer > 0.75) loadLevel(game.li);
+    return;
+  }
+  if (game.state === 'win') {
+    game.timer += dt;
+    if (game.timer > 0.9) { game.deaths = 0; loadLevel(game.li + 1); }
+    return;
+  }
+  if (game.state !== 'play') return;
+
+  // 陷阱触发：突然出现的平台 / 隐藏尖刺
+  for (var j = 0; j < game.plats.length; j++) {
+    var pl = game.plats[j];
+    if (pl.kind === 'appear' && pl.state === 'hidden' && p.x + p.w > pl.triggerX) {
+      pl.state = 'active'; pl.appeared = 0.18;
+      Sound.sfxTrap(); game.shake = 5;
+    }
+    if (pl.appeared > 0) pl.appeared -= dt;
+  }
+  for (var k = 0; k < game.spikes.length; k++) {
+    var sp = game.spikes[k];
+    if (!sp.shown && p.x + p.w > sp.triggerX) {
+      sp.shown = true; Sound.sfxTrap(); game.shake = 5;
+    }
+    if (sp.shown && sp.anim < 1) sp.anim = Math.min(1, sp.anim + dt * 7);
+  }
+
+  // 水平输入
+  var left = keys['left'];
+  var right = keys['right'];
+  p.vx = 0;
+  if (left) { p.vx = -MOVE; p.face = -1; }
+  if (right) { p.vx = MOVE; p.face = 1; }
+
+  // 跳跃（土狼时间 + 输入缓冲 0.12s + 按住连跳）
+  var wantJump = keys['jump'];
+  if (p.onGround) game.coyote = 0.1; else game.coyote = Math.max(0, game.coyote - dt);
+  if (jumpPressed) game.jumpBuf = 0.12; else game.jumpBuf = Math.max(0, game.jumpBuf - dt);
+  if (wantJump) game.jumpBuf = Math.max(game.jumpBuf, 0.08);
+  if (game.jumpBuf > 0 && game.coyote > 0) {
+    p.vy = -JUMP_V; p.onGround = false; game.coyote = 0; game.jumpBuf = 0; p.sq = 0.72;
+    Sound.sfxJump();
+  }
+  jumpPressed = false;
+  // 短按小跳（松开跳跃键时截断上升，轻点≈80px，按住≈170px）
+  if (p.vy < -600 && !wantJump) p.vy = -600;
+
+  // 水平移动 + 碰撞（单向薄平台不参与，避免跳跃时被平台边缘卡死）
+  p.x += p.vx * dt;
+  for (var m = 0; m < game.plats.length; m++) {
+    var a = game.plats[m];
+    if (a.state !== 'active' || a.oneWay) continue;
+    if (aabb(p, a)) {
+      if (p.vx > 0) p.x = a.x - p.w;
+      else if (p.vx < 0) p.x = a.x + a.w;
+    }
+  }
+
+  // 垂直移动 + 碰撞
+  var prevBottom = p.y + p.h;               // 移动前的脚底位置
+  p.vy = Math.min(MAX_FALL, p.vy + GRAVITY * dt);
+  p.y += p.vy * dt;
+  p.onGround = false; p.ground = null;
+  for (var n = 0; n < game.plats.length; n++) {
+    var b = game.plats[n];
+    if (b.state !== 'active') continue;
+    if (aabb(p, b)) {
+      if (p.vy > 0 && prevBottom <= b.y + 8) {
+        // 只有从上方落下来才站得住
+        p.y = b.y - p.h; p.onGround = true; p.ground = b;
+        if (p.vy > 240) p.sq = 0.78;
+        p.vy = 0;
+      } else if (!b.oneWay && p.vy < 0) {
+        // 实心平台的底面可以顶头（墙就是靠这个挡住你的）
+        p.y = b.y + b.h; p.vy = 0;
+      }
+    }
+  }
+
+  // 假地板踩上 0.4 秒后塌；虚线板踩上 0.3 秒后碎（都留出反应时间）
+  for (var t = 0; t < game.plats.length; t++) {
+    var c = game.plats[t];
+    if (c.state !== 'active') continue;
+    if ((c.kind === 'fake' || c.kind === 'vanish') && p.ground === c) {
+      c.timer += dt;
+      var lim = c.kind === 'fake' ? 0.4 : 0.3;
+      if (c.timer > lim) { c.state = 'gone'; Sound.sfxTrap(); puff(c.x + c.w / 2, c.y); }
+    }
+  }
+
+  // 挤压回弹
+  p.sq += (1 - p.sq) * Math.min(1, dt * 12);
+
+  // 尖刺致死
+  for (var s = 0; s < game.spikes.length; s++) {
+    var sp2 = game.spikes[s];
+    if (!sp2.shown) continue;
+    var box = spikeBox(sp2);
+    if (aabb(p, box)) { die(); return; }
+  }
+
+  // 掉出地图
+  if (p.y > VH + 120) { die(); return; }
+
+  // 到达终点
+  var g = LEVELS[game.li].goal;
+  if (aabb(p, g)) { winLevel(); return; }
+
+  // 相机
+  var target = p.x + p.w / 2 - VW * 0.42;
+  var maxCam = Math.max(0, LEVELS[game.li].width - VW);
+  game.cam += (Math.max(0, Math.min(maxCam, target)) - game.cam) * Math.min(1, dt * 9);
+}
+
+function spikeBox(sp) {
+  // 弹出动画：尖刺会从底部/顶部"长"出来
+  var e = sp.anim;
+  if (sp.dir === 'down') {
+    var h2 = sp.h * e;
+    return { x: sp.x, y: sp.y, w: sp.w, h: h2 };
+  }
+  var h3 = sp.h * e;
+  return { x: sp.x, y: sp.y + (sp.h - h3), w: sp.w, h: h3 };
+}
+
+function puff(x, y) {
+  for (var i = 0; i < 10; i++) {
+    game.particles.push({
+      x: x, y: y,
+      vx: (Math.random() - 0.5) * 240,
+      vy: -Math.random() * 200,
+      life: 0.35 + Math.random() * 0.25, max: 1, c: '#8b95a5'
+    });
+  }
+}
+
+/* ---------------- 渲染 ---------------- */
+function roundRect(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawBackground() {
+  var g = ctx.createLinearGradient(0, 0, 0, VH);
+  g.addColorStop(0, '#1a2233');
+  g.addColorStop(1, '#0f1420');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, VW, VH);
+
+  // 远景视差
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  var off = -game.cam * 0.25;
+  for (var i = 0; i < 8; i++) {
+    var x = ((i * 320 + off) % (VW + 700)) - 200;
+    ctx.fillStyle = '#151d2b';
+    ctx.beginPath();
+    ctx.moveTo(x, VH);
+    ctx.lineTo(x + 150, 300);
+    ctx.lineTo(x + 300, VH);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // 网格
+  ctx.save();
+  ctx.globalAlpha = 0.06;
+  ctx.strokeStyle = '#8fb4ff';
+  ctx.lineWidth = 1;
+  var gx = -(game.cam % 60);
+  for (var a = gx; a < VW; a += 60) {
+    ctx.beginPath(); ctx.moveTo(a, 0); ctx.lineTo(a, VH); ctx.stroke();
+  }
+  for (var b = 0; b < VH; b += 60) {
+    ctx.beginPath(); ctx.moveTo(0, b); ctx.lineTo(VW, b); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawPlatforms() {
+  for (var i = 0; i < game.plats.length; i++) {
+    var p = game.plats[i];
+    if (p.state === 'hidden') continue;
+    if (p.state === 'gone') continue;
+    var appear = p.appeared > 0 ? 1 - p.appeared / 0.18 : 1;
+    ctx.save();
+    if (p.appeared > 0) ctx.globalAlpha = 0.4 + 0.6 * appear;
+
+    if (p.kind === 'appear') {
+      ctx.fillStyle = '#ff9f43';
+      roundRect(p.x, p.y, p.w, p.h, 5);
+      ctx.fill();
+      ctx.strokeStyle = '#ffd08a'; ctx.lineWidth = 2; ctx.stroke();
+    } else if (p.kind === 'vanish') {
+      ctx.fillStyle = '#3d4a60';
+      roundRect(p.x, p.y, p.w, p.h, 6);
+      ctx.fill();
+      ctx.setLineDash([6, 5]);
+      ctx.strokeStyle = '#7d8ea8'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      ctx.fillStyle = p.kind === 'fake' ? '#333e51' : '#2e3949';
+      roundRect(p.x, p.y, p.w, p.h, p.h > 40 ? 8 : 6);
+      ctx.fill();
+      ctx.fillStyle = p.kind === 'fake' ? '#3d4960' : '#3a4759';
+      roundRect(p.x + 3, p.y + 3, p.w - 6, Math.min(6, p.h - 6), 3);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function drawSpikes() {
+  for (var i = 0; i < game.spikes.length; i++) {
+    var sp = game.spikes[i];
+    if (!sp.shown) continue;
+    var box = spikeBox(sp);
+    var n = Math.max(2, Math.round(box.w / 24));
+    var step = box.w / n;
+    ctx.save();
+    ctx.fillStyle = '#ff4d6d';
+    ctx.beginPath();
+    if (sp.dir === 'down') {
+      for (var a = 0; a < n; a++) {
+        var x0 = sp.x + a * step;
+        ctx.moveTo(x0, box.y);
+        ctx.lineTo(x0 + step / 2, box.y + box.h);
+        ctx.lineTo(x0 + step, box.y);
+        ctx.closePath();
+      }
+    } else {
+      for (var b = 0; b < n; b++) {
+        var x1 = sp.x + b * step;
+        ctx.moveTo(x1, box.y + box.h);
+        ctx.lineTo(x1 + step / 2, box.y);
+        ctx.lineTo(x1 + step, box.y + box.h);
+        ctx.closePath();
+      }
+    }
+    ctx.fill();
+    ctx.strokeStyle = '#ff8fa3'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawGoal() {
+  var g = LEVELS[game.li].goal;
+  var t = performance.now() / 1000;
+  ctx.save();
+  ctx.shadowColor = '#5ee6a8';
+  ctx.shadowBlur = 16 + Math.sin(t * 3) * 6;
+  ctx.fillStyle = '#5ee6a8';
+  roundRect(g.x, g.y, g.w, g.h, 6);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#0f1420';
+  roundRect(g.x + 7, g.y + 10, g.w - 14, g.h - 10, 4);
+  ctx.fill();
+  ctx.fillStyle = '#5ee6a8';
+  ctx.beginPath();
+  ctx.arc(g.x + g.w - 12, g.y + g.h / 2 + 4, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawArrows() {
+  ctx.save();
+  for (var i = 0; i < game.arrows.length; i++) {
+    var a = game.arrows[i];
+    ctx.save();
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = '#ffd166';
+    ctx.translate(a.x, a.y);
+    var s = 1;
+    if (a.dir === 'left') ctx.rotate(Math.PI);
+    if (a.dir === 'up') ctx.rotate(-Math.PI / 2);
+    if (a.dir === 'down') ctx.rotate(Math.PI / 2);
+    ctx.beginPath();
+    ctx.moveTo(34 * s, 0);
+    ctx.lineTo(-6 * s, -20 * s);
+    ctx.lineTo(2 * s, -9 * s);
+    ctx.lineTo(-30 * s, -9 * s);
+    ctx.lineTo(-30 * s, 9 * s);
+    ctx.lineTo(2 * s, 9 * s);
+    ctx.lineTo(-6 * s, 20 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawPlayer() {
+  if (game.state === 'dead') return;
+  var p = game.p;
+  var sq = p.sq;
+  var w = p.w / sq, h = p.h * sq;
+  var x = p.x + (p.w - w) / 2, y = p.y + (p.h - h);
+  ctx.save();
+  ctx.shadowColor = '#6ee7f0';
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = '#6ee7f0';
+  roundRect(x, y, w, h, 7);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  // 眼睛
+  ctx.fillStyle = '#0f1420';
+  var ex = x + (p.face > 0 ? w * 0.56 : w * 0.24);
+  ctx.fillRect(ex, y + h * 0.3, 4, 6);
+  ctx.fillRect(ex + (p.face > 0 ? 8 : 8), y + h * 0.3, 4, 6);
+  ctx.restore();
+}
+
+function drawParticles() {
+  for (var i = 0; i < game.particles.length; i++) {
+    var q = game.particles[i];
+    ctx.globalAlpha = Math.max(0, q.life / q.max);
+    ctx.fillStyle = q.c;
+    ctx.fillRect(q.x - 3, q.y - 3, 6, 6);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function text(str, x, y, size, color, align, bold) {
+  ctx.font = (bold ? '700 ' : '500 ') + size + 'px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillStyle = color;
+  ctx.textAlign = align || 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(str, x, y);
+}
+
+function drawHUD() {
+  var L = LEVELS[game.li];
+  text(L.name, 26, 30, 20, '#e8eefc', 'left', true);
+  text('死亡 ' + game.deaths, VW - 26, 30, 18, '#8b98ad', 'right');
+  text('第 ' + (game.li + 1) + ' / ' + LEVELS.length + ' 关', VW - 26, 56, 15, '#5d6a7e', 'right');
+  if (game.tauntT > 0) {
+    var a = Math.min(1, game.tauntT / 0.4);
+    ctx.globalAlpha = a;
+    text(game.taunt, VW / 2, 92, 34, '#ff5a6e', 'center', true);
+    ctx.globalAlpha = 1;
+  }
+  // 底部提示：先教操作，死两次给思路，死八次给台阶
+  if (game.state === 'play') {
+    if (game.li === 0 && game.deaths === 0) {
+      text('← → / A D 移动　　空格 跳跃　　R 重来　　M 音乐', VW / 2, VH - 26, 15, '#5d6a7e', 'center');
+    } else if (game.deaths >= 8) {
+      text('踩上会碎的板子别停，落地立刻按空格　　按 N 跳过本关', VW / 2, VH - 26, 15, '#5ee6a8', 'center');
+    } else if (game.deaths >= 2) {
+      text('提示：踩上会碎的板子别停留，落地立刻按空格跳走', VW / 2, VH - 26, 15, '#ffd166', 'center');
+    }
+  }
+}
+
+function drawTitle() {
+  drawBackground();
+  var t = performance.now() / 1000;
+  text('坑 爹 跑 酷', VW / 2, VH / 2 - 90, 66, '#6ee7f0', 'center', true);
+  text('TRAP  RUNNER', VW / 2, VH / 2 - 30, 20, '#4d5a70', 'center', true);
+  text('看起来很简单，直到你踩上去。', VW / 2, VH / 2 + 30, 20, '#8b98ad', 'center');
+  var a = 0.55 + 0.45 * Math.sin(t * 3);
+  ctx.globalAlpha = a;
+  text('按 空格 / 点击屏幕 开始', VW / 2, VH / 2 + 110, 24, '#5ee6a8', 'center', true);
+  ctx.globalAlpha = 1;
+  text('8 关 · 全是坑 · 死了重来就好', VW / 2, VH - 46, 15, '#4d5a70', 'center');
+}
+
+function drawComplete() {
+  drawBackground();
+  var t = performance.now() / 1000;
+  ctx.save();
+  ctx.shadowColor = '#5ee6a8'; ctx.shadowBlur = 30;
+  text('全 部 通 关', VW / 2, VH / 2 - 70, 58, '#5ee6a8', 'center', true);
+  ctx.restore();
+  text('总死亡次数：' + game.totalDeaths + ' 次', VW / 2, VH / 2 + 6, 26, '#e8eefc', 'center', true);
+  text(game.totalDeaths <= 15 ? '这身手，有点东西。' :
+       game.totalDeaths <= 40 ? '坑是踩出来的，路是走出来的。' :
+       '……你和这个游戏，都挺倔的。', VW / 2, VH / 2 + 54, 18, '#8b98ad', 'center');
+  var a = 0.55 + 0.45 * Math.sin(t * 3);
+  ctx.globalAlpha = a;
+  text('按 空格 再玩一次', VW / 2, VH / 2 + 130, 22, '#6ee7f0', 'center', true);
+  ctx.globalAlpha = 1;
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, VW, VH);
+
+  if (game.state === 'title') { drawTitle(); return; }
+  if (game.state === 'complete') { drawComplete(); return; }
+
+  var sx = 0, sy = 0;
+  if (game.shake > 0) {
+    sx = (Math.random() - 0.5) * game.shake;
+    sy = (Math.random() - 0.5) * game.shake;
+  }
+  drawBackground();
+  ctx.save();
+  ctx.translate(-Math.round(game.cam) + sx, sy);
+  drawPlatforms();
+  drawArrows();
+  drawSpikes();
+  drawGoal();
+  drawPlayer();
+  drawParticles();
+  ctx.restore();
+  drawHUD();
+
+  if (game.state === 'win') {
+    ctx.fillStyle = 'rgba(15,20,32,' + Math.min(0.55, game.timer * 1.2) + ')';
+    ctx.fillRect(0, 0, VW, VH);
+    text('过 关 !', VW / 2, VH / 2, 60, '#5ee6a8', 'center', true);
+  }
+}
+
+/* ---------------- 主循环 ---------------- */
+var last = 0;
+function loop(ts) {
+  if (!last) last = ts;
+  var dt = Math.min(0.033, (ts - last) / 1000);
+  last = ts;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+// 供测试与调试使用
+window.__TRAP__ = {
+  game: game, LEVELS: LEVELS, loadLevel: loadLevel,
+  update: update, render: render, Sound: Sound,
+  key: function (k, v) { keys[k] = v; },
+  keyAction: keyAction,
+  jump: function () { jumpPressed = true; }
+};
+
+loadLevel(0);
+game.state = 'title';
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
