@@ -170,134 +170,134 @@ var Sound = {
 };
 
 /* ==================================================================
-   关卡数据
+   关卡数据 —— 一屏一关（固定视角）
+   ------------------------------------------------------------------
+   参考 Level Devil：每关都压缩进 960×540 一屏之内，相机永不滚动。
+   这样坑的位置每次都在同一个地方，玩家死一次就能记住，
+   第二次是"我知道有坑"却依然可能中招 —— 这才是坑向游戏的乐趣。
+   （width 必须等于视口宽 VW，相机算法会自动锁死在 0）
+
+   坐标约定：地面顶部 y=470、厚 70；门高 70，站在地面上 → y=400
    kind: solid | fake（踩塌）| vanish（踩碎）| appear（突然出现）
    spike: hidden=true 时，玩家 x 越过 triggerX 后弹出
+   能力上限：跳跃高 188px，平地可跨间隙约 223px
    ================================================================== */
 var LEVELS = [
   {
     name: '第一关 · 就这？',
     hint: '走到右边的门就行，很简单的。',
-    width: 1500,
+    width: 960,
     spawn: [70, 380],
-    goal: { x: 1360, y: 400, w: 46, h: 70 },
+    goal: { x: 860, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 640, h: 80, kind: 'solid' },
-      { x: 640, y: 470, w: 160, h: 80, kind: 'fake' },
-      { x: 800, y: 470, w: 700, h: 80, kind: 'solid' }
+      { x: 0, y: 470, w: 430, h: 70, kind: 'solid' },
+      { x: 430, y: 470, w: 140, h: 70, kind: 'fake' },   // 踩上就塌
+      { x: 570, y: 470, w: 430, h: 70, kind: 'solid' }
     ],
     spikes: [], arrows: []
   },
   {
     name: '第二关 · 信任崩塌',
-    hint: '脚下的板子，不一定靠得住。',
-    width: 1700,
-    spawn: [70, 360],
-    goal: { x: 1560, y: 340, w: 46, h: 70 },
+    hint: '中间那块板子，是给你准备的。',
+    width: 960,
+    spawn: [70, 380],
+    goal: { x: 860, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 320, h: 80, kind: 'solid' },
-      { x: 420, y: 400, w: 140, h: 26, kind: 'solid' },
-      { x: 640, y: 330, w: 140, h: 26, kind: 'fake' },
-      { x: 860, y: 330, w: 140, h: 26, kind: 'solid' },
-      { x: 1080, y: 400, w: 140, h: 26, kind: 'vanish' },
-      { x: 1280, y: 410, w: 420, h: 140, kind: 'solid' }
+      { x: 0, y: 470, w: 180, h: 70, kind: 'solid' },
+      { x: 260, y: 380, w: 120, h: 24, kind: 'solid' },
+      { x: 420, y: 380, w: 100, h: 24, kind: 'fake' },   // 诱饵：可以直接跳过它
+      { x: 560, y: 380, w: 120, h: 24, kind: 'solid' },
+      { x: 740, y: 470, w: 260, h: 70, kind: 'solid' }
     ],
     spikes: [], arrows: []
   },
   {
     name: '第三关 · 别信箭头',
-    hint: '箭头说的……也不一定对。',
-    width: 1600,
+    hint: '箭头指的，是死路。',
+    width: 960,
     spawn: [70, 380],
-    goal: { x: 1480, y: 400, w: 46, h: 70 },
+    goal: { x: 860, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 680, h: 80, kind: 'solid' },
-      { x: 940, y: 470, w: 660, h: 80, kind: 'solid' },
-      { x: 600, y: 350, w: 170, h: 24, kind: 'solid' },
-      { x: 840, y: 350, w: 170, h: 24, kind: 'solid' },
-      { x: 1080, y: 350, w: 180, h: 24, kind: 'solid' }
+      { x: 0, y: 470, w: 380, h: 70, kind: 'solid' },
+      { x: 420, y: 360, w: 140, h: 24, kind: 'solid' },  // 真正的路在上面
+      { x: 640, y: 470, w: 360, h: 70, kind: 'solid' }
     ],
-    spikes: [{ x: 680, y: 500, w: 260, h: 40, hidden: false, dir: 'up' }],
-    arrows: [{ x: 620, y: 420, dir: 'right' }]
+    spikes: [{ x: 380, y: 500, w: 260, h: 40, hidden: false, dir: 'up' }],
+    arrows: [{ x: 300, y: 420, dir: 'right' }]
   },
   {
     name: '第四关 · 天降正义',
     hint: '跑得快，也要看得远。',
-    width: 1600,
+    width: 960,
     spawn: [70, 380],
-    goal: { x: 1460, y: 400, w: 46, h: 70 },
+    goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 1600, h: 80, kind: 'solid' }
+      { x: 0, y: 470, w: 1000, h: 70, kind: 'solid' }
     ],
     spikes: [
-      { x: 920, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 700, dir: 'up' },
-      { x: 1300, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 1080, dir: 'up' }
+      { x: 380, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 250, dir: 'up' },
+      { x: 680, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 550, dir: 'up' }
     ],
     arrows: []
   },
   {
     name: '第五关 · 一触即碎',
     hint: '别停，停下来就没了。',
-    width: 1700,
+    width: 960,
     spawn: [70, 380],
-    goal: { x: 1520, y: 400, w: 46, h: 70 },
+    goal: { x: 900, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 300, h: 80, kind: 'solid' },
-      { x: 380, y: 400, w: 120, h: 24, kind: 'vanish' },
-      { x: 580, y: 400, w: 120, h: 24, kind: 'vanish' },
-      { x: 780, y: 400, w: 120, h: 24, kind: 'vanish' },
-      { x: 980, y: 400, w: 120, h: 24, kind: 'vanish' },
-      { x: 1180, y: 470, w: 520, h: 80, kind: 'solid' }
+      { x: 0, y: 470, w: 220, h: 70, kind: 'solid' },
+      { x: 300, y: 390, w: 110, h: 24, kind: 'vanish' },
+      { x: 490, y: 390, w: 110, h: 24, kind: 'vanish' },
+      { x: 680, y: 390, w: 110, h: 24, kind: 'vanish' },
+      { x: 860, y: 470, w: 140, h: 70, kind: 'solid' }
     ],
     spikes: [], arrows: []
   },
   {
     name: '第六关 · 此路不通',
-    hint: '它不是一直长在那儿的。',
-    width: 1700,
+    hint: '那堵墙不是一直长在那儿的。',
+    width: 960,
     spawn: [70, 380],
-    goal: { x: 1560, y: 400, w: 46, h: 70 },
+    goal: { x: 900, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 700, h: 80, kind: 'solid' },
-      { x: 850, y: 470, w: 850, h: 80, kind: 'solid' },
-      { x: 1150, y: 350, w: 36, h: 120, kind: 'appear', triggerX: 980 }
+      { x: 0, y: 470, w: 430, h: 70, kind: 'solid' },
+      { x: 580, y: 470, w: 420, h: 70, kind: 'solid' },
+      { x: 780, y: 350, w: 36, h: 120, kind: 'appear', triggerX: 670 }
     ],
     spikes: [], arrows: []
   },
   {
     name: '第七关 · 荆棘地板',
     hint: '走路要看脚下。',
-    width: 1650,
+    width: 960,
     spawn: [70, 380],
-    goal: { x: 1500, y: 400, w: 46, h: 70 },
+    goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 1650, h: 80, kind: 'solid' }
+      { x: 0, y: 470, w: 1000, h: 70, kind: 'solid' }
     ],
     spikes: [
-      { x: 560, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 420, dir: 'up' },
-      { x: 940, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 800, dir: 'up' },
-      { x: 1300, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 1160, dir: 'up' }
+      { x: 240, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 140, dir: 'up' },
+      { x: 490, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 390, dir: 'up' },
+      { x: 730, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 630, dir: 'up' }
     ],
     arrows: []
   },
   {
     name: '第八关 · 终极考验',
     hint: '前面学的，全都要用上。',
-    width: 2300,
+    width: 960,
     spawn: [70, 380],
-    goal: { x: 2080, y: 400, w: 46, h: 70 },
+    goal: { x: 890, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 400, h: 80, kind: 'solid' },
-      { x: 560, y: 470, w: 340, h: 80, kind: 'solid' },
-      { x: 900, y: 470, w: 160, h: 80, kind: 'fake' },
-      { x: 1060, y: 470, w: 340, h: 80, kind: 'solid' },
-      { x: 1440, y: 400, w: 120, h: 24, kind: 'vanish' },
-      { x: 1640, y: 400, w: 120, h: 24, kind: 'vanish' },
-      { x: 1840, y: 470, w: 460, h: 80, kind: 'solid' },
-      { x: 1250, y: 350, w: 36, h: 120, kind: 'appear', triggerX: 1120 }
+      { x: 0, y: 470, w: 240, h: 70, kind: 'solid' },
+      { x: 400, y: 470, w: 240, h: 70, kind: 'solid' },
+      { x: 640, y: 470, w: 130, h: 70, kind: 'fake' },   // 又是它
+      { x: 770, y: 470, w: 230, h: 70, kind: 'solid' }
     ],
     spikes: [
-      { x: 700, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 560, dir: 'up' }
+      { x: 500, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 420, dir: 'up' }
     ],
     arrows: []
   }
@@ -558,13 +558,14 @@ function update(dt) {
     }
   }
 
-  // 假地板踩上 0.4 秒后塌；虚线板踩上 0.3 秒后碎（都留出反应时间）
+  // 假地板：踩上只撑 0.12 秒 —— 走是绝对走不过去的，踩上去就得往下掉
+  // 虚线板：踩上撑 0.3 秒 —— 给"踩一下马上跳走"留出反应窗口
   for (var t = 0; t < game.plats.length; t++) {
     var c = game.plats[t];
     if (c.state !== 'active') continue;
     if ((c.kind === 'fake' || c.kind === 'vanish') && p.ground === c) {
       c.timer += dt;
-      var lim = c.kind === 'fake' ? 0.4 : 0.3;
+      var lim = c.kind === 'fake' ? 0.12 : 0.3;
       if (c.timer > lim) { c.state = 'gone'; Sound.sfxTrap(); puff(c.x + c.w / 2, c.y); }
     }
   }
@@ -593,7 +594,11 @@ function update(dt) {
   var g = LEVELS[game.li].goal;
   if (aabb(p, g)) { winLevel(); return; }
 
-  // 相机
+  // 一屏一关：把玩家夹在屏幕内，不许走出可视区
+  if (p.x < 0) p.x = 0;
+  if (p.x + p.w > VW) { p.x = VW - p.w; p.vx = 0; }
+
+  // 相机：关卡宽度 = 视口宽度，所以 maxCam 恒为 0 —— 视角永远锁死，不滚动
   var target = p.x + p.w / 2 - VW * 0.42;
   var maxCam = Math.max(0, LEVELS[game.li].width - VW);
   game.cam += (Math.max(0, Math.min(maxCam, target)) - game.cam) * Math.min(1, dt * 9);
