@@ -213,17 +213,21 @@ var LEVELS = [
   },
   {
     name: '第三关 · 别信箭头',
-    hint: '箭头指的，是死路。',
+    hint: '箭头指的方向，一定是活路吗？',
     width: 960,
     spawn: [70, 380],
-    goal: { x: 860, y: 400, w: 46, h: 70 },
+    goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 380, h: 70, kind: 'solid' },
-      { x: 420, y: 360, w: 140, h: 24, kind: 'solid' },  // 真正的路在上面
-      { x: 640, y: 470, w: 360, h: 70, kind: 'solid' }
+      { x: 0, y: 470, w: 1000, h: 70, kind: 'solid' },    // 下面其实一路都是实地
+      { x: 380, y: 330, w: 380, h: 22, kind: 'solid' }    // 上面这条看着才像"正路"
     ],
-    spikes: [{ x: 380, y: 500, w: 260, h: 40, hidden: false, dir: 'up' }],
-    arrows: [{ x: 300, y: 420, dir: 'right' }]
+    spikes: [
+      // 下面这排刺长得跟真的一模一样，但踩上去什么事都不会发生
+      { x: 350, y: 470 - 56, w: 280, h: 56, hidden: false, dir: 'up', fake: true },
+      // 上面这块：踩上去整块平台从地板里升起尖刺，平台够长，跑不掉
+      { x: 380, y: 330 - 210, w: 380, h: 210, hidden: true, triggerX: 418, dir: 'up' }
+    ],
+    arrows: [{ x: 330, y: 392, dir: 'up' }]
   },
   {
     name: '第四关 · 天降正义',
@@ -258,14 +262,16 @@ var LEVELS = [
   },
   {
     name: '第六关 · 此路不通',
-    hint: '那堵墙不是一直长在那儿的。',
+    hint: '有些墙，不是用来挡你的。',
     width: 960,
     spawn: [70, 380],
-    goal: { x: 900, y: 400, w: 46, h: 70 },
+    goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
       { x: 0, y: 470, w: 430, h: 70, kind: 'solid' },
-      { x: 580, y: 470, w: 420, h: 70, kind: 'solid' },
-      { x: 780, y: 350, w: 36, h: 120, kind: 'appear', triggerX: 670 }
+      { x: 430, y: 470, w: 80, h: 70, kind: 'fake' },     // 被它顶上去，就塌
+      { x: 510, y: 470, w: 490, h: 70, kind: 'solid' },
+      // 从背后追上来的墙：比玩家跑得快，追上来后把人一路顶到那块假地板上
+      { x: 140, y: 350, w: 36, h: 120, kind: 'appear', triggerX: 250, moveV: 420, moveTo: 700 }
     ],
     spikes: [], arrows: []
   },
@@ -344,13 +350,16 @@ function loadLevel(i) {
       x: p.x, y: p.y, w: p.w, h: p.h, kind: p.kind,
       state: p.kind === 'appear' ? 'hidden' : 'active',
       triggerX: p.triggerX || 0, timer: 0, appeared: 0,
-      oneWay: p.h < 60          // 薄平台单向：可从下方穿过，不会被侧面卡住
+      oneWay: p.h < 60,         // 薄平台单向：可从下方穿过，不会被侧面卡住
+      moveV: p.moveV || 0,      // 会走的障碍：出现后自己移动，把玩家顶走
+      moveTo: p.moveTo || 0
     };
   });
   game.spikes = L.spikes.map(function (s) {
     return {
       x: s.x, y: s.y, w: s.w, h: s.h, hidden: !!s.hidden,
       triggerX: s.triggerX || 0, dir: s.dir || 'up',
+      fake: !!s.fake,           // 假刺：长得一模一样，但不致命
       shown: !s.hidden, anim: s.hidden ? 0 : 1
     };
   });
@@ -499,6 +508,15 @@ function update(dt) {
       Sound.sfxTrap(); game.shake = 5;
     }
     if (pl.appeared > 0) pl.appeared -= dt;
+    // 会走的障碍：出现后自己往前推。玩家被它堵住时，
+    // 水平碰撞会把玩家按在它身前，于是"被推着走"。
+    if (pl.moveV && pl.state === 'active') {
+      pl.x += pl.moveV * dt;
+      if (pl.moveTo && pl.x >= pl.moveTo) pl.state = 'gone';
+      if (aabb(p, pl)) {
+        p.x = pl.moveV > 0 ? pl.x + pl.w : pl.x - p.w;
+      }
+    }
   }
   for (var k = 0; k < game.spikes.length; k++) {
     var sp = game.spikes[k];
@@ -586,10 +604,10 @@ function update(dt) {
   else if (Math.abs(p.vx) > 1) p.animState = 'walk';
   else p.animState = 'idle';
 
-  // 尖刺致死
+  // 尖刺致死（假刺长得一样，但踩上去没事——这是骗人的）
   for (var s = 0; s < game.spikes.length; s++) {
     var sp2 = game.spikes[s];
-    if (!sp2.shown) continue;
+    if (!sp2.shown || sp2.fake) continue;
     var box = spikeBox(sp2);
     if (aabb(p, box)) { die(); return; }
   }
