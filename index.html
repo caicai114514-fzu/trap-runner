@@ -9,8 +9,8 @@
   html,body{height:100%;overflow:hidden;background:#0d0409;
     font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
   #wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-  canvas{display:block;background:#1a0a12;border-radius:14px;
-    box-shadow:0 0 46px rgba(255,110,40,.35),0 24px 70px rgba(0,0,0,.8);max-width:100%;max-height:100%}
+  canvas{display:block;background:#2b0b12;border-radius:10px;
+    box-shadow:0 24px 70px rgba(0,0,0,.75);max-width:100%;max-height:100%}
 </style>
 </head>
 <body>
@@ -633,88 +633,33 @@ function roundRect(x, y, w, h, r) {
   ctx.closePath();
 }
 
-/* ---------------- 美术：火柴人 + 地狱背景 ----------------
-   背景是地狱：暗红天、火山剪影、岩浆辉光、往上飘的火星。
-   角色是一个火柴人（头 + 一根身体 + 四肢，全用线画），
-   亮黄色 + 外发光，在暗红地狱里是全画面最亮的东西，一眼就能找到自己。 */
+/* ---------------- 美术：Level Devil 式极简 ----------------
+   只用三样东西：纯色块、直线、几何形。
+   没有渐变、没有纹理、没有粒子、没有描边装饰——靠对比度说话。
+   背景一整块暗红，地面是近黑实心块 + 一条亮橙顶边，
+   障碍是纯色三角，出口是纯青方块，火柴人是全画面唯一的亮色。 */
 var PAL = {
-  // 地狱天空
-  skyA: '#120610', skyB: '#2e0b16', skyC: '#5c1414', skyD: '#8a2410',
-  rockSil: '#1b0810', ventGlow: 'rgba(255,120,40,0.55)',
-  emberHot: '#ffd166', ember: '#ff7a2f',
-  // 平台：焦黑石灰岩 + 岩浆裂纹
-  rock: '#5c3529', rockTop: '#8a5136', rockEdge: '#170a06',
-  rockShade: '#40251c', crack: '#ff8a3c',
-  fake: '#55301f', fakeTop: '#7d4629',
-  vanish: '#4c3a33', vanishTop: '#6d5449', vanishLine: '#2b1c16',
-  // 火柴人
-  player: '#ffd23f', playerGlow: 'rgba(255,180,60,0.9)',
+  bg: '#2b0b12',          // 背景：一整块暗红
+  bgDeep: '#180509',      // 下半部分更深
+  ground: '#0d0507',      // 平台：近黑实心
+  groundTop: '#ff6b35',   // 平台顶边：一条亮橙线
+  fake: '#150809',        // 假地板：比正常只暗一点点
+  appear: '#3c2412',      // 突然出现的障碍
+  vanish: '#22140f',      // 一触即碎
+  player: '#ffd23f',      // 火柴人：亮黄
   pupil: '#2a1206',
-  // 危险
-  spike: '#ff3b2f', spikeEdge: '#6b0f08',
-  // 出口（地狱里唯一冷色）
-  door: '#3fd18a', doorDark: '#1f8a55', knob: '#ffe08a',
-  ink: '#170a06',
-  text: '#ffdcb0', dim: '#b08a6a', warn: '#ff5a3c', good: '#5ee6a8'
+  spike: '#ff3b2f',       // 尖刺：纯红
+  door: '#3fd18a',        // 出口：纯青
+  ink: '#0a0305',
+  text: '#ffdcb0', dim: '#a8785e', warn: '#ff5a3c', good: '#5ee6a8'
 };
 
-function inkStroke(x, y, w, h, r, lw) {
-  ctx.strokeStyle = PAL.ink;
-  ctx.lineWidth = lw || 3;
-  roundRect(x, y, w, h, r);
-  ctx.stroke();
-}
-
 function drawBackground() {
-  var t = performance.now() / 1000;
-  // 地狱天空：黑紫 -> 暗红 -> 血红
-  var g = ctx.createLinearGradient(0, 0, 0, VH);
-  g.addColorStop(0, PAL.skyA);
-  g.addColorStop(0.42, PAL.skyB);
-  g.addColorStop(0.74, PAL.skyC);
-  g.addColorStop(1, PAL.skyD);
-  ctx.fillStyle = g;
+  // 一整块底色，下半部分再压深一档 —— 就这两笔
+  ctx.fillStyle = PAL.bg;
   ctx.fillRect(0, 0, VW, VH);
-
-  // 地平线附近的岩浆辉光
-  var lg = ctx.createLinearGradient(0, VH * 0.55, 0, VH);
-  lg.addColorStop(0, 'rgba(255,140,40,0)');
-  lg.addColorStop(1, 'rgba(255,150,50,0.4)');
-  ctx.fillStyle = lg;
-  ctx.fillRect(0, VH * 0.55, VW, VH * 0.45);
-
-  // 远处火山岩柱剪影（火山口有火光）
-  var ho = -game.cam * 0.22;
-  for (var j = 0; j < 11; j++) {
-    var hx = ((j * 262 + ho) % (VW + 700)) - 200;
-    var hh = 210 + (j % 3) * 74;
-    ctx.fillStyle = PAL.rockSil;
-    ctx.beginPath();
-    ctx.moveTo(hx - 74, VH);
-    ctx.lineTo(hx - 12, VH - hh);
-    ctx.lineTo(hx + 14, VH - hh + 46);
-    ctx.lineTo(hx + 74, VH);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = PAL.ventGlow;
-    ctx.beginPath();
-    ctx.arc(hx + 1, VH - hh + 8, 9, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // 火星：一直往上飘
-  ctx.save();
-  for (var i = 0; i < 46; i++) {
-    var seed = i * 137.51;
-    var px = (seed * 3.13 - game.cam * 0.3) % (VW + 200);
-    if (px < 0) px += VW + 200;
-    px -= 100;
-    var py = VH - ((t * 24 + seed * 5.7) % (VH + 150));
-    ctx.globalAlpha = 0.18 + 0.55 * Math.abs(Math.sin(t * 2.2 + seed));
-    ctx.fillStyle = (i % 4 === 0) ? PAL.emberHot : PAL.ember;
-    ctx.fillRect(px, py, 3, 3);
-  }
-  ctx.restore();
+  ctx.fillStyle = PAL.bgDeep;
+  ctx.fillRect(0, VH * 0.66, VW, VH * 0.34);
 }
 
 function drawPlatforms() {
@@ -723,59 +668,25 @@ function drawPlatforms() {
     if (p.state === 'hidden') continue;
     if (p.state === 'gone') continue;
     var grow = p.appeared > 0 ? 1 - p.appeared / 0.18 : 1;
-    var r = p.h > 40 ? 8 : 6;
     ctx.save();
     if (p.appeared > 0) ctx.globalAlpha = 0.35 + 0.65 * grow;
 
     if (p.kind === 'vanish') {
-      // 一触即碎：干裂的旧木板
+      // 一触即碎：虚线框，一眼看出"不结实"
       ctx.fillStyle = PAL.vanish;
-      roundRect(p.x, p.y, p.w, p.h, r); ctx.fill();
-      ctx.fillStyle = PAL.vanishTop;
-      roundRect(p.x + 2, p.y + 2, p.w - 4, Math.max(4, Math.min(7, p.h - 4)), 3); ctx.fill();
-      ctx.strokeStyle = PAL.vanishLine;
-      ctx.lineWidth = 1.6;
-      for (var vx = p.x + 15; vx < p.x + p.w - 6; vx += 21) {
-        ctx.beginPath();
-        ctx.moveTo(vx, p.y + 3);
-        ctx.lineTo(vx + 5, p.y + p.h - 3);
-        ctx.stroke();
-      }
-      ctx.strokeStyle = PAL.ink;
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([8, 6]);
-      roundRect(p.x + 1, p.y + 1, p.w - 2, p.h - 2, r);
-      ctx.stroke();
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.strokeStyle = PAL.dim;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 5]);
+      ctx.strokeRect(p.x + 1, p.y + 1, p.w - 2, p.h - 2);
       ctx.setLineDash([]);
     } else {
-      var body = PAL.rock, top = PAL.rockTop;
-      if (p.kind === 'fake') { body = PAL.fake; top = PAL.fakeTop; }
-      if (p.kind === 'appear') { body = '#a8451f'; top = '#e0703a'; }
-      // 底部阴影
-      ctx.fillStyle = PAL.rockShade;
-      roundRect(p.x, p.y + 3, p.w, Math.max(4, p.h - 3), r); ctx.fill();
-      // 主体
-      ctx.fillStyle = body;
-      roundRect(p.x, p.y, p.w, Math.max(4, p.h - 3), r); ctx.fill();
-      // 顶部亮面
-      ctx.fillStyle = top;
-      roundRect(p.x + 2, p.y + 2, p.w - 4, Math.max(4, Math.min(9, p.h - 5)), 4); ctx.fill();
-      // 粗描边
-      inkStroke(p.x + 1.5, p.y + 1.5, p.w - 3, Math.max(4, p.h - 4), r, 3);
-      // 大块地面：岩浆裂纹
-      if (p.h > 50) {
-        ctx.save();
-        ctx.strokeStyle = PAL.crack;
-        ctx.globalAlpha = 0.45;
-        ctx.lineWidth = 2;
-        for (var bx = p.x + 44; bx < p.x + p.w - 24; bx += 54) {
-          ctx.beginPath();
-          ctx.moveTo(bx, p.y + 13);
-          ctx.lineTo(bx + 4, p.y + p.h - 8);
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
+      // 实心块 + 一条亮橙顶边
+      ctx.fillStyle = p.kind === 'fake' ? PAL.fake
+                    : p.kind === 'appear' ? PAL.appear : PAL.ground;
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.fillStyle = PAL.groundTop;
+      ctx.fillRect(p.x, p.y, p.w, 4);
     }
     ctx.restore();
   }
@@ -788,10 +699,11 @@ function drawSpikes() {
     var box = spikeBox(sp);
     var n = Math.max(2, Math.round(box.w / 26));
     var step = box.w / n;
-    ctx.save();
+    // 纯色三角，一次画完，没有描边也没有高光
+    ctx.fillStyle = PAL.spike;
+    ctx.beginPath();
     for (var a = 0; a < n; a++) {
       var x0 = sp.x + a * step;
-      ctx.beginPath();
       if (sp.dir === 'down') {
         ctx.moveTo(x0, box.y);
         ctx.lineTo(x0 + step / 2, box.y + box.h);
@@ -802,59 +714,20 @@ function drawSpikes() {
         ctx.lineTo(x0 + step, box.y + box.h);
       }
       ctx.closePath();
-      ctx.fillStyle = PAL.spike;
-      ctx.fill();
-      ctx.strokeStyle = PAL.spikeEdge;
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-      // 一点高光，让它看着更"卡通"
-      ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      if (sp.dir === 'down') {
-        ctx.moveTo(x0 + step / 2, box.y + 4);
-        ctx.lineTo(x0 + step * 0.32, box.y + box.h * 0.62);
-      } else {
-        ctx.moveTo(x0 + step / 2, box.y + box.h - 4);
-        ctx.lineTo(x0 + step * 0.32, box.y + box.h * 0.38);
-      }
-      ctx.stroke();
     }
-    ctx.restore();
+    ctx.fill();
   }
 }
 
 function drawGoal() {
   var g = LEVELS[game.li].goal;
-  var t = performance.now() / 1000;
-  var r = 6;
-  ctx.save();
-  // 门后一点点"在呼吸"的光
-  ctx.globalAlpha = 0.22 + 0.16 * Math.sin(t * 3);
-  ctx.fillStyle = '#a8f0c0';
-  roundRect(g.x - 10, g.y - 10, g.w + 20, g.h + 20, 14);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  // 门框（深色描边）
+  // 纯色方块当门，一眼可辨
+  ctx.fillStyle = PAL.door;
+  ctx.fillRect(g.x, g.y, g.w, g.h);
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.fillRect(g.x + 7, g.y + 10, g.w - 14, g.h - 16);
   ctx.fillStyle = PAL.ink;
-  roundRect(g.x - 4, g.y - 4, g.w + 8, g.h + 8, 8);
-  ctx.fill();
-  // 门板
-  var gg = ctx.createLinearGradient(g.x, g.y, g.x, g.y + g.h);
-  gg.addColorStop(0, PAL.door);
-  gg.addColorStop(1, PAL.doorDark);
-  ctx.fillStyle = gg;
-  roundRect(g.x, g.y, g.w, g.h, r);
-  ctx.fill();
-  // 门里的小窗
-  ctx.fillStyle = 'rgba(255,255,255,0.22)';
-  roundRect(g.x + 9, g.y + 10, g.w - 18, 16, 4);
-  ctx.fill();
-  // 门把手
-  ctx.fillStyle = PAL.knob;
-  ctx.beginPath(); ctx.arc(g.x + g.w - 13, g.y + g.h * 0.56, 4.6, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = PAL.ink; ctx.lineWidth = 2; ctx.stroke();
-  ctx.restore();
+  ctx.fillRect(g.x + g.w - 13, g.y + g.h * 0.54, 4, 7);
 }
 
 function drawArrows() {
@@ -875,12 +748,8 @@ function drawArrows() {
     ctx.lineTo(2, 9);
     ctx.lineTo(-6, 20);
     ctx.closePath();
-    ctx.fillStyle = '#f2b21c';
+    ctx.fillStyle = '#ffb020';
     ctx.fill();
-    ctx.strokeStyle = PAL.ink;
-    ctx.lineWidth = 2.5;
-    ctx.lineJoin = 'round';
-    ctx.stroke();
     ctx.restore();
   }
   ctx.restore();
@@ -923,8 +792,6 @@ function drawPlayer() {
   ctx.lineWidth = 3.4;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.shadowColor = PAL.playerGlow;
-  ctx.shadowBlur = 11;
 
   // 身体
   ctx.beginPath();
@@ -1073,15 +940,6 @@ function render() {
   drawParticles();
   ctx.restore();
   drawHUD();
-
-  // 陷阱触发 / 死亡时闪一下暖色——诡异感来源之一
-  if (game.shake > 0.5) {
-    ctx.save();
-    ctx.globalAlpha = Math.min(0.22, game.shake / 70);
-    ctx.fillStyle = '#ff7a2f';
-    ctx.fillRect(0, 0, VW, VH);
-    ctx.restore();
-  }
 
   if (game.state === 'win') {
     ctx.fillStyle = 'rgba(12,4,10,' + Math.min(0.72, game.timer * 1.5) + ')';
