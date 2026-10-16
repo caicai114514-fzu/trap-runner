@@ -262,17 +262,14 @@ var LEVELS = [
     spikes: [], arrows: []
   },
   {
-    name: '1-5 · 追上来了', hint: '别回头，也别停。',
+    name: '1-5 · 虚晃一枪', hint: '它先假装要塌。',
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
-    // 三段地面：会缩的地板 / 会陷下去的坑 / 右岸落脚点。
-    // 走过触发点后第一段左缘开始往右追（290px/s，你 315，跑得赢），
-    // 追到 520 停；同时中间那一段整体往下缩，沉没了就是一个 150px 的坑。【触发点卡在坑前 36px，
-    // 也就是你离坑只剩 0.11 秒的时候它才塌 —— 初见根本反应不过来，只能靠记住。】
-    shrinkFloor: { triggerX: 180, speed: 306, stopX: 604 },
+    // 一路跑到 604 → 整片地面开始抖（虚晃一枪，其实不塌）。
+    // 抖 0.45 秒后全部平台秒变坑，只有门留在原地浮着。
+    // 唯一的活路：在抖完之前起跳，整个人撞进门里。
+    quake: { triggerX: 604, shakeTime: 0.45, sinkTime: 0.10 },
     platforms: [
-      { x: 0, y: 470, w: 660, h: 70, kind: 'solid' },       // 第一段：会从左边缩
-      { x: 660, y: 470, w: 150, h: 70, kind: 'pitFloor', triggerX: 624, sinkTime: 0.12 },
-      { x: 810, y: 470, w: 150, h: 70, kind: 'solid' }      // 右岸：门在这儿
+      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' }
     ],
     spikes: [], arrows: []
   },
@@ -675,6 +672,7 @@ function loadLevel(i) {
   game.sinkPhase = 'idle'; game.sinkT = 0; game.sinkY = 0; game.sinkLock = false;   // 门下沉
   game.goalDead = false;                                                            // 门是否已失效
   game.shrinkX = 0;                                          // 地板左缘右移量
+  game.quakePhase = 'idle'; game.quakeT = 0; game.quakeOff = 0;   // 抖动 → 全塌
   game.keyThisLife = false;          // 这一命有没有捡到钥匙
   game.keyGetT = 999;                // 拿到钥匙之后过了多久（决定是不是"献祭"）
   game.keys = (L.keys || []).map(function (k) {
@@ -1172,6 +1170,34 @@ function update(dt) {
 
   // ===== 门下沉：跳过去就跟着沉，够不着（死后动画自动停住，因为 dead 分支直接 return）=====
   var LV = LEVELS[game.li];
+  // ===== 虚晃一枪：先抖一下骗你，然后所有平台秒变坑，只有门留在原地 =====
+  if (LV.quake && game.quakePhase !== 'done') {
+    var qk = LV.quake;
+    if (game.quakePhase === 'idle' && p.x + p.w / 2 > qk.triggerX) {
+      game.quakePhase = 'shake'; game.quakeT = 0; Sound.sfxTrap();
+    }
+    if (game.quakePhase === 'shake') {
+      game.quakeT += dt;
+      game.quakeOff = Math.sin(game.quakeT * 55) * 6;      // 只是抖，不塌 —— 骗你跳
+      for (var qi = 0; qi < game.plats.length; qi++) {
+        var qp = game.plats[qi];
+        qp.y = qp.y0 + game.quakeOff;
+      }
+      if (game.quakeT > qk.shakeTime) {
+        game.quakePhase = 'sinking'; game.quakeT = 0; Sound.sfxBoom();
+      }
+    } else if (game.quakePhase === 'sinking') {
+      game.quakeT += dt;
+      var qk2 = Math.min(1, game.quakeT / qk.sinkTime);
+      game.quakeOff = 0;
+      for (var qj = 0; qj < game.plats.length; qj++) {
+        var qp2 = game.plats[qj];
+        qp2.noCollide = true;                              // 秒变坑：碰撞立刻失效
+        qp2.y = qp2.y0 + qk2 * 420;
+        if (qk2 >= 1) { qp2.state = 'gone'; game.quakePhase = 'done'; }
+      }
+    }
+  }
   if (LV.sinkGoal) {
     var sg = LV.sinkGoal;
     var depth = sg.depth === undefined ? 220 : sg.depth;
@@ -1211,6 +1237,7 @@ function update(dt) {
   for (var pf = 0; pf < game.plats.length; pf++) {
     var fp2 = game.plats[pf];
     if (fp2.kind !== 'pitFloor' || fp2.sunk) continue;
+    if (LV.quake) continue;                                 // 这一关交给 quake 剧本
     if (p.x + p.w / 2 > fp2.triggerX) {
       if (!fp2.sinking) { fp2.sinking = true; fp2.noCollide = true; Sound.sfxTrap(); }
       fp2.y += (fp2.h / fp2.sinkT2) * dt;                   // 整块往下沉（纯视觉）
