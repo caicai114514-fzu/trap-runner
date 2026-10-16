@@ -1190,8 +1190,9 @@ function update(dt) {
   // ===== 隐藏跳板：踩上去皮会伸起来，然后自动把人大力弹飞 =====
   for (var bp = 0; bp < game.plats.length; bp++) {
     var bt = game.plats[bp];
-    if (bt.kind !== 'bounce' || bt.popped) continue;
-    if (p.ground === bt) {
+    if (bt.kind !== 'bounce') continue;
+    if (p.ground !== bt) { bt.pop = Math.max(0, bt.pop - dt * 6); continue; }   // 离开就慢慢瘪回去
+    {
       bt.pop = Math.min(1, bt.pop + dt / (bt.popTime || 0.10));
       if (bt.pop >= 1) {
         bt.popped = true;
