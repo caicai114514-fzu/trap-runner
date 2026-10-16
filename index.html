@@ -349,21 +349,24 @@ var SAVE_KEY = 'trap-runner-save-v1';
 var save = { cleared:{}, keys:{}, deaths:0 };
 
 function loadSave() {
+  var o = null;
   try {
     var raw = localStorage.getItem(SAVE_KEY);
-    if (raw) {
-      var o = JSON.parse(raw);
-      if (o && typeof o === 'object') save = o;
-    }
+    if (raw) o = JSON.parse(raw);
   } catch (e) {}
-  if (!save.cleared || typeof save.cleared !== 'object') save.cleared = {};
-  if (!save.keys || typeof save.keys !== 'object') save.keys = {};
-  if (typeof save.deaths !== 'number') save.deaths = 0;
+  /* 注意：这里要"原地改"，不能 save = {...} 整个换对象 ——
+     换了之后 __TRAP__.save 这类外部引用就指向旧对象了。 */
+  save.cleared = (o && typeof o.cleared === 'object' && o.cleared) || {};
+  save.keys    = (o && typeof o.keys    === 'object' && o.keys)    || {};
+  save.deaths  = (o && typeof o.deaths  === 'number') ? o.deaths : 0;
 }
 function writeSave() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
 }
-function resetSave() { save = { cleared:{}, keys:{}, deaths:0 }; writeSave(); }
+function resetSave() {
+  save.cleared = {}; save.keys = {}; save.deaths = 0;
+  writeSave();
+}
 
 function keyCount() {
   var n = 0;
@@ -570,6 +573,19 @@ var LEVEL_POS = [ {x:150,y:342}, {x:302,y:258}, {x:462,y:322}, {x:640,y:244}, {x
 
 window.addEventListener('keydown', function (e) {
   if (e.isComposing || e.keyCode === 229) return;        // 输入法组字中，忽略
+
+  /* ---- 调试键必须先判 ----
+     B / C 在 keyAction 里没有对应的动作名，如果放在下面，
+     会被 `if (!a) return` 直接拦掉（A 之所以好使，是因为它映射成了 left）。 */
+  if (e.code === 'KeyN' && game.state === 'play') {
+    e.preventDefault(); debugClearCurrent(); return;
+  }
+  if (game.state !== 'play') {
+    if (e.code === 'KeyA') { e.preventDefault(); giveKey(0); flashMsg('🔑 获得钥匙 · 脚下不稳'); return; }
+    if (e.code === 'KeyB') { e.preventDefault(); giveKey(1); flashMsg('🔑 获得钥匙 · 眼见为虚'); return; }
+    if (e.code === 'KeyC') { e.preventDefault(); giveKey(2); flashMsg('🔑 获得钥匙 · 机关重重'); return; }
+  }
+
   var a = keyAction(e);
   if (!a) return;
   e.preventDefault();
@@ -577,16 +593,6 @@ window.addEventListener('keydown', function (e) {
   keys[a] = true;
   Sound.init();
   if (Sound.ac && Sound.ac.state === 'suspended') Sound.ac.resume();
-
-  /* ---- 调试键（正式关卡还没做，先用这些推进进度）----
-     N        = 直接通关当前小关
-     A / B / C = 分别拿到一 / 二 / 三大关的钥匙（只在菜单里按，避免和 A 左移打架） */
-  if (e.code === 'KeyN' && game.state === 'play') { debugClearCurrent(); return; }
-  if (game.state !== 'play') {
-    if (e.code === 'KeyA') { giveKey(0); flashMsg('🔑 获得钥匙 · 脚下不稳'); return; }
-    if (e.code === 'KeyB') { giveKey(1); flashMsg('🔑 获得钥匙 · 眼见为虚'); return; }
-    if (e.code === 'KeyC') { giveKey(2); flashMsg('🔑 获得钥匙 · 机关重重'); return; }
-  }
 
   if (game.state === 'world') {
     if (a === 'left' || a === 'up')    { game.cursorW = (game.cursorW + 3) % 4; return; }
