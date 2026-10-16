@@ -527,14 +527,17 @@ function die() {
   game.tauntT = 1.4;
   game.shake = 14;
   Sound.sfxDeath();
+  // 死亡粒子：全用火柴人自己那套黄，亮的那几颗当溅出来的尸块。
+  // 不再用五颜六色 —— 那样像撒彩纸，不像死了。
+  var DEBRIS = ['#9c7a1e', '#b8901f', '#c9a02b', '#d8b02f', '#e8bb35', '#ffd23f', '#fff0a8'];
   var p = game.p;
-  for (var i = 0; i < 26; i++) {
+  for (var i = 0; i < 32; i++) {
     game.particles.push({
       x: p.x + p.w / 2, y: p.y + p.h / 2,
-      vx: (Math.random() - 0.5) * 520,
-      vy: (Math.random() - 0.9) * 520,
-      life: 0.6 + Math.random() * 0.4, max: 1,
-      c: ['#ff5a6e', '#ffd166', '#6ee7f0', '#a78bfa'][(Math.random() * 4) | 0]
+      vx: (Math.random() - 0.5) * 380,
+      vy: (Math.random() - 0.95) * 400,
+      life: 0.8 + Math.random() * 0.6, max: 1,
+      c: DEBRIS[(Math.random() * DEBRIS.length) | 0]
     });
   }
 }
@@ -626,6 +629,12 @@ var LEVEL_POS = [ {x:150,y:342}, {x:302,y:258}, {x:462,y:322}, {x:640,y:244}, {x
 window.addEventListener('keydown', function (e) {
   if (e.isComposing || e.keyCode === 229) return;        // 输入法组字中，忽略
 
+  /* 死亡后：按任意键继续（留 0.35s 缓冲，免得死亡瞬间手还按着键就跳过了） */
+  if (game.state === 'dead') {
+    if (game.timer > 0.35) { e.preventDefault(); game.deaths = 0; loadSlot(CUR.w, CUR.i); }
+    return;
+  }
+
   /* ---- 调试键必须先判 ----
      B / C 在 keyAction 里没有对应的动作名，如果放在下面，
      会被 `if (!a) return` 直接拦掉（A 之所以好使，是因为它映射成了 left）。 */
@@ -712,6 +721,8 @@ canvas.addEventListener('mousedown', function (e) {
         game.cursorL = j; enterLevel(game.levelsWorld, j); return;
       }
     }
+  } else if (game.state === 'dead') {
+    if (game.timer > 0.35) { game.deaths = 0; loadSlot(CUR.w, CUR.i); }
   } else {
     jumpPressed = true;
   }
@@ -759,8 +770,7 @@ function update(dt) {
   if (game.tauntT > 0) game.tauntT -= dt;
 
   if (game.state === 'dead') {
-    game.timer += dt;
-    if (game.timer > 0.75) { game.deaths = 0; loadSlot(CUR.w, CUR.i); }
+    game.timer += dt;      // 不再自动重开 —— 等玩家按任意键
     return;
   }
   if (game.state === 'win') {
@@ -1296,7 +1306,23 @@ function drawHUD() {
   text((CUR.w + 1) + ' - ' + (CUR.i + 1), 26, 56, 14, PAL.dim, 'left');
   text('死亡 ' + game.deaths, VW - 26, 30, 18, PAL.text, 'right', true);
   text('总计 ' + save.deaths, VW - 26, 56, 14, PAL.dim, 'right');
-  if (game.tauntT > 0) {
+  // 死亡：嘲讽 + 按任意键继续（都跟着死亡时间淡入）
+  if (game.state === 'dead') {
+    var da = Math.min(1, game.timer * 4);
+    ctx.save();
+    ctx.globalAlpha = da;
+    ctx.translate(VW / 2, VH * 0.36);
+    ctx.rotate((Math.random() - 0.5) * 0.035);
+    text(game.taunt, 0, 0, 36, PAL.warn, 'center', true);
+    ctx.restore();
+    if (game.timer > 0.35) {
+      var pl = 0.55 + 0.45 * Math.sin(performance.now() / 260);
+      ctx.save();
+      ctx.globalAlpha = da * pl;
+      text('按任意键继续', VW / 2, VH * 0.36 + 48, 18, PAL.text, 'center', true);
+      ctx.restore();
+    }
+  } else if (game.tauntT > 0) {
     ctx.save();
     ctx.globalAlpha = Math.min(1, game.tauntT / 0.4);
     ctx.translate(VW / 2, 92);
