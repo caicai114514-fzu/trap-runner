@@ -1077,7 +1077,7 @@ function update(dt) {
   p.x += p.vx * dt;
   for (var m = 0; m < game.plats.length; m++) {
     var a = game.plats[m];
-    if (a.state !== 'active' || a.oneWay) continue;
+    if (a.state !== 'active' || a.oneWay || a.noCollide) continue;
     if (a.kind === 'flip' && game.flipT >= 0) continue;      // 翻板过程中不挡路
     if (aabb(p, a)) {
       if (p.vx > 0) p.x = a.x - p.w;
@@ -1092,7 +1092,7 @@ function update(dt) {
   p.onGround = false; p.ground = null;
   for (var n = 0; n < game.plats.length; n++) {
     var b = game.plats[n];
-    if (b.state !== 'active') continue;
+    if (b.state !== 'active' || b.noCollide) continue;       // noCollide = 已经"变成坑"了
     if (b.kind === 'flip' && game.flipT >= 0) continue;      // 翻板过程中站不住
     if (aabb(p, b)) {
       if (p.vy > 0 && prevBottom <= b.y + 8) {
@@ -1208,7 +1208,8 @@ function update(dt) {
     var fp2 = game.plats[pf];
     if (fp2.kind !== 'pitFloor' || fp2.sunk) continue;
     if (p.x + p.w / 2 > fp2.triggerX) {
-      fp2.y += (fp2.h / fp2.sinkT2) * dt;                   // 整块往下沉
+      if (!fp2.sinking) { fp2.sinking = true; fp2.noCollide = true; Sound.sfxTrap(); }
+      fp2.y += (fp2.h / fp2.sinkT2) * dt;                   // 整块往下沉（纯视觉）
       if (fp2.y > fp2.y0 + fp2.h * 1.7) { fp2.state = 'gone'; fp2.sunk = true; }
     }
   }
