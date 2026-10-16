@@ -1513,29 +1513,38 @@ function drawPlatforms() {
         ctx.rect(p.x - 2, 0, p.w + 4, p.baseY + p.h);
         ctx.clip();
       }
-      // 跳板：没踩上去之前什么都不画 —— 那块地方看起来就是普通地面本身。
-      // 人站上去之后，这段地板自己拱起来（像被从下面顶起来一样）。
+      // 跳板 = 一块板子 + 底下连着弹簧。
+      // 没踩时：板子平贴在地面里，弹簧完全压扁 —— 看起来就是普通地面。
+      // 踩上去：弹簧伸展，板子被顶起来，到顶就弹飞。
       if (p.kind === 'bounce') {
         var bpop = p.pop || 0;
-        if (bpop <= 0.02) continue;                 // 平的，交给底下的地面显示
-        var arch = (p.h + 30) * bpop;               // 拱起高度
+        var topY = p.y + p.h;                         // 板子静止时贴着地面
+        var rise = 30 * bpop;                         // 板子升起高度
+        var by = topY - rise;
+        var coilH = 22 * (1 - bpop * 0.85);           // 弹簧剩余高度（越弹越伸展）
+        if (bpop > 0.02) {
+          // 弹簧：中间一根立杆 + 上下两圈，画成被压住的样子
+          ctx.strokeStyle = PAL.groundTop;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          for (var ci = 0; ci <= 8; ci++) {
+            var cz = ci / 8;
+            var cx2 = p.x + p.w / 2 + (ci % 2 === 0 ? -13 : 13) * (0.45 + 0.55 * cz);
+            var cy2 = by + 6 + cz * coilH;
+            if (ci === 0) ctx.moveTo(cx2, cy2); else ctx.lineTo(cx2, cy2);
+          }
+          ctx.stroke();
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(p.x + p.w / 2, by + 6);
+          ctx.lineTo(p.x + p.w / 2, by + 6 + coilH);
+          ctx.stroke();
+        }
+        // 板子：一块比跳板略宽的厚板
         ctx.fillStyle = PAL.ground;
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y + p.h + 4);
-        ctx.quadraticCurveTo(p.x + p.w / 2, p.y - arch, p.x + p.w, p.y + p.h + 4);
-        ctx.closePath();
-        ctx.fill();
-        // 顶边那条亮色跟着拱
+        ctx.fillRect(p.x - 3, by, p.w + 6, 9);
         ctx.fillStyle = PAL.groundTop;
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y + p.h + 4);
-        ctx.quadraticCurveTo(p.x + p.w / 2, p.y - arch, p.x + p.w, p.y + p.h + 4);
-        ctx.lineTo(p.x + p.w, p.y + p.h + 9);
-        ctx.quadraticCurveTo(p.x + p.w / 2, p.y - arch + 5, p.x, p.y + p.h + 9);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
+        ctx.fillRect(p.x - 3, by, p.w + 6, 3);
         continue;
       }
       // 翻板：绕自己中心转
