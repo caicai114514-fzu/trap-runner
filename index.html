@@ -287,7 +287,7 @@ var LEVELS = [
     // 绕开之后，后面还有一根位置触发的刺等着。
     platforms: [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
-      { x: 420, y: 452, w: 90, h: 18, kind: 'bounce', power: 1420, popTime: 0.10 }
+      { x: 420, y: 469, w: 90, h: 18, kind: 'bounce', power: 1420, popTime: 0.10 }
     ],
     spikes: [
       { x: 400, y: 0, w: 130, h: 210, dir: 'down', hidden: true, triggerX: 380 },
@@ -1191,7 +1191,10 @@ function update(dt) {
   for (var bp = 0; bp < game.plats.length; bp++) {
     var bt = game.plats[bp];
     if (bt.kind !== 'bounce') continue;
-    if (p.ground !== bt) { bt.pop = Math.max(0, bt.pop - dt * 6); continue; }   // 离开就慢慢瘪回去
+    // 位置检测：人压在跳板那一小块上就触发（不要求 p.ground 是它）
+    var onIt = p.x + p.w > bt.x + 6 && p.x < bt.x + bt.w - 6 &&
+               p.y + p.h > bt.y - 6 && p.y + p.h < bt.y + bt.h + 16 && p.vy >= -40;
+    if (!onIt) { bt.pop = Math.max(0, bt.pop - dt * 6); continue; }   // 离开就慢慢瘪回去
     {
       bt.pop = Math.min(1, bt.pop + dt / (bt.popTime || 0.10));
       if (bt.pop >= 1) {
