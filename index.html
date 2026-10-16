@@ -270,7 +270,7 @@ var LEVELS = [
       { x: 230, y: 450, w: 90, h: 24, kind: 'vanish', retractT: 0.14 },
       { x: 390, y: 430, w: 90, h: 24, kind: 'vanish', retractT: 0.14 },
       { x: 550, y: 410, w: 90, h: 24, kind: 'vanish', retractT: 0.14 },
-      { x: 710, y: 400, w: 90, h: 24, kind: 'solid' },      // 第四块：正常的，不缩
+      { x: 710, y: 400, w: 90, h: 24, kind: 'feint' },      // 第四块：踩上去先缩一截吓你，再弹回来
       { x: 850, y: 470, w: 110, h: 70, kind: 'sinkFloor' }  // 门脚下这块：跟着门一起没
     ],
     spikes: [], arrows: []
@@ -1155,6 +1155,22 @@ function update(dt) {
     var c = game.plats[t];
     if (c.state !== 'active') continue;
 
+    // feint（假动作）：踩上去先往里缩一截吓你一下，然后原样弹回来，根本不塌
+    if (c.kind === 'feint') {
+      if (c.feinting === undefined) { c.feinting = false; c.feintDone = false; }
+      if (p.ground !== c) { c.feintDone = false; c.feinting = false; c.w = c.w0; continue; }   // 离开就复位
+      if (!c.feinting && !c.feintDone) { c.feinting = true; c.feintDone = true; c.feintT = 0; Sound.sfxTrap(); }
+      if (c.feinting) {
+        c.feintT += dt;
+        var fk;
+        if (c.feintT < 0.09) fk = (c.feintT / 0.09) * 0.22;                 // 猛地缩进去
+        else if (c.feintT < 0.34) fk = 0.22;                                // 卡住一小会儿
+        else if (c.feintT < 0.62) fk = 0.22 * (1 - (c.feintT - 0.34) / 0.28); // 慢慢弹回来
+        else { fk = 0; c.feinting = false; }
+        c.w = c.w0 * (1 - fk);
+      }
+      continue;
+    }
     if ((c.kind === 'fake' || c.kind === 'vanish') && c.retract === undefined) {
       if (p.ground === c) { c.retract = 0; Sound.sfxTrap(); }        // 踩上就缩
       else if (c.triggerX && p.x + p.w / 2 > c.triggerX) { c.retract = 0; Sound.sfxTrap(); }  // 或走到触发点就缩
