@@ -240,7 +240,7 @@ var LEVELS = [
     name: '第四关 · 天降正义',
     hint: '这一关……你好像跳不高。',
     width: 960,
-    jump: 830,                 // ← 本关跳跃力调低：容错只剩 ~35px，初见必吃一次
+    jump: 776,                 // ← 本关跳跃力压低：容错窗口 ~15px（10px 太苛刻，实测手感发紧）
     spawn: [70, 380],
     goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
@@ -271,6 +271,9 @@ var LEVELS = [
     name: '第六关 · 此路不通',
     hint: '左边一堵，右边一堵。',
     width: 960,
+    jump: 950,                 // ← 特例：这关两根活塞的推出时序是围绕 950 调出来的，
+                               //    跳跃力一降就变死关（实测 900 就已经过不去）。
+                               //    以后按新跳跃力重做这关时，把这行删掉即可。
     spawn: [70, 380],
     goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
@@ -289,7 +292,7 @@ var LEVELS = [
     name: '第七关 · 荆棘地板',
     hint: '走路要看脚下。而且这一关，你跳得更矮。',
     width: 960,
-    jump: 800,                 // ← 三连刺 + 更矮的跳跃，容错进一步压缩
+    jump: 746,                 // ← 三连刺 + 更矮的跳跃，容错 ~15px
     spawn: [70, 380],
     goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
@@ -324,7 +327,7 @@ var LEVELS = [
 /* ==================================================================
    游戏状态与物理
    ================================================================== */
-var GRAVITY = 2400, MOVE = 315, JUMP_V = 950, MAX_FALL = 1500;
+var GRAVITY = 2400, MOVE = 315, JUMP_V = 810, MAX_FALL = 1500;   // 跳跃力整体调低（950 → 810）：容错从 ~73px 压到 ~27px
 var PISTON_RISE = 0.16, PISTON_SINK = 0.18;   // 活塞钻出地面 / 缩回地下所需时间
 
 var TAUNTS = ['就这？', '再来一次', '差一点点', '你被坑了', '哈哈哈哈哈',
@@ -483,6 +486,7 @@ function loadLevel(i) {
       // （早期为了修"卡板边"把薄平台做成单向，代价是跳上去的途中会从板身里穿过去，
       //   看起来像穿模。现在改成：要平台单向得在关卡数据里显式写 oneWay: true）
       oneWay: !!p.oneWay,
+      w0: p.w,                  // 消失板收缩动画用的原始宽度
       moveV: p.moveV || 0,      // 会走的障碍：出现后自己移动，把玩家顶走
       moveTo: p.moveTo || 0,
       baseY: p.y,               // 活塞：原始高度（升降都相对它算）
@@ -913,14 +917,22 @@ function update(dt) {
   }
 
   // 假地板：踩上只撑 0.12 秒 —— 走是绝对走不过去的，踩上去就得往下掉
-  // 虚线板：踩上撑 0.3 秒 —— 给"踩一下马上跳走"留出反应窗口
+  // 会塌的板（假地板 / 消失板）：行为完全统一 ——
+  // 踩上去「立刻」开始往左缩进去，左缘钉死、宽度收到 0。
+  // 外观也和普通平台一模一样，不给任何提前剧透。
   for (var t = 0; t < game.plats.length; t++) {
     var c = game.plats[t];
     if (c.state !== 'active') continue;
-    if ((c.kind === 'fake' || c.kind === 'vanish') && p.ground === c) {
-      c.timer += dt;
-      var lim = c.kind === 'fake' ? 0.12 : 0.3;
-      if (c.timer > lim) { c.state = 'gone'; Sound.sfxTrap(); puff(c.x + c.w / 2, c.y); }
+
+    if ((c.kind === 'fake' || c.kind === 'vanish') && p.ground === c && c.retract === undefined) {
+      c.retract = 0;
+      Sound.sfxTrap();
+    }
+    if (c.retract !== undefined) {
+      c.retract += dt;
+      var rk = Math.min(1, c.retract / 0.20);
+      c.w = Math.max(0, c.w0 * (1 - rk));
+      if (rk >= 1) { c.state = 'gone'; puff(c.x, c.y); }
     }
   }
 
@@ -1053,14 +1065,11 @@ function drawPlatforms() {
     if (p.appeared > 0) ctx.globalAlpha = 0.35 + 0.65 * grow;
 
     if (p.kind === 'vanish') {
-      // 一触即碎：虚线框，一眼看出"不结实"
-      ctx.fillStyle = PAL.vanish;
+      // 和普通平台长得一模一样 —— 不给任何提示，踩上去才知道会缩
+      ctx.fillStyle = PAL.ground;
       ctx.fillRect(p.x, p.y, p.w, p.h);
-      ctx.strokeStyle = PAL.dim;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 5]);
-      ctx.strokeRect(p.x + 1, p.y + 1, p.w - 2, p.h - 2);
-      ctx.setLineDash([]);
+      ctx.fillStyle = PAL.groundTop;
+      ctx.fillRect(p.x, p.y, p.w, 4);
     } else {
       // 活塞：只保留地面以上的部分，看起来才像"从地里钻出来"。
       // 注意裁剪下边界是「地面表面」= baseY + h，不是 baseY ——
@@ -1070,9 +1079,8 @@ function drawPlatforms() {
         ctx.rect(p.x - 2, 0, p.w + 4, p.baseY + p.h);
         ctx.clip();
       }
-      // 实心块 + 一条亮橙顶边
-      ctx.fillStyle = p.kind === 'fake' ? PAL.fake
-                    : p.kind === 'piston' ? PAL.piston
+      // 实心块 + 一条亮橙顶边（假地板 / 消失板也走这条，外观不给任何提示）
+      ctx.fillStyle = p.kind === 'piston' ? PAL.piston
                     : p.kind === 'appear' ? PAL.appear : PAL.ground;
       ctx.fillRect(p.x, p.y, p.w, p.h);
       ctx.fillStyle = p.kind === 'piston' ? PAL.pistonTop : PAL.groundTop;
@@ -2171,6 +2179,13 @@ game.state = 'title';
     if (sw0) { game.p.x = sw0.x - game.p.w / 2; game.p.y = sw0.y - game.p.h / 2; }
     var dp = parseFloat((location.search.match(/p=([\d.]+)/) || [])[1] || '0.2');
     for (var d2 = 0; d2 < Math.round(dp / (1 / 60)); d2++) update(1 / 60);
+  }
+  else if (m[1] === 'vanish') {               // 让小人踩上消失板，看往左缩的动画
+    if (lvq !== undefined) { applyWorldPalette(wq); loadLevel(parseInt(lvq, 10)); } else loadSlot(wq, 0);
+    var vp0 = game.plats.filter(function (x) { return x.kind === 'vanish' || x.kind === 'fake'; })[0];
+    if (vp0) { game.p.x = vp0.x + 20; game.p.y = vp0.y - game.p.h - 4; game.p.vy = 0; }
+    var vq = parseFloat((location.search.match(/p=([\d.]+)/) || [])[1] || '0');
+    for (var v2 = 0; v2 < Math.round(vq / (1 / 60)); v2++) update(1 / 60);
   }
   else if (m[1] === 'trans') {                // 冻结在过场红门的某个进度
     loadSlot(wq, 0);
