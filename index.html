@@ -220,52 +220,60 @@ var LEVELS = [
   {
     name: '1-2 · 信任崩塌', hint: '三块板，只有一块是真的。',
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
-    keys: [{ x: 500, y: 520 }],                 // 钥匙在坑底：要拿就得摔死一次
+    // 钥匙一开始收在左边那块地板里；走过悬空板之后才慢慢滑到坑底浮出来。
+    // 想拿就得从中间跳下去 —— 而那一跳是必死的。
+    keys: [{ x: 500, y: 520, hidden: true, from: [100, 520], triggerX: 360, outT: 1.3 }],
     platforms: [
       { x: 0, y: 470, w: 200, h: 70, kind: 'solid' },
       { x: 290, y: 390, w: 120, h: 24, kind: 'solid' },
-      { x: 450, y: 390, w: 120, h: 24, kind: 'fake' },
-      { x: 610, y: 390, w: 120, h: 24, kind: 'solid' },
-      { x: 770, y: 470, w: 190, h: 70, kind: 'solid' }
+      { x: 500, y: 390, w: 120, h: 24, kind: 'fake' },     // 唯一的中转站，也是唯一会缩的
+      { x: 670, y: 390, w: 120, h: 24, kind: 'solid' },
+      { x: 790, y: 470, w: 170, h: 70, kind: 'solid' }
     ],
     spikes: [], arrows: []
   },
   {
-    name: '1-3 · 多米诺', hint: '踩上去就开始缩，别停。',
+    name: '1-3 · 甜头', hint: '先给你一点甜头。',
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 180, h: 70, kind: 'solid' },
-      { x: 260, y: 440, w: 110, h: 24, kind: 'vanish' },
-      { x: 440, y: 420, w: 110, h: 24, kind: 'vanish' },
-      { x: 620, y: 400, w: 110, h: 24, kind: 'vanish' },
-      { x: 800, y: 470, w: 160, h: 70, kind: 'solid' }
+      { x: 0, y: 470, w: 480, h: 70, kind: 'solid' },
+      { x: 480, y: 470, w: 480, h: 70, kind: 'flip' }      // 后半块会整块翻掉
+    ],
+    coins: [
+      { x: 200, y: 440 }, { x: 280, y: 440 }, { x: 360, y: 440 },   // 地上这一串，走过去就能吃
+      { x: 520, y: 368, flip: true }                                 // 这颗要跳一下才够得到 —— 也是它翻你
     ],
     spikes: [], arrows: []
   },
   {
     name: '1-4 · 一口气', hint: '四块。中间喘一口气都不行。',
-    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    width: 960, spawn: [70, 380], goal: { x: 890, y: 400, w: 46, h: 70 },
+    // 直接扑过去的话，门会连着脚下那块一起沉下去，快到你追不上。
+    // 但如果站在最后那块平台上等它消失满 3 秒，门会重新从地里长出来。
+    sinkGoal: { triggerX: 835, depth: 220, time: 0.28, riseDelay: 3.0 },
     platforms: [
       { x: 0, y: 470, w: 150, h: 70, kind: 'solid' },
       { x: 230, y: 450, w: 90, h: 24, kind: 'vanish' },
       { x: 390, y: 430, w: 90, h: 24, kind: 'vanish' },
       { x: 550, y: 410, w: 90, h: 24, kind: 'vanish' },
       { x: 710, y: 400, w: 90, h: 24, kind: 'vanish' },
-      { x: 850, y: 470, w: 110, h: 70, kind: 'solid' }
+      { x: 800, y: 470, w: 90, h: 70, kind: 'solid' },      // 最后一块：不消失，是落脚点
+      { x: 890, y: 470, w: 70, h: 70, kind: 'sinkFloor' }    // 门底下这块会跟着门沉
     ],
     spikes: [], arrows: []
   },
   {
-    name: '1-5 · 真假难辨', hint: '这时候眼睛已经没用了。',
+    name: '1-5 · 追上来了', hint: '别回头，也别停。',
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    // 走过箭头 → 脚下的地板左缘开始往右追你（你跑得赢）。
+    // 追到一半它不追了，改成你正前方那块直接塌掉。
+    shrinkFloor: { triggerX: 200, speed: 250, stopX: 520 },
     platforms: [
-      { x: 0, y: 470, w: 160, h: 70, kind: 'solid' },
-      { x: 240, y: 440, w: 110, h: 24, kind: 'fake' },
-      { x: 420, y: 420, w: 110, h: 24, kind: 'vanish' },
-      { x: 600, y: 430, w: 110, h: 24, kind: 'fake' },
-      { x: 780, y: 470, w: 180, h: 70, kind: 'solid' }
+      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
+      { x: 700, y: 470, w: 150, h: 70, kind: 'vanish', triggerX: 560 }
     ],
-    spikes: [], arrows: []
+    arrows: [{ x: 190, y: 438, dir: 'right' }],
+    spikes: []
   },
 
   /* ================= 大关二 · 眼见为虚（假刺 / 箭头 / 假门）================= */
@@ -612,6 +620,7 @@ function loadLevel(i) {
       //   看起来像穿模。现在改成：要平台单向得在关卡数据里显式写 oneWay: true）
       oneWay: !!p.oneWay,
       w0: p.w,                  // 消失板收缩动画用的原始宽度
+      y0: p.y,                  // sinkFloor 下沉用的原始高度
       moveV: p.moveV || 0,      // 会走的障碍：出现后自己移动，把玩家顶走
       moveTo: p.moveTo || 0,
       baseY: p.y,               // 活塞：原始高度（升降都相对它算）
@@ -647,17 +656,31 @@ function loadLevel(i) {
     return {
       x: b.x, y: (b.y === undefined ? -50 : b.y), r: b.r || 18,
       vy: b.vy || 0, vx: 0, bounce: 0, maxBounce: b.bounces || 3,
-      speed: b.speed || 300, homing: false, spin: 0
+      speed: b.speed || 300, homing: false, spin: 0,
+      delay: b.chaseDelay === undefined ? 1.4 : b.chaseDelay    // 弹够之后还要等这么久才追
+
     };
   });
   game.timeLimit = L.timeLimit || 0;         // 限时（秒），到点所有球开始追你
   game.timeLeft = game.timeLimit;
   game.coins = (L.coins || []).map(function (c) {
-    return { x: c.x, y: c.y, fake: !!c.fake, got: false, t: Math.random() * 6 };
+    return { x: c.x, y: c.y, fake: !!c.fake, flip: !!c.flip, got: false, t: Math.random() * 6 };
   });
-  game.keyThisLife = false;          // 这一命有没有捡到钥匙（决定死亡台词）
+  game.flipT = -1;                    // >=0 表示翻转动画进行中
+  game.sinkPhase = 'idle'; game.sinkT = 0; game.sinkY = 0;   // 门下沉
+  game.shrinkX = 0;                                          // 地板左缘右移量
+  game.keyThisLife = false;          // 这一命有没有捡到钥匙
+  game.keyGetT = 999;                // 拿到钥匙之后过了多久（决定是不是"献祭"）
   game.keys = (L.keys || []).map(function (k) {
-    return { x: k.x, y: k.y, got: false, t: 0 };
+    return {
+      x: k.x, y: k.y, got: false, t: 0,
+      show: k.show || 0,                   // 出场动画进度 0~1
+      hidden: !!k.hidden,                  // 一开始收着
+      triggerX: k.triggerX || 0,           // 玩家走过这里才开始浮现
+      outT: k.outT || 1.1,                 // 浮现用多久
+      fx: (k.from === undefined ? k.x : k.from[0]),   // 从哪浮现（默认原地）
+      fy: (k.from === undefined ? k.y : k.from[1])
+    };
   });
   game.arrows = L.arrows || [];
   game.cam = 0;
@@ -678,17 +701,24 @@ function die(kind) {
   game.totalDeaths++;
   save.deaths++;               // 总死亡次数进存档（选关界面那只小幽灵看的就是它）
   writeSave();
-  // 死人话：如果这一命刚捡了钥匙就死了，换成血红色的"献祭"台词
-  if (game.keyThisLife) {
+  // 死人话：
+  //   普通死 → 黄色，语气轻一点，别那么惊悚
+  //   献祭死 → 血红。判定不是"拿过钥匙就死"，而是"死的时候正在钥匙旁边"
+  //            （也就是真的为了拿它才死的）
+  // 判定：拿到钥匙之后 2.6 秒内就死了 —— 也就是"拿完就没命了"。
+  // 拿完钥匙跑很远才死的不算，那是自己作死，不是献祭。
+  var sacrificed = game.keyThisLife && game.keyGetT < 2.6;
+  if (sacrificed) {
     game.taunt = '你献祭了自己，这是你应得的';
     game.tauntColor = '#c0392b';
+    game.shake = 20;                    // 献祭额外震一下
   } else {
     game.taunt = TAUNTS[(Math.random() * TAUNTS.length) | 0];
-    game.tauntColor = PAL.warn;
+    game.tauntColor = PAL.player;       // 黄色，轻一点
   }
   game.tauntT = 1.4;
   game.shake = 14;
-  if (kind !== 'fall') Sound.sfxDeath();
+  Sound.sfxDeath();                     // 掉坑也要有音效（只是不爆尸体）
   // 掉坑：不爆尸体，就是人没了（约定：除了掉坑，其它死法都爆尸体）
   if (kind === 'fall') return;
 
@@ -1046,6 +1076,7 @@ function update(dt) {
   for (var m = 0; m < game.plats.length; m++) {
     var a = game.plats[m];
     if (a.state !== 'active' || a.oneWay) continue;
+    if (a.kind === 'flip' && game.flipT >= 0) continue;      // 翻板过程中不挡路
     if (aabb(p, a)) {
       if (p.vx > 0) p.x = a.x - p.w;
       else if (p.vx < 0) p.x = a.x + a.w;
@@ -1060,6 +1091,7 @@ function update(dt) {
   for (var n = 0; n < game.plats.length; n++) {
     var b = game.plats[n];
     if (b.state !== 'active') continue;
+    if (b.kind === 'flip' && game.flipT >= 0) continue;      // 翻板过程中站不住
     if (aabb(p, b)) {
       if (p.vy > 0 && prevBottom <= b.y + 8) {
         // 只有从上方落下来才站得住
@@ -1081,9 +1113,9 @@ function update(dt) {
     var c = game.plats[t];
     if (c.state !== 'active') continue;
 
-    if ((c.kind === 'fake' || c.kind === 'vanish') && p.ground === c && c.retract === undefined) {
-      c.retract = 0;
-      Sound.sfxTrap();
+    if ((c.kind === 'fake' || c.kind === 'vanish') && c.retract === undefined) {
+      if (p.ground === c) { c.retract = 0; Sound.sfxTrap(); }        // 踩上就缩
+      else if (c.triggerX && p.x + p.w / 2 > c.triggerX) { c.retract = 0; Sound.sfxTrap(); }  // 或走到触发点就缩
     }
     if (c.retract !== undefined) {
       c.retract += dt;
@@ -1130,6 +1162,60 @@ function update(dt) {
   // 掉出地图
   if (p.y > VH + 120) { die('fall'); return; }
 
+  game.keyGetT += dt;
+
+  // ===== 门下沉：跳过去就跟着沉，够不着（死后动画自动停住，因为 dead 分支直接 return）=====
+  var LV = LEVELS[game.li];
+  if (LV.sinkGoal) {
+    var sg = LV.sinkGoal;
+    var depth = sg.depth === undefined ? 220 : sg.depth;
+    var stime = sg.time || 0.30;
+    if (game.sinkPhase === 'idle' && p.x + p.w / 2 > sg.triggerX) {
+      game.sinkPhase = 'sinking'; Sound.sfxTrap();
+    }
+    if (game.sinkPhase === 'sinking') {
+      game.sinkT += dt;
+      game.sinkY = Math.min(1, game.sinkT / stime) * depth;
+      if (game.sinkY >= depth - 0.5) { game.sinkPhase = 'down'; game.sinkT = 0; }
+    } else if (game.sinkPhase === 'down') {
+      game.sinkT += dt;
+      if (game.sinkT > (sg.riseDelay === undefined ? 3 : sg.riseDelay)) { game.sinkPhase = 'rising'; game.sinkT = 0; }
+    } else if (game.sinkPhase === 'rising') {
+      game.sinkT += dt;
+      game.sinkY = Math.max(0, (1 - Math.min(1, game.sinkT / stime)) * depth);
+      if (game.sinkY <= 0.5) { game.sinkPhase = 'idle'; game.sinkY = 0; }
+    }
+    // 门下面的那块地板跟着一起沉
+    for (var sfi = 0; sfi < game.plats.length; sfi++) {
+      if (game.plats[sfi].kind === 'sinkFloor') game.plats[sfi].y = game.plats[sfi].y0 + game.sinkY;
+    }
+  }
+
+  // ===== 地板从左往右缩：左缘一路往右追你，跑到某个位置停，再让前方塌掉 =====
+  if (LV.shrinkFloor) {
+    var shf = LV.shrinkFloor;
+    if (p.x + p.w / 2 > shf.triggerX) {
+      if (game.shrinkX < (shf.stopX || 500)) {
+        game.shrinkX = Math.min(shf.stopX || 500, game.shrinkX + shf.speed * dt);
+      }
+    }
+    var fl0 = game.plats[0];
+    fl0.x = game.shrinkX;
+    fl0.w = 960 - game.shrinkX;
+  }
+
+  // 翻转平台：吃金币触发，整块板绕中心转 180°，转完就没了。
+  // 转动期间碰撞失效 —— 所以人是"没地方站直接掉下去"。
+  if (game.flipT >= 0 && game.flipT < 1) {
+    game.flipT = Math.min(1, game.flipT + dt / 0.35);
+    if (game.flipT >= 1) {
+      for (var fp = 0; fp < game.plats.length; fp++) {
+        if (game.plats[fp].kind === 'flip') game.plats[fp].state = 'gone';
+      }
+      puff(VW / 2, 470);
+    }
+  }
+
   // 反向关：每次落地 → 震一下 + 方向再次翻转（给玩家一个身体上的提示）
   if (game.flipOnLand && p.onGround && !game.wasOnGround) {
     game.reverse = -(game.reverse || 1);
@@ -1162,7 +1248,11 @@ function update(dt) {
         bl.vy = -bl.vy * 0.62;
         bl.bounce++;
         if (bl.bounce === 1) Sound.sfxTrap();
-        if (bl.bounce >= bl.maxBounce) bl.homing = true;
+        if (bl.bounce >= bl.maxBounce && !bl.armed) { bl.armed = true; bl.delay = (bl.delay === undefined ? 1.4 : bl.delay); }
+      }
+      if (bl.armed && !bl.homing) {
+        bl.delay -= dt;
+        if (bl.delay <= 0) bl.homing = true;
       }
     }
     if (Math.abs((p.x + p.w / 2) - bl.x) < bl.r + 9 && Math.abs((p.y + p.h / 2) - bl.y) < bl.r + 11) {
@@ -1192,6 +1282,7 @@ function update(dt) {
     if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22) {
       if (co.fake) { Sound.sfxBoom(); die(); return; }
       co.got = true; Sound.sfxCoin();
+      if (co.flip) { game.flipT = 0; Sound.sfxTrap(); }     // 吃到"翻板金币"→整块地板开始翻
     }
   }
 
@@ -1200,9 +1291,18 @@ function update(dt) {
     var kk = game.keys[ki];
     kk.t += dt;
     if (kk.got) continue;
-    if (Math.abs(p.x + p.w / 2 - kk.x) < 22 && Math.abs(p.y + p.h / 2 - kk.y) < 24) {
+    // 出场：一开始收着，玩家走过触发点之后慢慢浮现
+    if (kk.show < 1) {
+      if (!kk.hidden) kk.show = 1;
+      else if (p.x + p.w / 2 > kk.triggerX) kk.show = Math.min(1, kk.show + dt / kk.outT);
+      else continue;                     // 还没浮现，碰不到
+    }
+    var kcx = kk.fx + (kk.x - kk.fx) * kk.show;
+    var kcy = kk.fy + (kk.y - kk.fy) * kk.show;
+    if (Math.abs(p.x + p.w / 2 - kcx) < 22 && Math.abs(p.y + p.h / 2 - kcy) < 24) {
       kk.got = true;
       game.keyThisLife = true;
+      game.keyGetT = 0;
       save.keys[CUR.w] = 1;
       writeSave();
       Sound.sfxWin();
@@ -1212,7 +1312,8 @@ function update(dt) {
   }
 
   // 到达终点
-  var g = LEVELS[game.li].goal;
+  var g0 = LEVELS[game.li].goal;
+  var g = { x: g0.x, y: g0.y + (game.sinkY || 0), w: g0.w, h: g0.h };
   if (aabb(p, g)) { winLevel(); return; }
 
   // 一屏一关：把玩家夹在屏幕内，不许走出可视区
@@ -1317,6 +1418,18 @@ function drawPlatforms() {
         ctx.rect(p.x - 2, 0, p.w + 4, p.baseY + p.h);
         ctx.clip();
       }
+      // 翻板：绕自己中心转
+      if (p.kind === 'flip' && game.flipT >= 0) {
+        ctx.save();
+        ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
+        ctx.rotate(Math.PI * Math.min(1, game.flipT));
+        ctx.fillStyle = PAL.ground;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.fillStyle = PAL.groundTop;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, 4);
+        ctx.restore();
+        continue;
+      }
       // 实心块 + 一条亮橙顶边（假地板 / 消失板也走这条，外观不给任何提示）
       ctx.fillStyle = p.kind === 'piston' ? PAL.piston
                     : p.kind === 'appear' ? PAL.appear : PAL.ground;
@@ -1404,12 +1517,44 @@ function drawCoins() {
   }
 }
 
-/* 关卡里的钥匙：上下轻轻浮动 */
+/* 骷髅头钥匙：一个骷髅脑袋 + 下面一根钥匙杆 */
+function drawSkullKey(x, y, s, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y); ctx.scale(s, s);
+  // 钥匙杆
+  ctx.strokeStyle = '#d8d2c4'; ctx.lineWidth = 3.2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 8); ctx.lineTo(0, 22);
+  ctx.moveTo(0, 17); ctx.lineTo(6, 17); ctx.moveTo(0, 21); ctx.lineTo(5, 21); ctx.stroke();
+  // 骷髅头
+  ctx.fillStyle = '#e8e2d4';
+  ctx.beginPath();
+  ctx.arc(0, -2, 11, Math.PI, 0);
+  ctx.lineTo(11, 5);
+  ctx.quadraticCurveTo(8, 12, 4, 10);
+  ctx.lineTo(-4, 10);
+  ctx.quadraticCurveTo(-8, 12, -11, 5);
+  ctx.closePath(); ctx.fill();
+  // 眼窝（黑洞）
+  ctx.fillStyle = '#120303';
+  ctx.beginPath(); ctx.ellipse(-4.4, -2, 3.6, 4.2, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(4.4, -2, 3.6, 4.2, 0, 0, 7); ctx.fill();
+  // 鼻孔 + 牙缝
+  ctx.beginPath(); ctx.moveTo(0, 3); ctx.lineTo(-1.6, 7); ctx.lineTo(1.6, 7); ctx.closePath(); ctx.fill();
+  ctx.fillRect(-2.6, 8.6, 1.4, 3);
+  ctx.fillRect(1.2, 8.6, 1.4, 3);
+  ctx.restore();
+}
+
 function drawKeys() {
   for (var i = 0; i < game.keys.length; i++) {
     var k = game.keys[i];
-    if (k.got) continue;
-    keyIcon(k.x, k.y + Math.sin(k.t * 2.6) * 3, 1.5, PAL.player, true);
+    if (k.got || k.show <= 0) continue;
+    var e = k.show * k.show * (3 - 2 * k.show);         // smoothstep
+    var bob = Math.sin(k.t * 2.6) * 3 * e;
+    var kx = k.fx + (k.x - k.fx) * e;                   // 从"藏身处"滑到"该在的地方"
+    var ky = k.fy + (k.y - k.fy) * e;
+    drawSkullKey(kx, ky + bob, 1.25, e);
   }
 }
 
@@ -1449,6 +1594,7 @@ function drawGoal() {
 
 function drawOneDoor(g, alpha) {
   if (alpha <= 0.01) return;
+  g = { x: g.x, y: g.y + (game.sinkY || 0), w: g.w, h: g.h };   // 门跟着一起沉
   var k = alpha;
   var w = g.w * k;
   if (w < 0.6) return;                       // 收成一条线之后就没了
@@ -2062,7 +2208,8 @@ function drawLevelSelect() {
     var n = LEVEL_POS[k];
     var cleared = isCleared(game.levelsWorld, k);
     var open = levelUnlocked(game.levelsWorld, k);
-    var isKey = KEY_LEVEL.indexOf(k) >= 0 && game.levelsWorld < 3;
+    var keyIdx = (game.levelsWorld < 3) ? KEY_LEVEL[game.levelsWorld] : -1;
+    var isKey = (k === keyIdx);              // 每个大关只有一个小关藏钥匙
 
     if (cleared) {
       ctx.fillStyle = PAL.ground; ctx.beginPath(); ctx.arc(n.x, n.y, 26, 0, 7); ctx.fill();
