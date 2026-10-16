@@ -357,14 +357,15 @@ function applyWorldPalette(w) {
   var W = WORLDS[w] || WORLDS[0];
   var c = W.color;
   // 机关色：以本关背景为底，再压深一档（delta 负值 = 稍微亮一点）
-  // TRAP_DARK 别调太大 —— 压太狠就完全看不见了，那不是"藏"而是"瞎猜"
-  var TRAP_DARK = 0.26;
+  var TRAP_DARK = 0.34;
   function trapShade(delta) {
-    return mix(W.bg, '#000000', Math.max(0, Math.min(1, TRAP_DARK + delta)));
+    return mix(PAL.bg, '#000000', Math.max(0, Math.min(1, TRAP_DARK + delta)));
   }
 
-  PAL.bg        = W.bg;
-  PAL.bgDeep    = W.bgDeep;
+  // 关卡背景：比菜单的深底提亮一档。
+  // 深色机关必须比背景更深才立得住，背景太黑的话它们就没地方待了。
+  PAL.bg     = mix(W.bg, c, 0.17);
+  PAL.bgDeep = PAL.bg;                       // 纯色，不再有下半部分那条
   // 平台
   PAL.ground    = mix('#7d5a44', c, 0.38);   // 平台主体
   PAL.groundTop = mix('#ff8a4a', c, 0.62);   // 平台顶边（最抢眼的一条）
@@ -478,7 +479,10 @@ function loadLevel(i) {
       x: p.x, y: p.y, w: p.w, h: p.h, kind: p.kind,
       state: (p.kind === 'appear' || isPiston) ? 'hidden' : 'active',
       triggerX: p.triggerX || 0, timer: 0, appeared: 0,
-      oneWay: p.h < 60,         // 薄平台单向：可从下方穿过，不会被侧面卡住
+      // 默认全实心：从下面顶头、从侧面会挡住。
+      // （早期为了修"卡板边"把薄平台做成单向，代价是跳上去的途中会从板身里穿过去，
+      //   看起来像穿模。现在改成：要平台单向得在关卡数据里显式写 oneWay: true）
+      oneWay: !!p.oneWay,
       moveV: p.moveV || 0,      // 会走的障碍：出现后自己移动，把玩家顶走
       moveTo: p.moveTo || 0,
       baseY: p.y,               // 活塞：原始高度（升降都相对它算）
@@ -1032,11 +1036,11 @@ var PAL = {
 };
 
 function drawBackground() {
-  // 一整块底色，下半部分再压深一档 —— 就这两笔
+  // 纯色背景。
+  // 之前下半部分会再压深一档（bgDeep），结果那条深色带比机关本身还深，
+  // 机关画在上面全被吃掉 —— 玩家根本看不见要躲什么。
   ctx.fillStyle = PAL.bg;
   ctx.fillRect(0, 0, VW, VH);
-  ctx.fillStyle = PAL.bgDeep;
-  ctx.fillRect(0, VH * 0.66, VW, VH * 0.34);
 }
 
 function drawPlatforms() {
