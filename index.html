@@ -1174,14 +1174,15 @@ function update(dt) {
     if (Math.sqrt(ddx * ddx + ddy * ddy) < sw.r * 0.80 + 8) { die(); return; }
   }
 
-  // onPop 的刺：跳板把人弹起来之后才长出来（更极限）
-  if (game.popFired) {
-    for (var op = 0; op < game.spikes.length; op++) {
-      if (game.spikes[op].onPop && !game.spikes[op].shown) {
-        game.spikes[op].shown = true;
-        Sound.sfxTrap();
-      }
-    }
+  // onPop 的刺：每帧强制跟 popFired 同步 —— 没被弹起来之前绝对不显示。
+  // （之前只在"弹起那一刻"置 shown，结果初始化/重载路径上会被别的逻辑又点亮）
+  for (var op = 0; op < game.spikes.length; op++) {
+    var osp = game.spikes[op];
+    if (!osp.onPop) continue;
+    var should = !!game.popFired;
+    if (should && !osp.shown) Sound.sfxTrap();
+    osp.shown = should;
+    osp.anim = should ? 1 : 0;
   }
 
   // 尖刺致死（假刺长得一样，但踩上去没事——这是骗人的）
@@ -1585,6 +1586,7 @@ function drawSpikes() {
   for (var i = 0; i < game.spikes.length; i++) {
     var sp = game.spikes[i];
     if (!sp.shown) continue;
+    if (sp.onPop && !game.popFired) continue;      // 保险：没弹起来就不画
     var box = spikeBox(sp);
     var n = Math.max(2, Math.round(box.w / 26));
     var step = box.w / n;
