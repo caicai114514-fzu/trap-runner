@@ -264,12 +264,14 @@ var LEVELS = [
   {
     name: '1-5 · 追上来了', hint: '别回头，也别停。',
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
-    // 走一段之后脚下的地板左缘开始往右追你（290px/s，你 315，跑得赢）。
-    // 追到 520 停下，改成你正前方那块整体"往下缩"沉进地里 —— 那里就成了坑。
+    // 三段地面：会缩的地板 / 会陷下去的坑 / 右岸落脚点。
+    // 走过触发点后第一段左缘开始往右追（290px/s，你 315，跑得赢），
+    // 追到 520 停；同时中间那一段整体往下缩，沉没了就是一个 150px 的坑。
     shrinkFloor: { triggerX: 180, speed: 290, stopX: 520 },
     platforms: [
-      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
-      { x: 660, y: 470, w: 170, h: 70, kind: 'pitFloor', triggerX: 500, sinkTime: 0.30 }
+      { x: 0, y: 470, w: 660, h: 70, kind: 'solid' },       // 第一段：会从左边缩
+      { x: 660, y: 470, w: 150, h: 70, kind: 'pitFloor', triggerX: 500, sinkTime: 0.30 },
+      { x: 810, y: 470, w: 150, h: 70, kind: 'solid' }      // 右岸：门在这儿
     ],
     spikes: [], arrows: []
   },
@@ -617,6 +619,7 @@ function loadLevel(i) {
       // （早期为了修"卡板边"把薄平台做成单向，代价是跳上去的途中会从板身里穿过去，
       //   看起来像穿模。现在改成：要平台单向得在关卡数据里显式写 oneWay: true）
       oneWay: !!p.oneWay,
+      x0: p.x,
       w0: p.w,                  // 消失板收缩动画用的原始宽度
       retractT: p.retractT || 0.20,   // 收缩用时（越小消失越快）
       sinkT2: p.sinkTime || 0.26,     // pitFloor 往下缩用时
@@ -1223,8 +1226,8 @@ function update(dt) {
       }
     }
     var fl0 = game.plats[0];
-    fl0.x = game.shrinkX;
-    fl0.w = 960 - game.shrinkX;
+    fl0.x = fl0.x0 + game.shrinkX;
+    fl0.w = fl0.w0 - game.shrinkX;
   }
 
   // 翻转平台：吃金币触发，整块板绕中心转 180°，转完就没了。
