@@ -234,7 +234,8 @@ var LEVELS = [
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
     // 钥匙一开始收在左边那块地板里；走过悬空板之后才慢慢滑到坑底浮出来。
     // 想拿就得从中间跳下去 —— 而那一跳是必死的。
-    keys: [{ x: 500, y: 520, hidden: true, from: [100, 520], triggerX: 360, outT: 1.3 }],
+    keys: [{ x: 100, y: 520, hidden: true, from: [100, 520], triggerX: 360, outT: 0.5,
+             slideTo: 800, slideTime: 2.4 }],
     platforms: [
       { x: 0, y: 470, w: 200, h: 70, kind: 'solid' },
       { x: 290, y: 390, w: 120, h: 24, kind: 'solid' },
@@ -713,7 +714,9 @@ function loadLevel(i) {
       triggerX: k.triggerX || 0,           // 玩家走过这里才开始浮现
       outT: k.outT || 1.1,                 // 浮现用多久
       fx: (k.from === undefined ? k.x : k.from[0]),   // 从哪浮现（默认原地）
-      fy: (k.from === undefined ? k.y : k.from[1])
+      fy: (k.from === undefined ? k.y : k.from[1]),
+      slideToX: (k.slideTo === undefined ? null : k.slideTo),   // 一路滑到这儿
+      slideT: 0, slideTime: k.slideTime || 2.6, gone: false
     };
   });
   game.arrows = L.arrows || [];
@@ -1419,14 +1422,22 @@ function update(dt) {
     kk.t += dt;
     if (kk.got) continue;
     // 出场：一开始收着，玩家走过触发点之后慢慢浮现
+    if (kk.gone) continue;
     if (kk.show < 1) {
       if (!kk.hidden) kk.show = 1;
       else if (p.x + p.w / 2 > kk.triggerX) kk.show = Math.min(1, kk.show + dt / kk.outT);
       else continue;                     // 还没浮现，碰不到
     }
+    // 浮现完成之后，如果配了 slideTo：就一路从左滑到右，滑到头就消失
+    if (kk.slideToX !== null && kk.show >= 1) {
+      kk.slideT += dt;
+      var sk = Math.min(1, kk.slideT / kk.slideTime);
+      kk.x = kk.fx + (kk.slideToX - kk.fx) * sk;
+      if (sk >= 1) { kk.gone = true; continue; }   // 滑过去了就没了，只能等下一命
+    }
     var kcx = kk.fx + (kk.x - kk.fx) * kk.show;
     var kcy = kk.fy + (kk.y - kk.fy) * kk.show;
-    if (Math.abs(p.x + p.w / 2 - kcx) < 22 && Math.abs(p.y + p.h / 2 - kcy) < 24) {
+    if (Math.abs(p.x + p.w / 2 - kcx) < 26 && Math.abs(p.y + p.h / 2 - kcy) < 28) {
       kk.got = true;
       game.keyThisLife = true;
       game.keyGetT = 0;
@@ -1709,7 +1720,7 @@ function drawSkullKey(x, y, s, alpha) {
 function drawKeys() {
   for (var i = 0; i < game.keys.length; i++) {
     var k = game.keys[i];
-    if (k.got || k.show <= 0) continue;
+    if (k.got || k.gone || k.show <= 0) continue;
     var e = k.show * k.show * (3 - 2 * k.show);         // smoothstep
     var bob = Math.sin(k.t * 2.6) * 3 * e;
     var kx = k.fx + (k.x - k.fx) * e;                   // 从"藏身处"滑到"该在的地方"
