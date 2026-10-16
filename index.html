@@ -246,19 +246,18 @@ var LEVELS = [
     spikes: [], arrows: []
   },
   {
-    name: '1-4 · 一口气', hint: '四块。中间喘一口气都不行。',
-    width: 960, spawn: [70, 380], goal: { x: 914, y: 310, w: 46, h: 70 },
-    // 直接扑过去的话，门会连着它脚下那一小块浮空板一起沉下去，快到你追不上。
-    // 但站在倒数第二块（不会沉的）浮空板上等满 3 秒，门会重新从地里长出来。
-    sinkGoal: { triggerX: 868, depth: 240, time: 0.26, riseDelay: 3.0 },
+    name: '1-4 · 一口气', hint: '前三块会缩，第四块是稳的。',
+    width: 960, spawn: [70, 380], goal: { x: 862, y: 400, w: 46, h: 70 },
+    // 门可以被"勾引"：从第四块平台往右跳一下（人不用真过去），
+    // 门当场失效、脚下变坑，视觉上快速落下；等 2 秒再长回来。
+    sinkGoal: { triggerX: 828, depth: 320, time: 0.14, riseDelay: 2.0 },
     platforms: [
       { x: 0, y: 470, w: 150, h: 70, kind: 'solid' },
-      { x: 230, y: 450, w: 90, h: 24, kind: 'vanish' },
-      { x: 390, y: 430, w: 90, h: 24, kind: 'vanish' },
-      { x: 550, y: 410, w: 90, h: 24, kind: 'vanish' },
-      { x: 710, y: 395, w: 90, h: 24, kind: 'vanish' },
-      { x: 800, y: 380, w: 90, h: 24, kind: 'solid' },      // 最后一块浮空平台：安全落脚点
-      { x: 920, y: 380, w: 40, h: 24, kind: 'sinkFloor' }    // 门底下这一小块：会跟着门沉
+      { x: 230, y: 450, w: 90, h: 24, kind: 'vanish', retractT: 0.14 },
+      { x: 390, y: 430, w: 90, h: 24, kind: 'vanish', retractT: 0.14 },
+      { x: 550, y: 410, w: 90, h: 24, kind: 'vanish', retractT: 0.14 },
+      { x: 710, y: 400, w: 90, h: 24, kind: 'solid' },      // 第四块：正常的，不缩
+      { x: 850, y: 470, w: 110, h: 70, kind: 'sinkFloor' }  // 门脚下这块：跟着门一起没
     ],
     spikes: [], arrows: []
   },
@@ -620,6 +619,7 @@ function loadLevel(i) {
       //   看起来像穿模。现在改成：要平台单向得在关卡数据里显式写 oneWay: true）
       oneWay: !!p.oneWay,
       w0: p.w,                  // 消失板收缩动画用的原始宽度
+      retractT: p.retractT || 0.20,   // 收缩用时（越小消失越快）
       y0: p.y,                  // sinkFloor 下沉用的原始高度
       moveV: p.moveV || 0,      // 会走的障碍：出现后自己移动，把玩家顶走
       moveTo: p.moveTo || 0,
@@ -668,6 +668,7 @@ function loadLevel(i) {
   });
   game.flipT = -1;                    // >=0 表示翻转动画进行中
   game.sinkPhase = 'idle'; game.sinkT = 0; game.sinkY = 0; game.sinkLock = false;   // 门下沉
+  game.goalDead = false;                                                            // 门是否已失效
   game.shrinkX = 0;                                          // 地板左缘右移量
   game.keyThisLife = false;          // 这一命有没有捡到钥匙
   game.keyGetT = 999;                // 拿到钥匙之后过了多久（决定是不是"献祭"）
@@ -1119,7 +1120,7 @@ function update(dt) {
     }
     if (c.retract !== undefined) {
       c.retract += dt;
-      var rk = Math.min(1, c.retract / 0.20);
+      var rk = Math.min(1, c.retract / (c.retractT || 0.20));
       c.w = Math.max(0, c.w0 * (1 - rk));
       if (rk >= 1) { c.state = 'gone'; puff(c.x, c.y); }
     }
@@ -1170,10 +1171,13 @@ function update(dt) {
     var sg = LV.sinkGoal;
     var depth = sg.depth === undefined ? 220 : sg.depth;
     var stime = sg.time || 0.30;
-    // 只有"跳起来扑过去"才触发 —— 站着或走着不算
+    // 只有"跳起来扑过去"才触发 —— 站着或走着不算。
+    // 触发的那一刻门就"在代码上没了"：判定区立即失效、脚下变坑，
+    // 视觉上再补一个快速落下的动画。
     if (game.sinkPhase === 'idle' && !game.sinkLock && !p.onGround &&
         p.x + p.w / 2 > sg.triggerX) {
-      game.sinkPhase = 'sinking'; game.sinkT = 0; Sound.sfxTrap();
+      game.sinkPhase = 'sinking'; game.sinkT = 0;
+      game.goalDead = true; Sound.sfxTrap();
     }
     // 升起之后上锁：玩家得先离开触发区，门才允许再被触发（避免反复升降）
     if (game.sinkLock && p.x + p.w / 2 < sg.triggerX - 90) game.sinkLock = false;
@@ -1187,7 +1191,10 @@ function update(dt) {
     } else if (game.sinkPhase === 'rising') {
       game.sinkT += dt;
       game.sinkY = Math.max(0, (1 - Math.min(1, game.sinkT / stime)) * depth);
-      if (game.sinkY <= 0.5) { game.sinkPhase = 'idle'; game.sinkY = 0; game.sinkLock = true; }
+      if (game.sinkY <= 0.5) {
+        game.sinkPhase = 'idle'; game.sinkY = 0; game.sinkLock = true;
+        game.goalDead = false;               // 门长回来了，判定区跟着一起回来
+      }
     }
     // 门下面的那块地板跟着一起沉
     for (var sfi = 0; sfi < game.plats.length; sfi++) {
@@ -1317,8 +1324,10 @@ function update(dt) {
 
   // 到达终点
   var g0 = LEVELS[game.li].goal;
-  var g = { x: g0.x, y: g0.y + (game.sinkY || 0), w: g0.w, h: g0.h };
-  if (aabb(p, g)) { winLevel(); return; }
+  if (!game.goalDead) {                       // 门被勾引掉之后，判定区也没了
+    var g = { x: g0.x, y: g0.y + (game.sinkY || 0), w: g0.w, h: g0.h };
+    if (aabb(p, g)) { winLevel(); return; }
+  }
 
   // 一屏一关：把玩家夹在屏幕内，不许走出可视区
   if (p.x < 0) p.x = 0;
@@ -1593,7 +1602,7 @@ function drawGoal() {
     drawOneDoor(L.goal, game.goalReveal);
     return;
   }
-  drawOneDoor(L.goal, (game.state === 'win' && game.winDoor) ? game.winDoor.k : 1);
+  if (!game.goalDead || game.sinkY > 0) drawOneDoor(L.goal, 1);
 }
 
 function drawOneDoor(g, alpha) {
