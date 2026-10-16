@@ -267,13 +267,11 @@ var LEVELS = [
     spawn: [70, 380],
     goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 430, h: 70, kind: 'solid' },
-      { x: 540, y: 470, w: 220, h: 70, kind: 'solid' },
-      { x: 880, y: 470, w: 120, h: 70, kind: 'solid' },
-      // 第一根活塞：从地下钻出，把人一路顶进第一个坑，到坑沿缩回地下
-      { x: 100, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 180, moveV: 420, moveTo: 430 },
-      // 第二根：钻得更急、冲得更猛，第二个坑更远 —— 跑是跑不掉的，只能跳
-      { x: 600, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 660, moveV: 600, moveTo: 760 }
+      { x: 0, y: 470, w: 420, h: 70, kind: 'solid' },
+      { x: 570, y: 470, w: 430, h: 70, kind: 'solid' },
+      // 从右边地下钻出来的墙：一路向左，把玩家推回左边那个坑里。
+      // 想躲开它只有一招 —— 从它头顶跳过去。
+      { x: 760, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 620, moveV: -260, moveTo: 560 }
     ],
     spikes: [], arrows: []
   },
@@ -318,6 +316,7 @@ var LEVELS = [
    ================================================================== */
 var GRAVITY = 2400, MOVE = 315, JUMP_V = 950, MAX_FALL = 1500;
 var PISTON_RISE = 0.16, PISTON_SINK = 0.18;   // 活塞钻出地面 / 缩回地下所需时间
+var PISTON_STUB = 10;                         // 缩回后仍留在地面上的"端头"高度（纯视觉提示）
 
 var TAUNTS = ['就这？', '再来一次', '差一点点', '你被坑了', '哈哈哈哈哈',
               '这也信？', '再想想', '手别抖', '别急', '熟悉的味道'];
@@ -524,13 +523,16 @@ function update(dt) {
         if (kr >= 1) { pl.phase = 'moving'; pl.phaseT = 0; }
       } else if (pl.phase === 'moving') {
         pl.x += pl.moveV * dt;
-        if (aabb(p, pl)) p.x = pl.x + pl.w;          // 顶着玩家往前走
-        if (pl.moveTo && pl.x >= pl.moveTo) { pl.phase = 'sinking'; pl.phaseT = 0; }
+        // 推着玩家走（moveV 为负就一路往左推）
+        if (aabb(p, pl)) p.x = pl.moveV > 0 ? pl.x + pl.w : pl.x - p.w;
+        var reached = pl.moveV > 0 ? (pl.x >= pl.moveTo) : (pl.x <= pl.moveTo);
+        if (pl.moveTo && reached) { pl.phase = 'sinking'; pl.phaseT = 0; }
       } else if (pl.phase === 'sinking') {
         pl.phaseT += dt;
         var ks = Math.min(1, pl.phaseT / PISTON_SINK);
-        pl.y = pl.baseY + pl.h * ks;                 // 缩回地下
-        if (ks >= 1) { pl.phase = 'gone'; pl.state = 'gone'; }
+        // 缩回地下，但地面上留一小截端头 —— 玩家第二次能认出"这儿有东西"
+        pl.y = pl.baseY + (pl.h - PISTON_STUB) * ks;
+        if (ks >= 1) { pl.phase = 'buried'; pl.state = 'buried'; }
       }
       continue;
     }
