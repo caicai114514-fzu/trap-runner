@@ -1171,7 +1171,7 @@ function update(dt) {
     var depth = sg.depth === undefined ? 220 : sg.depth;
     var stime = sg.time || 0.30;
     if (game.sinkPhase === 'idle' && p.x + p.w / 2 > sg.triggerX) {
-      game.sinkPhase = 'sinking'; Sound.sfxTrap();
+      game.sinkPhase = 'sinking'; game.sinkT = 0; Sound.sfxTrap();   // sinkT 必须归零，否则第二次下沉会一帧跳到底
     }
     if (game.sinkPhase === 'sinking') {
       game.sinkT += dt;
