@@ -1163,9 +1163,9 @@ function update(dt) {
       if (c.feinting) {
         c.feintT += dt;
         var fk;
-        if (c.feintT < 0.09) fk = (c.feintT / 0.09) * 0.22;                 // 猛地缩进去
-        else if (c.feintT < 0.34) fk = 0.22;                                // 卡住一小会儿
-        else if (c.feintT < 0.62) fk = 0.22 * (1 - (c.feintT - 0.34) / 0.28); // 慢慢弹回来
+        if (c.feintT < 0.09) fk = (c.feintT / 0.09) * 0.55;                 // 猛地缩进去（一半以上）
+        else if (c.feintT < 0.34) fk = 0.55;                                // 卡住一小会儿
+        else if (c.feintT < 0.62) fk = 0.55 * (1 - (c.feintT - 0.34) / 0.28); // 慢慢弹回来
         else { fk = 0; c.feinting = false; }
         c.w = c.w0 * (1 - fk);
       }
