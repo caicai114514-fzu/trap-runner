@@ -212,9 +212,9 @@ var LEVELS = [
       { x: 560, y: 380, w: 120, h: 24, kind: 'solid' },
       { x: 740, y: 470, w: 260, h: 70, kind: 'solid' }
     ],
-    // 演示用锯片：在左侧地面上来回滚
+    // 演示用锯片：贴着悬空平台滚，玩家走这条桥必然要躲它
     saws: [
-      { x: 300, y: 442, r: 24, tx: 660, ty: 442, speed: 165 }
+      { x: 300, y: 354, r: 24, tx: 640, ty: 354, speed: 150 }
     ],
     spikes: [], arrows: []
   },
@@ -370,11 +370,12 @@ function applyWorldPalette(w) {
   PAL.groundTop = mix('#ff8a4a', c, 0.62);   // 平台顶边（最抢眼的一条）
   // 机关
   PAL.spike     = trapShade(0.08);
-  PAL.saw       = trapShade(-0.04);
   PAL.piston    = trapShade(-0.02);
   PAL.pistonTop = trapShade(-0.26);          // 活塞顶盖留点亮，不然完全看不见
   PAL.appear    = trapShade(-0.20);
   PAL.vanish    = trapShade(-0.08);
+  // 锯片例外：它是高速移动的东西，藏起来就是耍赖 —— 用亮金属色，一眼看得见
+  PAL.saw       = mix('#d8c9b2', c, 0.26);
   // 假地板不是"机关"：它要装成正常地板，所以贴着平台色
   PAL.fake      = mix('#734f38', c, 0.28);
 }
@@ -1118,9 +1119,12 @@ function drawSaws() {
 
     // 盘体
     ctx.beginPath(); ctx.arc(0, 0, r * 0.74, 0, 7); ctx.fill();
-    // 中心孔
+    // 画锯片：中心孔用背景色，看起来是"穿透"的
     ctx.fillStyle = PAL.bgDeep;
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.24, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.26, 0, 7); ctx.fill();
+    // 中心轴（小圆点），让转动更好辨认
+    ctx.fillStyle = PAL.ink;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.09, 0, 7); ctx.fill();
     ctx.restore();
   }
 }
@@ -2130,6 +2134,13 @@ game.state = 'title';
     winLevel();
     var wp = parseFloat((location.search.match(/p=([\d.]+)/) || [])[1] || '0');
     for (var i = 0; i < Math.round(wp / (1 / 60)); i++) update(1 / 60);
+  }
+  else if (m[1] === 'die') {                  // 直接把玩家放到锯片上撞死，看死亡表现
+    if (lvq !== undefined) { applyWorldPalette(wq); loadLevel(parseInt(lvq, 10)); } else loadSlot(wq, 0);
+    var sw0 = game.saws[0];
+    if (sw0) { game.p.x = sw0.x - game.p.w / 2; game.p.y = sw0.y - game.p.h / 2; }
+    var dp = parseFloat((location.search.match(/p=([\d.]+)/) || [])[1] || '0.2');
+    for (var d2 = 0; d2 < Math.round(dp / (1 / 60)); d2++) update(1 / 60);
   }
   else if (m[1] === 'trans') {                // 冻结在过场红门的某个进度
     loadSlot(wq, 0);
