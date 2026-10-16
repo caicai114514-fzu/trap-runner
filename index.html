@@ -1520,11 +1520,12 @@ function drawPlatforms() {
       // 踩上去：弹簧伸展，板子被顶起来，到顶就弹飞。
       if (p.kind === 'bounce') {
         var bpop = p.pop || 0;
+        if (bpop <= 0.02) continue;                   // 没踩 → 一根线都不画，就是普通地面
         var topY = p.y + p.h;                         // 板子静止时贴着地面
         var rise = 30 * bpop;                         // 板子升起高度
         var by = topY - rise;
         var coilH = 22 * (1 - bpop * 0.85);           // 弹簧剩余高度（越弹越伸展）
-        if (bpop > 0.02) {
+        {
           // 弹簧：中间一根立杆 + 上下两圈，画成被压住的样子
           ctx.strokeStyle = PAL.groundTop;
           ctx.lineWidth = 3;
