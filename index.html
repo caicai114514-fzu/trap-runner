@@ -234,8 +234,9 @@ var LEVELS = [
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
     // 钥匙一开始收在左边那块地板里；走过悬空板之后才慢慢滑到坑底浮出来。
     // 想拿就得从中间跳下去 —— 而那一跳是必死的。
-    keys: [{ x: 100, y: 520, hidden: true, from: [100, 520], triggerX: 360, outT: 0.5,
-             slideTo: 800, slideTime: 2.4 }],
+    keys: [{ x: 100, y: 520, hidden: true, from: [100, 520],
+             armX: 680, triggerX: 250, outT: 0.6,      // 先到第三块板，再退回出发点
+             slideTo: 800, slideTime: 7.0 }],           // 慢慢滑，给你时间算
     platforms: [
       { x: 0, y: 470, w: 200, h: 70, kind: 'solid' },
       { x: 290, y: 390, w: 120, h: 24, kind: 'solid' },
@@ -716,7 +717,9 @@ function loadLevel(i) {
       fx: (k.from === undefined ? k.x : k.from[0]),   // 从哪浮现（默认原地）
       fy: (k.from === undefined ? k.y : k.from[1]),
       slideToX: (k.slideTo === undefined ? null : k.slideTo),   // 一路滑到这儿
-      slideT: 0, slideTime: k.slideTime || 2.6, gone: false
+      slideT: 0, slideTime: k.slideTime || 2.6, gone: false,
+      armX: (k.armX === undefined ? null : k.armX),             // 检查点一：先得到过这儿
+      armed: false, started: false                              // 检查点二：再回到 triggerX 左边才启动
     };
   });
   game.arrows = L.arrows || [];
@@ -1423,9 +1426,17 @@ function update(dt) {
     if (kk.got) continue;
     // 出场：一开始收着，玩家走过触发点之后慢慢浮现
     if (kk.gone) continue;
+    // 检查点一：人得先跑到 armX 那边去
+    if (kk.armX !== null && !kk.armed && p.x + p.w / 2 > kk.armX) kk.armed = true;
+    // 检查点二：再回到出发点（triggerX 左边），机关才真正启动
+    if (kk.armX !== null && !kk.started) {
+      if (kk.armed && p.x + p.w / 2 < kk.triggerX) {
+        kk.started = true; Sound.sfxTrap();          // 这时候才听到"机关响了"
+      } else continue;
+    }
     if (kk.show < 1) {
       if (!kk.hidden) kk.show = 1;
-      else if (p.x + p.w / 2 > kk.triggerX) kk.show = Math.min(1, kk.show + dt / kk.outT);
+      else if (kk.armX !== null || p.x + p.w / 2 > kk.triggerX) kk.show = Math.min(1, kk.show + dt / kk.outT);
       else continue;                     // 还没浮现，碰不到
     }
     // 浮现完成之后，如果配了 slideTo：就一路从左滑到右，滑到头就消失
