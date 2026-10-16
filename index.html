@@ -268,7 +268,7 @@ var LEVELS = [
     // 走过触发点后第一段左缘开始往右追（290px/s，你 315，跑得赢），
     // 追到 520 停；同时中间那一段整体往下缩，沉没了就是一个 150px 的坑。【触发点卡在坑前 36px，
     // 也就是你离坑只剩 0.11 秒的时候它才塌 —— 初见根本反应不过来，只能靠记住。】
-    shrinkFloor: { triggerX: 180, speed: 306, stopX: 520 },
+    shrinkFloor: { triggerX: 180, speed: 306, stopX: 604 },
     platforms: [
       { x: 0, y: 470, w: 660, h: 70, kind: 'solid' },       // 第一段：会从左边缩
       { x: 660, y: 470, w: 150, h: 70, kind: 'pitFloor', triggerX: 624, sinkTime: 0.12 },
