@@ -280,11 +280,20 @@ var LEVELS = [
 
   /* ================= 大关二 · 眼见为虚（假刺 / 箭头 / 假门）================= */
   {
-    name: '2-1 · 箭头', hint: '它指的方向，是活路吗？',
+    name: '2-1 · 弹簧', hint: '那块地板看着挺正常的。',
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
-    platforms: [{ x: 0, y: 470, w: 960, h: 70, kind: 'solid' }],
-    spikes: [{ x: 520, y: 414, w: 120, h: 56, hidden: true, triggerX: 430 }],
-    arrows: [{ x: 400, y: 438, dir: 'up' }]
+    // 中间藏了一块跳板：踩上去皮会伸起来，然后自动把你弹飞 ——
+    // 同时天花板立刻长出刺，你正好撞上去。第二次记得绕开它。
+    // 绕开之后，后面还有一根位置触发的刺等着。
+    platforms: [
+      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
+      { x: 420, y: 450, w: 90, h: 20, kind: 'bounce', power: 1420, popTime: 0.10 }
+    ],
+    spikes: [
+      { x: 400, y: 0, w: 130, h: 210, dir: 'down', hidden: true, triggerX: 380 },
+      { x: 720, y: 414, w: 110, h: 56, hidden: true, triggerX: 640 }
+    ],
+    arrows: []
   },
   {
     name: '2-2 · 假刺阵', hint: '前面几片都是假的。大概吧。',
@@ -624,6 +633,8 @@ function loadLevel(i) {
       x0: p.x,
       w0: p.w,                  // 消失板收缩动画用的原始宽度
       retractT: p.retractT || 0.20,   // 收缩用时（越小消失越快）
+      pop: 0,                          // bounce 跳板：皮鼓起来的进度 0~1
+      popped: false,
       sinkT2: p.sinkTime || 0.26,     // pitFloor 往下缩用时
       sunk: false,
       y0: p.y,                  // sinkFloor 下沉用的原始高度
@@ -1174,6 +1185,21 @@ function update(dt) {
 
   // ===== 门下沉：跳过去就跟着沉，够不着（死后动画自动停住，因为 dead 分支直接 return）=====
   var LV = LEVELS[game.li];
+  // ===== 隐藏跳板：踩上去皮会伸起来，然后自动把人大力弹飞 =====
+  for (var bp = 0; bp < game.plats.length; bp++) {
+    var bt = game.plats[bp];
+    if (bt.kind !== 'bounce' || bt.popped) continue;
+    if (p.ground === bt) {
+      bt.pop = Math.min(1, bt.pop + dt / (bt.popTime || 0.10));
+      if (bt.pop >= 1) {
+        bt.popped = true;
+        p.vy = -(bt.power || 1420);          // 自动起跳，不由玩家决定
+        p.onGround = false;
+        Sound.sfxJump();
+      }
+    }
+  }
+
   // ===== 虚晃一枪：先抖一下骗你，然后所有平台秒变坑，只有门留在原地 =====
   if (LV.quake && game.quakePhase !== 'done') {
     var qk = LV.quake;
@@ -1477,6 +1503,25 @@ function drawPlatforms() {
         ctx.beginPath();
         ctx.rect(p.x - 2, 0, p.w + 4, p.baseY + p.h);
         ctx.clip();
+      }
+      // 跳板：皮会鼓起来
+      if (p.kind === 'bounce') {
+        var bpop = p.pop || 0;
+        var bh = p.h * (1 + bpop * 2.2);
+        ctx.fillStyle = PAL.ground;
+        ctx.fillRect(p.x, p.y + p.h - p.h * (1 + bpop * 2.2) + p.h * bpop * 2.2 - bh + bh, p.w, 4);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y + p.h);
+        ctx.quadraticCurveTo(p.x + p.w / 2, p.y + p.h - bh, p.x + p.w, p.y + p.h);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = PAL.groundTop;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y + p.h);
+        ctx.quadraticCurveTo(p.x + p.w / 2, p.y + p.h - bh, p.x + p.w, p.y + p.h);
+        ctx.lineTo(p.x + p.w, p.y + p.h + 4);
+        ctx.lineTo(p.x, p.y + p.h + 4);
+        ctx.closePath(); ctx.fill();
+        continue;
       }
       // 翻板：绕自己中心转
       if (p.kind === 'flip' && game.flipT >= 0) {
