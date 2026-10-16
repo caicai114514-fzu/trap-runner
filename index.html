@@ -247,18 +247,18 @@ var LEVELS = [
   },
   {
     name: '1-4 · 一口气', hint: '四块。中间喘一口气都不行。',
-    width: 960, spawn: [70, 380], goal: { x: 890, y: 400, w: 46, h: 70 },
-    // 直接扑过去的话，门会连着脚下那块一起沉下去，快到你追不上。
-    // 但如果站在最后那块平台上等它消失满 3 秒，门会重新从地里长出来。
-    sinkGoal: { triggerX: 835, depth: 220, time: 0.28, riseDelay: 3.0 },
+    width: 960, spawn: [70, 380], goal: { x: 914, y: 310, w: 46, h: 70 },
+    // 直接扑过去的话，门会连着它脚下那一小块浮空板一起沉下去，快到你追不上。
+    // 但站在倒数第二块（不会沉的）浮空板上等满 3 秒，门会重新从地里长出来。
+    sinkGoal: { triggerX: 868, depth: 240, time: 0.26, riseDelay: 3.0 },
     platforms: [
       { x: 0, y: 470, w: 150, h: 70, kind: 'solid' },
       { x: 230, y: 450, w: 90, h: 24, kind: 'vanish' },
       { x: 390, y: 430, w: 90, h: 24, kind: 'vanish' },
       { x: 550, y: 410, w: 90, h: 24, kind: 'vanish' },
-      { x: 710, y: 400, w: 90, h: 24, kind: 'vanish' },
-      { x: 800, y: 470, w: 90, h: 70, kind: 'solid' },      // 最后一块：不消失，是落脚点
-      { x: 890, y: 470, w: 70, h: 70, kind: 'sinkFloor' }    // 门底下这块会跟着门沉
+      { x: 710, y: 395, w: 90, h: 24, kind: 'vanish' },
+      { x: 800, y: 380, w: 90, h: 24, kind: 'solid' },      // 最后一块浮空平台：安全落脚点
+      { x: 920, y: 380, w: 40, h: 24, kind: 'sinkFloor' }    // 门底下这一小块：会跟着门沉
     ],
     spikes: [], arrows: []
   },
@@ -667,7 +667,7 @@ function loadLevel(i) {
     return { x: c.x, y: c.y, fake: !!c.fake, flip: !!c.flip, got: false, t: Math.random() * 6 };
   });
   game.flipT = -1;                    // >=0 表示翻转动画进行中
-  game.sinkPhase = 'idle'; game.sinkT = 0; game.sinkY = 0;   // 门下沉
+  game.sinkPhase = 'idle'; game.sinkT = 0; game.sinkY = 0; game.sinkLock = false;   // 门下沉
   game.shrinkX = 0;                                          // 地板左缘右移量
   game.keyThisLife = false;          // 这一命有没有捡到钥匙
   game.keyGetT = 999;                // 拿到钥匙之后过了多久（决定是不是"献祭"）
@@ -1170,9 +1170,13 @@ function update(dt) {
     var sg = LV.sinkGoal;
     var depth = sg.depth === undefined ? 220 : sg.depth;
     var stime = sg.time || 0.30;
-    if (game.sinkPhase === 'idle' && p.x + p.w / 2 > sg.triggerX) {
-      game.sinkPhase = 'sinking'; game.sinkT = 0; Sound.sfxTrap();   // sinkT 必须归零，否则第二次下沉会一帧跳到底
+    // 只有"跳起来扑过去"才触发 —— 站着或走着不算
+    if (game.sinkPhase === 'idle' && !game.sinkLock && !p.onGround &&
+        p.x + p.w / 2 > sg.triggerX) {
+      game.sinkPhase = 'sinking'; game.sinkT = 0; Sound.sfxTrap();
     }
+    // 升起之后上锁：玩家得先离开触发区，门才允许再被触发（避免反复升降）
+    if (game.sinkLock && p.x + p.w / 2 < sg.triggerX - 90) game.sinkLock = false;
     if (game.sinkPhase === 'sinking') {
       game.sinkT += dt;
       game.sinkY = Math.min(1, game.sinkT / stime) * depth;
@@ -1183,7 +1187,7 @@ function update(dt) {
     } else if (game.sinkPhase === 'rising') {
       game.sinkT += dt;
       game.sinkY = Math.max(0, (1 - Math.min(1, game.sinkT / stime)) * depth);
-      if (game.sinkY <= 0.5) { game.sinkPhase = 'idle'; game.sinkY = 0; }
+      if (game.sinkY <= 0.5) { game.sinkPhase = 'idle'; game.sinkY = 0; game.sinkLock = true; }
     }
     // 门下面的那块地板跟着一起沉
     for (var sfi = 0; sfi < game.plats.length; sfi++) {
