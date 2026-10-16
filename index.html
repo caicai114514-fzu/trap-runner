@@ -290,7 +290,7 @@ var LEVELS = [
       { x: 420, y: 469, w: 90, h: 18, kind: 'bounce', power: 1420, popTime: 0.10 }
     ],
     spikes: [
-      { x: 400, y: 0, w: 130, h: 210, dir: 'down', hidden: true, triggerX: 380 },
+      { x: 400, y: 0, w: 130, h: 210, dir: 'down', onPop: true },
       { x: 720, y: 414, w: 110, h: 56, hidden: true, triggerX: 640 }
     ],
     arrows: []
@@ -649,7 +649,8 @@ function loadLevel(i) {
       x: s.x, y: s.y, w: s.w, h: s.h, hidden: !!s.hidden,
       triggerX: s.triggerX || 0, dir: s.dir || 'up',
       fake: !!s.fake,           // 假刺：长得一模一样，但不致命
-      shown: !s.hidden, anim: s.hidden ? 0 : 1
+      onPop: !!s.onPop,         // 等跳板把人弹起来之后才长出来
+      shown: !s.hidden && !s.onPop, anim: (s.hidden || s.onPop) ? 0 : 1
     };
   });
   game.saws = (L.saws || []).map(function (s) {
@@ -687,7 +688,8 @@ function loadLevel(i) {
   game.sinkPhase = 'idle'; game.sinkT = 0; game.sinkY = 0; game.sinkLock = false;   // 门下沉
   game.goalDead = false;                                                            // 门是否已失效
   game.shrinkX = 0;                                          // 地板左缘右移量
-  game.jumpLock = 0;      // 弹起后短暂禁止跳跃，免得被普通跳跃覆盖
+  game.jumpLock = 0;
+  game.popFired = false;      // 弹起后短暂禁止跳跃，免得被普通跳跃覆盖
   game.quakePhase = 'idle'; game.quakeT = 0; game.quakeOff = 0;   // 抖动 → 全塌
   game.keyThisLife = false;          // 这一命有没有捡到钥匙
   game.keyGetT = 999;                // 拿到钥匙之后过了多久（决定是不是"献祭"）
@@ -1172,6 +1174,16 @@ function update(dt) {
     if (Math.sqrt(ddx * ddx + ddy * ddy) < sw.r * 0.80 + 8) { die(); return; }
   }
 
+  // onPop 的刺：跳板把人弹起来之后才长出来（更极限）
+  if (game.popFired) {
+    for (var op = 0; op < game.spikes.length; op++) {
+      if (game.spikes[op].onPop && !game.spikes[op].shown) {
+        game.spikes[op].shown = true;
+        Sound.sfxTrap();
+      }
+    }
+  }
+
   // 尖刺致死（假刺长得一样，但踩上去没事——这是骗人的）
   for (var s = 0; s < game.spikes.length; s++) {
     var sp2 = game.spikes[s];
@@ -1205,6 +1217,7 @@ function update(dt) {
         p.y = bt.y - p.h - 3;                // 抬出板子，免得下一帧又被判"顶头"
         p.onGround = false;
         game.jumpLock = 0.18;                // 锁一会儿，否则会被土狼时间里的普通跳跃覆盖掉
+        game.popFired = true;                // 通知：人已经被弹起来了
         game.coyote = 0; game.jumpBuf = 0;
         Sound.sfxJump();
       }
