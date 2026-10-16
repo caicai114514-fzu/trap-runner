@@ -1192,8 +1192,10 @@ function update(dt) {
     var bt = game.plats[bp];
     if (bt.kind !== 'bounce') continue;
     // 位置检测：人压在跳板那一小块上就触发（不要求 p.ground 是它）
-    var onIt = p.x + p.w > bt.x + 6 && p.x < bt.x + bt.w - 6 &&
-               p.y + p.h > bt.y - 6 && p.y + p.h < bt.y + bt.h + 16 && p.vy >= -40;
+    // 只有"人真的站在这块板上"才触发：脚底贴着板面、水平有交集、不是往上飞
+    var onIt = Math.abs((p.y + p.h) - bt.y) < 7 &&
+               p.x + p.w > bt.x + 4 && p.x < bt.x + bt.w - 4 &&
+               p.vy >= -20;
     if (!onIt) { bt.pop = Math.max(0, bt.pop - dt * 6); continue; }   // 离开就慢慢瘪回去
     {
       bt.pop = Math.min(1, bt.pop + dt / (bt.popTime || 0.10));
@@ -1533,11 +1535,6 @@ function drawPlatforms() {
             var cy2 = by + 6 + cz * coilH;
             if (ci === 0) ctx.moveTo(cx2, cy2); else ctx.lineTo(cx2, cy2);
           }
-          ctx.stroke();
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(p.x + p.w / 2, by + 6);
-          ctx.lineTo(p.x + p.w / 2, by + 6 + coilH);
           ctx.stroke();
         }
         // 板子：一块比跳板略宽的厚板
