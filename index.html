@@ -1882,50 +1882,89 @@ function transK() {
   return 1 - b;
 }
 
-/* 一扇红门板：木纹 + 内缘高光 */
-function redDoorPanel(x, w, fromLeft) {
-  if (w <= 0.5) return;
-  ctx.save();
-  ctx.beginPath(); ctx.rect(x, 0, w, VH); ctx.clip();
+/* 关门那条边的锯齿轮廓：整局只生成一次，左右两扇共用同一条缝线。
+   共用是关键 —— 合上时严丝合缝，不会出现"各画各的锯齿对不上"。
+   每段高矮深浅都不同，不规则的才像真的咬合。 */
+var JAG = null;
+function jagProfile() {
+  if (JAG) return JAG;
+  JAG = [];
+  var seed = 20261016;
+  function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+  var y = 0;
+  while (y < VH) {
+    var h = 20 + rnd() * 44;                     // 每段高 20~64
+    var d = (rnd() * 2 - 1) * (9 + rnd() * 22);  // 相对缝线凸出 / 凹进 ±(9~31)
+    JAG.push({ y0: y, y1: Math.min(VH, y + h), d: d });
+    y += h;
+  }
+  return JAG;
+}
 
-  var g = ctx.createLinearGradient(x, 0, x + w, 0);
-  if (fromLeft) { g.addColorStop(0, '#4e0c07'); g.addColorStop(0.75, '#96201a'); g.addColorStop(1, '#b32a20'); }
-  else          { g.addColorStop(0, '#b32a20'); g.addColorStop(0.25, '#96201a'); g.addColorStop(1, '#4e0c07'); }
-  ctx.fillStyle = g; ctx.fillRect(x, 0, w, VH);
+/* 一扇红门板：外侧贴屏幕边，内侧（关门那一边）走锯齿 */
+function redDoorPanel(half, fromLeft) {
+  if (half <= 0.5) return;
+  var J = jagProfile();
+  var seam = fromLeft ? half : (VW - half);      // 这一扇的缝线基准位置
+  var bx0 = fromLeft ? 0 : VW - half, bx1 = fromLeft ? half : VW;
+
+  // 1) 门板形状：内侧走锯齿
+  ctx.beginPath();
+  if (fromLeft) {
+    ctx.moveTo(0, 0);
+    for (var i = 0; i < J.length; i++) {
+      var x = seam + J[i].d;
+      ctx.lineTo(x, J[i].y0);
+      ctx.lineTo(x, J[i].y1);
+    }
+    ctx.lineTo(0, VH);
+  } else {
+    ctx.moveTo(VW, 0);
+    for (var j = 0; j < J.length; j++) {
+      var x2 = seam + J[j].d;
+      ctx.lineTo(x2, J[j].y0);
+      ctx.lineTo(x2, J[j].y1);
+    }
+    ctx.lineTo(VW, VH);
+  }
+  ctx.closePath();
+
+  // 2) 在门板形状里铺质感
+  ctx.save();
+  ctx.clip();
+  var g = ctx.createLinearGradient(bx0, 0, bx1, 0);
+  if (fromLeft) { g.addColorStop(0, '#4e0c07'); g.addColorStop(0.72, '#96201a'); g.addColorStop(1, '#b32a20'); }
+  else          { g.addColorStop(0, '#b32a20'); g.addColorStop(0.28, '#96201a'); g.addColorStop(1, '#4e0c07'); }
+  ctx.fillStyle = g;
+  ctx.fillRect(bx0 - 60, 0, (bx1 - bx0) + 120, VH);
 
   // 竖向木纹
   ctx.strokeStyle = 'rgba(0,0,0,0.20)'; ctx.lineWidth = 3;
-  for (var i = 1; i * 52 < w; i++) {
-    var lx = x + i * 52;
+  for (var k = 1; k * 52 < half + 60; k++) {
+    var lx = fromLeft ? k * 52 : VW - k * 52;
     ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, VH); ctx.stroke();
   }
   // 横向压条
   ctx.fillStyle = 'rgba(0,0,0,0.16)';
-  [VH * 0.20, VH * 0.80].forEach(function (yy) { ctx.fillRect(x, yy - 4, w, 8); });
-
-  // 内缘（两扇碰在一起的那条边）
-  var ex = fromLeft ? x + w - 6 : x;
-  ctx.fillStyle = '#ff6b48'; ctx.fillRect(ex, 0, 6, VH);
-  ctx.fillStyle = 'rgba(0,0,0,0.45)';
-  ctx.fillRect(fromLeft ? x + w - 10 : x + 6, 0, 4, VH);
-
+  [VH * 0.20, VH * 0.80].forEach(function (yy) { ctx.fillRect(bx0 - 60, yy - 4, (bx1 - bx0) + 120, 8); });
   ctx.restore();
+
+  // 3) 沿锯齿描一条亮边，让咬合处看得清
+  ctx.beginPath();
+  for (var m = 0; m < J.length; m++) {
+    var xx = seam + J[m].d;
+    if (m === 0) ctx.moveTo(xx, J[m].y0); else ctx.lineTo(xx, J[m].y0);
+    ctx.lineTo(xx, J[m].y1);
+  }
+  ctx.strokeStyle = '#ff6b48'; ctx.lineWidth = 3; ctx.lineJoin = 'miter'; ctx.stroke();
 }
 
 function drawTransition() {
   if (!TRANS.on) return;
   var half = (VW / 2) * transK();
   if (half <= 0.5) return;
-  redDoorPanel(0, half, true);
-  redDoorPanel(VW - half, half, false);
-  // 合拢时的中缝光
-  if (half > VW / 2 - 60) {
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, 1 - (VW / 2 - half) / 60) * 0.5;
-    ctx.fillStyle = '#ffb08c';
-    ctx.fillRect(VW / 2 - 2, 0, 4, VH);
-    ctx.restore();
-  }
+  redDoorPanel(half, true);
+  redDoorPanel(half, false);
 }
 
 function render() {
