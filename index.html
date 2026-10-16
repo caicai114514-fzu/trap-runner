@@ -262,16 +262,19 @@ var LEVELS = [
   },
   {
     name: '第六关 · 此路不通',
-    hint: '有些墙，不是用来挡你的。',
+    hint: '左边一堵，右边一堵。',
     width: 960,
     spawn: [70, 380],
     goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 420, h: 70, kind: 'solid' },
-      { x: 570, y: 470, w: 430, h: 70, kind: 'solid' },
-      // 从右边地下钻出来的墙：一路向左，把玩家推回左边那个坑里。
-      // 想躲开它只有一招 —— 从它头顶跳过去。
-      { x: 760, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 620, moveV: -260, moveTo: 560 }
+      { x: 0, y: 470, w: 620, h: 70, kind: 'solid' },
+      { x: 720, y: 470, w: 280, h: 70, kind: 'solid' },
+      // 第一堵：从身后（左边）地下钻出来，一路向右，把人顶进前面的坑。
+      // 躲法是跳起来让它从脚下过去 —— 而且必须跳得够远，落点要越过坑。
+      { x: 300, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 430, moveV: 600, moveTo: 620 },
+      // 第二堵：你刚跳过坑落到对面，它立刻从前面（右边）钻出来。
+      // 更快、更靠前，一路向左把你推回刚才那个坑里。
+      { x: 900, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 780, moveV: -700, moveTo: 720 }
     ],
     spikes: [], arrows: []
   },
@@ -316,7 +319,6 @@ var LEVELS = [
    ================================================================== */
 var GRAVITY = 2400, MOVE = 315, JUMP_V = 950, MAX_FALL = 1500;
 var PISTON_RISE = 0.16, PISTON_SINK = 0.18;   // 活塞钻出地面 / 缩回地下所需时间
-var PISTON_STUB = 10;                         // 缩回后仍留在地面上的"端头"高度（纯视觉提示）
 
 var TAUNTS = ['就这？', '再来一次', '差一点点', '你被坑了', '哈哈哈哈哈',
               '这也信？', '再想想', '手别抖', '别急', '熟悉的味道'];
@@ -530,9 +532,8 @@ function update(dt) {
       } else if (pl.phase === 'sinking') {
         pl.phaseT += dt;
         var ks = Math.min(1, pl.phaseT / PISTON_SINK);
-        // 缩回地下，但地面上留一小截端头 —— 玩家第二次能认出"这儿有东西"
-        pl.y = pl.baseY + (pl.h - PISTON_STUB) * ks;
-        if (ks >= 1) { pl.phase = 'buried'; pl.state = 'buried'; }
+        pl.y = pl.baseY + pl.h * ks;                 // 完全缩回地下，一点不留
+        if (ks >= 1) { pl.phase = 'gone'; pl.state = 'gone'; }
       }
       continue;
     }
