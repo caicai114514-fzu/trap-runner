@@ -1158,7 +1158,8 @@ function update(dt) {
     // feint（假动作）：踩上去先往里缩一截吓你一下，然后原样弹回来，根本不塌
     if (c.kind === 'feint') {
       if (c.feinting === undefined) { c.feinting = false; c.feintDone = false; }
-      if (p.ground !== c) { c.feintDone = false; c.feinting = false; c.w = c.w0; continue; }   // 离开就复位
+      // 人走了也照样缩完 —— 只有「没在动的」时候离开才复位
+      if (p.ground !== c && !c.feinting) { c.feintDone = false; c.w = c.w0; continue; }
       if (!c.feinting && !c.feintDone) { c.feinting = true; c.feintDone = true; c.feintT = 0; Sound.sfxTrap(); }
       if (c.feinting) {
         c.feintT += dt;
