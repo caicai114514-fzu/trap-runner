@@ -1883,50 +1883,40 @@ function transK() {
 }
 
 /* 关门那条边的锯齿轮廓：整局只生成一次，左右两扇共用同一条缝线。
-   共用是关键 —— 合上时严丝合缝，不会出现"各画各的锯齿对不上"。
-   每段高矮深浅都不同，不规则的才像真的咬合。 */
+   共用是关键 —— 合上时严丝合缝，不会"各画各的对不上"。
+   形状是折线（尖刺）而不是台阶：相邻点一凸一凹，每个齿都是尖的。
+   参考 Level Devil 平台下沿那种齿：**小而密**，一屏几十个。 */
 var JAG = null;
 function jagProfile() {
   if (JAG) return JAG;
   JAG = [];
   var seed = 20261016;
   function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
-  var y = 0;
-  while (y < VH) {
-    var h = 20 + rnd() * 44;                     // 每段高 20~64
-    var d = (rnd() * 2 - 1) * (9 + rnd() * 22);  // 相对缝线凸出 / 凹进 ±(9~31)
-    JAG.push({ y0: y, y1: Math.min(VH, y + h), d: d });
-    y += h;
+  var y = -30, sign = 1;                     // 从屏幕外开始，上下各多留一截
+  while (y < VH + 30) {
+    var d = sign * (5 + rnd() * 8);          // 尖刺幅度 5~13（小）
+    JAG.push({ y: y, d: d });
+    sign = -sign;                            // 一凸一凹交替 → 每个齿都是尖的
+    y += 7 + rnd() * 9;                      // 段高 7~16（密，一屏约 45 个齿）
   }
+  JAG.push({ y: VH + 30, d: 0 });
   return JAG;
 }
 
-/* 一扇红门板：外侧贴屏幕边，内侧（关门那一边）走锯齿 */
-function redDoorPanel(half, fromLeft) {
+/* 一扇红门板：外侧贴屏幕边，内侧（关门那一边）走尖刺锯齿。
+   k 是合门进度，用来在完全合上后把缝上的高光淡掉。 */
+function redDoorPanel(half, fromLeft, k) {
   if (half <= 0.5) return;
   var J = jagProfile();
   var seam = fromLeft ? half : (VW - half);      // 这一扇的缝线基准位置
   var bx0 = fromLeft ? 0 : VW - half, bx1 = fromLeft ? half : VW;
+  var yTop = J[0].y, yBot = J[J.length - 1].y;
 
-  // 1) 门板形状：内侧走锯齿
+  // 1) 门板形状：内侧是折线尖刺
   ctx.beginPath();
-  if (fromLeft) {
-    ctx.moveTo(0, 0);
-    for (var i = 0; i < J.length; i++) {
-      var x = seam + J[i].d;
-      ctx.lineTo(x, J[i].y0);
-      ctx.lineTo(x, J[i].y1);
-    }
-    ctx.lineTo(0, VH);
-  } else {
-    ctx.moveTo(VW, 0);
-    for (var j = 0; j < J.length; j++) {
-      var x2 = seam + J[j].d;
-      ctx.lineTo(x2, J[j].y0);
-      ctx.lineTo(x2, J[j].y1);
-    }
-    ctx.lineTo(VW, VH);
-  }
+  ctx.moveTo(fromLeft ? 0 : VW, yTop);
+  for (var i = 0; i < J.length; i++) ctx.lineTo(seam + J[i].d, J[i].y);
+  ctx.lineTo(fromLeft ? 0 : VW, yBot);
   ctx.closePath();
 
   // 2) 在门板形状里铺质感
@@ -1936,35 +1926,41 @@ function redDoorPanel(half, fromLeft) {
   if (fromLeft) { g.addColorStop(0, '#4e0c07'); g.addColorStop(0.72, '#96201a'); g.addColorStop(1, '#b32a20'); }
   else          { g.addColorStop(0, '#b32a20'); g.addColorStop(0.28, '#96201a'); g.addColorStop(1, '#4e0c07'); }
   ctx.fillStyle = g;
-  ctx.fillRect(bx0 - 60, 0, (bx1 - bx0) + 120, VH);
+  ctx.fillRect(bx0 - 70, 0, (bx1 - bx0) + 140, VH);
 
   // 竖向木纹
   ctx.strokeStyle = 'rgba(0,0,0,0.20)'; ctx.lineWidth = 3;
-  for (var k = 1; k * 52 < half + 60; k++) {
-    var lx = fromLeft ? k * 52 : VW - k * 52;
+  for (var m = 1; m * 52 < half + 70; m++) {
+    var lx = fromLeft ? m * 52 : VW - m * 52;
     ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, VH); ctx.stroke();
   }
   // 横向压条
   ctx.fillStyle = 'rgba(0,0,0,0.16)';
-  [VH * 0.20, VH * 0.80].forEach(function (yy) { ctx.fillRect(bx0 - 60, yy - 4, (bx1 - bx0) + 120, 8); });
+  [VH * 0.20, VH * 0.80].forEach(function (yy) { ctx.fillRect(bx0 - 70, yy - 4, (bx1 - bx0) + 140, 8); });
   ctx.restore();
 
-  // 3) 沿锯齿描一条亮边，让咬合处看得清
-  ctx.beginPath();
-  for (var m = 0; m < J.length; m++) {
-    var xx = seam + J[m].d;
-    if (m === 0) ctx.moveTo(xx, J[m].y0); else ctx.lineTo(xx, J[m].y0);
-    ctx.lineTo(xx, J[m].y1);
+  // 3) 沿尖刺描一条亮边。完全合上后就不要这条线了（合上了不该还亮着一条缝）
+  var fade = Math.max(0, 1 - Math.max(0, (k - 0.72) / 0.28));
+  if (fade > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.beginPath();
+    for (var n = 0; n < J.length; n++) {
+      var xx = seam + J[n].d;
+      if (n === 0) ctx.moveTo(xx, J[n].y); else ctx.lineTo(xx, J[n].y);
+    }
+    ctx.strokeStyle = '#ff6b48'; ctx.lineWidth = 3; ctx.lineJoin = 'miter'; ctx.stroke();
+    ctx.restore();
   }
-  ctx.strokeStyle = '#ff6b48'; ctx.lineWidth = 3; ctx.lineJoin = 'miter'; ctx.stroke();
 }
 
 function drawTransition() {
   if (!TRANS.on) return;
-  var half = (VW / 2) * transK();
+  var k = transK();
+  var half = (VW / 2) * k;
   if (half <= 0.5) return;
-  redDoorPanel(half, true);
-  redDoorPanel(half, false);
+  redDoorPanel(half, true, k);
+  redDoorPanel(half, false, k);
 }
 
 function render() {
