@@ -235,14 +235,14 @@ var LEVELS = [
     // 钥匙一开始收在左边那块地板里；走过悬空板之后才慢慢滑到坑底浮出来。
     // 想拿就得从中间跳下去 —— 而那一跳是必死的。
     keys: [{ x: 100, y: 520, hidden: true, from: [100, 520],
-             armX: 680, triggerX: 250, outT: 0.6,      // 先到第三块板，再退回出发点
+             armX: 610, triggerX: 250, outT: 0.6,      // 先到第三块板，再退回出发点
              slideTo: 800, slideTime: 7.0 }],           // 慢慢滑，给你时间算
     platforms: [
       { x: 0, y: 470, w: 200, h: 70, kind: 'solid' },
       { x: 290, y: 390, w: 120, h: 24, kind: 'solid' },
       { x: 500, y: 390, w: 120, h: 24, kind: 'fake' },     // 唯一的中转站，也是唯一会缩的
-      { x: 670, y: 390, w: 120, h: 24, kind: 'solid' },
-      { x: 790, y: 470, w: 170, h: 70, kind: 'solid' }
+      { x: 600, y: 390, w: 120, h: 24, kind: 'solid' },
+      { x: 760, y: 470, w: 200, h: 70, kind: 'solid' }
     ],
     spikes: [], arrows: []
   },
