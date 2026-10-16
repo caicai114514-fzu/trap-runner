@@ -287,7 +287,7 @@ var LEVELS = [
     // 绕开之后，后面还有一根位置触发的刺等着。
     platforms: [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
-      { x: 420, y: 450, w: 90, h: 20, kind: 'bounce', power: 1420, popTime: 0.10 }
+      { x: 420, y: 452, w: 90, h: 18, kind: 'bounce', power: 1420, popTime: 0.10 }
     ],
     spikes: [
       { x: 400, y: 0, w: 130, h: 210, dir: 'down', hidden: true, triggerX: 380 },
@@ -629,7 +629,7 @@ function loadLevel(i) {
       // 默认全实心：从下面顶头、从侧面会挡住。
       // （早期为了修"卡板边"把薄平台做成单向，代价是跳上去的途中会从板身里穿过去，
       //   看起来像穿模。现在改成：要平台单向得在关卡数据里显式写 oneWay: true）
-      oneWay: !!p.oneWay,
+      oneWay: !!p.oneWay || p.kind === 'bounce',   // 跳板必须单向，否则弹起后会被自己顶头清零
       x0: p.x,
       w0: p.w,                  // 消失板收缩动画用的原始宽度
       retractT: p.retractT || 0.20,   // 收缩用时（越小消失越快）
@@ -687,6 +687,7 @@ function loadLevel(i) {
   game.sinkPhase = 'idle'; game.sinkT = 0; game.sinkY = 0; game.sinkLock = false;   // 门下沉
   game.goalDead = false;                                                            // 门是否已失效
   game.shrinkX = 0;                                          // 地板左缘右移量
+  game.jumpLock = 0;      // 弹起后短暂禁止跳跃，免得被普通跳跃覆盖
   game.quakePhase = 'idle'; game.quakeT = 0; game.quakeOff = 0;   // 抖动 → 全塌
   game.keyThisLife = false;          // 这一命有没有捡到钥匙
   game.keyGetT = 999;                // 拿到钥匙之后过了多久（决定是不是"献祭"）
@@ -1081,14 +1082,15 @@ function update(dt) {
   if (p.onGround) game.coyote = 0.1; else game.coyote = Math.max(0, game.coyote - dt);
   if (jumpPressed) game.jumpBuf = 0.12; else game.jumpBuf = Math.max(0, game.jumpBuf - dt);
   if (wantJump) game.jumpBuf = Math.max(game.jumpBuf, 0.08);
-  if (game.jumpBuf > 0 && game.coyote > 0) {
+  if (game.jumpLock > 0) { game.jumpLock -= dt; game.jumpBuf = 0; game.coyote = 0; }
+  if (game.jumpLock <= 0 && game.jumpBuf > 0 && game.coyote > 0) {
     p.vy = -jumpV; p.onGround = false; game.coyote = 0; game.jumpBuf = 0; p.sq = 0.72;
     Sound.sfxJump();
   }
   jumpPressed = false;
   // 短按小跳：松开跳跃键时截断上升（约按住时的 45% 高）
   var hopV = jumpV * 0.63;
-  if (p.vy < -hopV && !wantJump) p.vy = -hopV;
+  if (game.jumpLock <= 0 && p.vy < -hopV && !wantJump) p.vy = -hopV;   // 跳板弹起时不许被"松手"截断
 
   // 水平移动 + 碰撞（单向薄平台不参与，避免跳跃时被平台边缘卡死）
   p.x += p.vx * dt;
@@ -1194,7 +1196,10 @@ function update(dt) {
       if (bt.pop >= 1) {
         bt.popped = true;
         p.vy = -(bt.power || 1420);          // 自动起跳，不由玩家决定
+        p.y = bt.y - p.h - 3;                // 抬出板子，免得下一帧又被判"顶头"
         p.onGround = false;
+        game.jumpLock = 0.18;                // 锁一会儿，否则会被土狼时间里的普通跳跃覆盖掉
+        game.coyote = 0; game.jumpBuf = 0;
         Sound.sfxJump();
       }
     }
@@ -1504,16 +1509,18 @@ function drawPlatforms() {
         ctx.rect(p.x - 2, 0, p.w + 4, p.baseY + p.h);
         ctx.clip();
       }
-      // 跳板：皮会鼓起来
+      // 跳板：没踩上去之前和普通地皮一模一样（不然隔老远就露馅了）
       if (p.kind === 'bounce') {
         var bpop = p.pop || 0;
-        var bh = p.h * (1 + bpop * 2.2);
+        var bh = p.h * (1 + bpop * 2.4);
         ctx.fillStyle = PAL.ground;
-        ctx.fillRect(p.x, p.y + p.h - p.h * (1 + bpop * 2.2) + p.h * bpop * 2.2 - bh + bh, p.w, 4);
         ctx.beginPath();
         ctx.moveTo(p.x, p.y + p.h);
         ctx.quadraticCurveTo(p.x + p.w / 2, p.y + p.h - bh, p.x + p.w, p.y + p.h);
+        ctx.lineTo(p.x + p.w, p.y + p.h + 26);
+        ctx.lineTo(p.x, p.y + p.h + 26);
         ctx.closePath(); ctx.fill();
+        // 顶边那一条亮色：bpop=0 时和普通平台完全一致
         ctx.fillStyle = PAL.groundTop;
         ctx.beginPath();
         ctx.moveTo(p.x, p.y + p.h);
