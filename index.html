@@ -269,7 +269,7 @@ var LEVELS = [
     shrinkFloor: { triggerX: 180, speed: 290, stopX: 520 },
     platforms: [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
-      { x: 700, y: 470, w: 150, h: 70, kind: 'pitFloor', triggerX: 540, sinkTime: 0.22 }
+      { x: 660, y: 470, w: 170, h: 70, kind: 'pitFloor', triggerX: 500, sinkTime: 0.30 }
     ],
     spikes: [], arrows: []
   },
@@ -1209,7 +1209,7 @@ function update(dt) {
     if (fp2.kind !== 'pitFloor' || fp2.sunk) continue;
     if (p.x + p.w / 2 > fp2.triggerX) {
       fp2.y += (fp2.h / fp2.sinkT2) * dt;                   // 整块往下沉
-      if (fp2.y > fp2.y0 + fp2.h + 4) { fp2.state = 'gone'; fp2.sunk = true; }
+      if (fp2.y > fp2.y0 + fp2.h * 1.7) { fp2.state = 'gone'; fp2.sunk = true; }
     }
   }
 
