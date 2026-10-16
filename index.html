@@ -264,15 +264,14 @@ var LEVELS = [
   {
     name: '1-5 · 追上来了', hint: '别回头，也别停。',
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
-    // 走过箭头 → 脚下的地板左缘开始往右追你（你跑得赢）。
-    // 追到一半它不追了，改成你正前方那块直接塌掉。
-    shrinkFloor: { triggerX: 200, speed: 250, stopX: 520 },
+    // 走一段之后脚下的地板左缘开始往右追你（290px/s，你 315，跑得赢）。
+    // 追到 520 停下，改成你正前方那块整体"往下缩"沉进地里 —— 那里就成了坑。
+    shrinkFloor: { triggerX: 180, speed: 290, stopX: 520 },
     platforms: [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
-      { x: 700, y: 470, w: 150, h: 70, kind: 'vanish', triggerX: 560 }
+      { x: 700, y: 470, w: 150, h: 70, kind: 'pitFloor', triggerX: 540, sinkTime: 0.22 }
     ],
-    arrows: [{ x: 190, y: 438, dir: 'right' }],
-    spikes: []
+    spikes: [], arrows: []
   },
 
   /* ================= 大关二 · 眼见为虚（假刺 / 箭头 / 假门）================= */
@@ -620,6 +619,8 @@ function loadLevel(i) {
       oneWay: !!p.oneWay,
       w0: p.w,                  // 消失板收缩动画用的原始宽度
       retractT: p.retractT || 0.20,   // 收缩用时（越小消失越快）
+      sinkT2: p.sinkTime || 0.26,     // pitFloor 往下缩用时
+      sunk: false,
       y0: p.y,                  // sinkFloor 下沉用的原始高度
       moveV: p.moveV || 0,      // 会走的障碍：出现后自己移动，把玩家顶走
       moveTo: p.moveTo || 0,
@@ -1202,6 +1203,16 @@ function update(dt) {
     }
   }
 
+  // ===== 前方那块地板"往下缩"变成坑 =====
+  for (var pf = 0; pf < game.plats.length; pf++) {
+    var fp2 = game.plats[pf];
+    if (fp2.kind !== 'pitFloor' || fp2.sunk) continue;
+    if (p.x + p.w / 2 > fp2.triggerX) {
+      fp2.y += (fp2.h / fp2.sinkT2) * dt;                   // 整块往下沉
+      if (fp2.y > fp2.y0 + fp2.h + 4) { fp2.state = 'gone'; fp2.sunk = true; }
+    }
+  }
+
   // ===== 地板从左往右缩：左缘一路往右追你，跑到某个位置停，再让前方塌掉 =====
   if (LV.shrinkFloor) {
     var shf = LV.shrinkFloor;
@@ -1602,7 +1613,9 @@ function drawGoal() {
     drawOneDoor(L.goal, game.goalReveal);
     return;
   }
-  if (!game.goalDead || game.sinkY > 0) drawOneDoor(L.goal, 1);
+  if (!game.goalDead || game.sinkY > 0) {
+    drawOneDoor(L.goal, (game.state === 'win' && game.winDoor) ? game.winDoor.k : 1);
+  }
 }
 
 function drawOneDoor(g, alpha) {
