@@ -102,6 +102,26 @@ var Sound = {
     this.noise(t, 0.3, 0.18);
   },
 
+  sfxCoin: function () {          // 吃真金币：两音上行，清脆
+    if (!this.ac) return;
+    var t = this.ac.currentTime;
+    this.note(88, t, 0.10, 'square', 0.20, this.sfxGain);
+    this.note(95, t + 0.07, 0.18, 'square', 0.18, this.sfxGain);
+  },
+
+  sfxBoom: function () {          // 假金币爆炸：低频冲击 + 两层噪声，要够吓人
+    if (!this.ac) return;
+    var t = this.ac.currentTime, o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(180, t);
+    o.frequency.exponentialRampToValueAtTime(28, t + 0.55);
+    g.gain.setValueAtTime(0.5, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.62);
+    this.noise(t, 0.45, 0.40);
+    this.noise(t + 0.03, 0.30, 0.30);
+  },
+
   sfxWin: function () {
     if (!this.ac) return;
     var t = this.ac.currentTime, seq = [72, 76, 79, 84], self = this;
@@ -186,140 +206,245 @@ var Sound = {
    能力上限：跳跃高 188px，平地可跨间隙约 223px
    ================================================================== */
 var LEVELS = [
+  /* ================= 大关一 · 脚下不稳（假地板 / 消失板）================= */
   {
-    name: '第一关 · 就这？',
-    hint: '走到右边的门就行，很简单的。',
-    width: 960,
-    spawn: [70, 380],
-    goal: { x: 860, y: 400, w: 46, h: 70 },
+    name: '1-1 · 就这？', hint: '走到右边的门。真的，就这。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 430, h: 70, kind: 'solid' },
-      { x: 430, y: 470, w: 140, h: 70, kind: 'fake' },   // 踩上就塌
-      { x: 570, y: 470, w: 430, h: 70, kind: 'solid' }
+      { x: 0, y: 470, w: 400, h: 70, kind: 'solid' },
+      { x: 400, y: 470, w: 150, h: 70, kind: 'fake' },
+      { x: 550, y: 470, w: 410, h: 70, kind: 'solid' }
     ],
     spikes: [], arrows: []
   },
   {
-    name: '第二关 · 信任崩塌',
-    hint: '中间那块板子，是给你准备的。',
-    width: 960,
-    spawn: [70, 380],
-    goal: { x: 860, y: 400, w: 46, h: 70 },
+    name: '1-2 · 信任崩塌', hint: '三块板，只有一块是真的。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    keys: [{ x: 500, y: 520 }],                 // 钥匙在坑底：要拿就得摔死一次
+    platforms: [
+      { x: 0, y: 470, w: 200, h: 70, kind: 'solid' },
+      { x: 290, y: 390, w: 120, h: 24, kind: 'solid' },
+      { x: 450, y: 390, w: 120, h: 24, kind: 'fake' },
+      { x: 610, y: 390, w: 120, h: 24, kind: 'solid' },
+      { x: 770, y: 470, w: 190, h: 70, kind: 'solid' }
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '1-3 · 多米诺', hint: '踩上去就开始缩，别停。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
       { x: 0, y: 470, w: 180, h: 70, kind: 'solid' },
-      { x: 260, y: 380, w: 120, h: 24, kind: 'solid' },
-      { x: 420, y: 380, w: 100, h: 24, kind: 'fake' },   // 诱饵：可以直接跳过它
-      { x: 560, y: 380, w: 120, h: 24, kind: 'solid' },
-      { x: 740, y: 470, w: 260, h: 70, kind: 'solid' }
-    ],
-    // 演示用锯片：贴着悬空平台滚，玩家走这条桥必然要躲它
-    saws: [
-      { x: 300, y: 354, r: 24, tx: 640, ty: 354, speed: 150 }
+      { x: 260, y: 440, w: 110, h: 24, kind: 'vanish' },
+      { x: 440, y: 420, w: 110, h: 24, kind: 'vanish' },
+      { x: 620, y: 400, w: 110, h: 24, kind: 'vanish' },
+      { x: 800, y: 470, w: 160, h: 70, kind: 'solid' }
     ],
     spikes: [], arrows: []
   },
   {
-    name: '第三关 · 别信箭头',
-    hint: '箭头指的方向，一定是活路吗？',
-    width: 960,
-    spawn: [70, 380],
-    goal: { x: 880, y: 400, w: 46, h: 70 },
+    name: '1-4 · 一口气', hint: '四块。中间喘一口气都不行。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 1000, h: 70, kind: 'solid' },    // 下面其实一路都是实地
-      { x: 380, y: 330, w: 380, h: 22, kind: 'solid' }    // 上面这条看着才像"正路"
+      { x: 0, y: 470, w: 150, h: 70, kind: 'solid' },
+      { x: 230, y: 450, w: 90, h: 24, kind: 'vanish' },
+      { x: 390, y: 430, w: 90, h: 24, kind: 'vanish' },
+      { x: 550, y: 410, w: 90, h: 24, kind: 'vanish' },
+      { x: 710, y: 400, w: 90, h: 24, kind: 'vanish' },
+      { x: 850, y: 470, w: 110, h: 70, kind: 'solid' }
     ],
-    spikes: [
-      // 下面这排刺长得跟真的一模一样，但踩上去什么事都不会发生
-      { x: 350, y: 470 - 56, w: 280, h: 56, hidden: false, dir: 'up', fake: true },
-      // 上面这块：踩上去整块平台从地板里升起尖刺，平台够长，跑不掉
-      { x: 380, y: 330 - 210, w: 380, h: 210, hidden: true, triggerX: 418, dir: 'up' }
-    ],
-    arrows: [{ x: 330, y: 392, dir: 'up' }]
+    spikes: [], arrows: []
   },
   {
-    name: '第四关 · 天降正义',
-    hint: '这一关……你好像跳不高。',
-    width: 960,
-    jump: 790,                 // ← 本关跳跃力压低：容错窗口 ~20px（10px 太苛刻，15px 还是紧）
-    spawn: [70, 380],
-    goal: { x: 880, y: 400, w: 46, h: 70 },
+    name: '1-5 · 真假难辨', hint: '这时候眼睛已经没用了。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 1000, h: 70, kind: 'solid' }
+      { x: 0, y: 470, w: 160, h: 70, kind: 'solid' },
+      { x: 240, y: 440, w: 110, h: 24, kind: 'fake' },
+      { x: 420, y: 420, w: 110, h: 24, kind: 'vanish' },
+      { x: 600, y: 430, w: 110, h: 24, kind: 'fake' },
+      { x: 780, y: 470, w: 180, h: 70, kind: 'solid' }
     ],
+    spikes: [], arrows: []
+  },
+
+  /* ================= 大关二 · 眼见为虚（假刺 / 箭头 / 假门）================= */
+  {
+    name: '2-1 · 箭头', hint: '它指的方向，是活路吗？',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [{ x: 0, y: 470, w: 960, h: 70, kind: 'solid' }],
+    spikes: [{ x: 520, y: 414, w: 120, h: 56, hidden: true, triggerX: 430 }],
+    arrows: [{ x: 400, y: 438, dir: 'up' }]
+  },
+  {
+    name: '2-2 · 假刺阵', hint: '前面几片都是假的。大概吧。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [{ x: 0, y: 470, w: 960, h: 70, kind: 'solid' }],
     spikes: [
-      { x: 380, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 310, dir: 'up' },
-      { x: 680, y: 470 - 56, w: 110, h: 56, hidden: true, triggerX: 610, dir: 'up' }
+      { x: 180, y: 414, w: 120, h: 56, fake: true },
+      { x: 360, y: 414, w: 120, h: 56, fake: true },
+      { x: 540, y: 414, w: 110, h: 56 },
+      { x: 720, y: 414, w: 120, h: 56, fake: true }
     ],
     arrows: []
   },
   {
-    name: '第五关 · 一触即碎',
-    hint: '别停，停下来就没了。',
-    width: 960,
-    spawn: [70, 380],
-    goal: { x: 900, y: 400, w: 46, h: 70 },
+    name: '2-3 · 上下', hint: '上面那条路看着平坦多了。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 220, h: 70, kind: 'solid' },
-      { x: 300, y: 390, w: 110, h: 24, kind: 'vanish' },
-      { x: 490, y: 390, w: 110, h: 24, kind: 'vanish' },
-      { x: 680, y: 390, w: 110, h: 24, kind: 'vanish' },
-      { x: 860, y: 470, w: 140, h: 70, kind: 'solid' }
+      { x: 0, y: 470, w: 340, h: 70, kind: 'solid' },
+      { x: 340, y: 470, w: 90, h: 70, kind: 'fake' },
+      { x: 430, y: 470, w: 530, h: 70, kind: 'solid' },
+      { x: 380, y: 330, w: 380, h: 22, kind: 'solid' }
+    ],
+    spikes: [{ x: 380, y: 120, w: 380, h: 210, hidden: true, triggerX: 300 }],
+    arrows: [{ x: 470, y: 296, dir: 'down' }]
+  },
+  {
+    name: '2-4 · 镜花', hint: '门就在那儿。看着挺正常的。',
+    width: 960, spawn: [70, 380],
+    goal: { x: 60, y: 330, w: 46, h: 70 },              // 真门：左上角
+    fakeGoal: { x: 880, y: 400, w: 46, h: 70 },         // 假门：右下角，看着才是出口
+    goalTriggerX: 640, goalRevealTime: 1.0,
+    keys: [{ x: 820, y: 300 }],                          // 钥匙：假门后面那条"死路"
+    platforms: [
+      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
+      { x: 60, y: 400, w: 200, h: 22, kind: 'solid' },
+      { x: 700, y: 380, w: 260, h: 22, kind: 'solid' }
     ],
     spikes: [], arrows: []
   },
   {
-    name: '第六关 · 此路不通',
-    hint: '左边一堵，右边一堵。',
-    width: 960,
-    jump: 950,                 // ← 特例：这关两根活塞的推出时序是围绕 950 调出来的，
-                               //    跳跃力一降就变死关（实测 900 就已经过不去）。
-                               //    以后按新跳跃力重做这关时，把这行删掉即可。
-    spawn: [70, 380],
+    name: '2-5 · 虚', hint: '这次有三种谎话一起说。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [{ x: 0, y: 470, w: 960, h: 70, kind: 'solid' }],
+    spikes: [
+      { x: 160, y: 414, w: 110, h: 56, fake: true },
+      { x: 340, y: 414, w: 110, h: 56, hidden: true, triggerX: 300 },
+      { x: 560, y: 414, w: 110, h: 56, fake: true },
+      { x: 740, y: 414, w: 110, h: 56, hidden: true, triggerX: 700 }
+    ],
+    arrows: [{ x: 470, y: 438, dir: 'up' }]
+  },
+
+  /* ================= 大关三 · 机关重重（活塞 / 锯片）================= */
+  {
+    name: '3-1 · 锯片', hint: '它比你快。但它的路线是死的。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [{ x: 0, y: 470, w: 960, h: 70, kind: 'solid' }],
+    saws: [{ x: 300, y: 442, r: 26, tx: 700, ty: 442, speed: 140 }],
+    spikes: [], arrows: []
+  },
+  {
+    name: '3-2 · 推手', hint: '背后那堵墙，是来送你的。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 500, h: 70, kind: 'solid' },
+      { x: 620, y: 470, w: 340, h: 70, kind: 'solid' },
+      { x: 200, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 300, moveV: 520, moveTo: 500 }
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '3-3 · 双簧', hint: '左边一堵，右边一堵。',
+    width: 960, spawn: [70, 380], jump: 950,
     goal: { x: 880, y: 400, w: 46, h: 70 },
+    keys: [{ x: 660, y: 425 }],                  // 钥匙在被推回坑的必经之路上
     platforms: [
       { x: 0, y: 470, w: 620, h: 70, kind: 'solid' },
-      { x: 720, y: 470, w: 280, h: 70, kind: 'solid' },
-      // 第一堵：从身后（左边）地下钻出来，一路向右，把人顶进前面的坑。
-      // 躲法是跳起来让它从脚下过去 —— 而且必须跳得够远，落点要越过坑。
+      { x: 720, y: 470, w: 240, h: 70, kind: 'solid' },
       { x: 300, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 430, moveV: 600, moveTo: 620 },
-      // 第二堵：你刚跳过坑落到对面，它立刻从前面（右边）钻出来。
-      // 更快、更靠前，一路向左把你推回刚才那个坑里。
       { x: 900, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 780, moveV: -700, moveTo: 720 }
     ],
     spikes: [], arrows: []
   },
   {
-    name: '第七关 · 荆棘地板',
-    hint: '走路要看脚下。而且这一关，你跳得更矮。',
-    width: 960,
-    jump: 760,                 // ← 三连刺 + 更矮的跳跃，容错 ~20px
-    spawn: [70, 380],
+    name: '3-4 · 追命', hint: '一根接一根。中间不许停。',
+    width: 960, spawn: [70, 380], jump: 900,
     goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 1000, h: 70, kind: 'solid' }
+      { x: 0, y: 470, w: 400, h: 70, kind: 'solid' },
+      { x: 520, y: 470, w: 440, h: 70, kind: 'solid' },
+      { x: 120, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 200, moveV: 540, moveTo: 400 },
+      { x: 620, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 560, moveV: -580, moveTo: 520 }
     ],
-    spikes: [
-      { x: 240, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 160, dir: 'up' },
-      { x: 490, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 410, dir: 'up' },
-      { x: 730, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 650, dir: 'up' }
+    spikes: [], arrows: []
+  },
+  {
+    name: '3-5 · 绞肉机', hint: '上面扫，后面推。两条命一起算。',
+    width: 960, spawn: [70, 380], jump: 900,
+    goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 420, h: 70, kind: 'solid' },
+      { x: 540, y: 470, w: 420, h: 70, kind: 'solid' },
+      { x: 200, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 300, moveV: 560, moveTo: 420 }
     ],
+    saws: [{ x: 620, y: 442, r: 24, tx: 860, ty: 442, speed: 200 }],
+    spikes: [], arrows: []
+  },
+
+  /* ================= 大关四 · 险路尽头（全部叠起来）================= */
+  {
+    name: '4-1 · 开局即终局', hint: '第一块板就是假的。',
+    width: 960, spawn: [70, 380], jump: 900,
+    goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 300, h: 70, kind: 'solid' },
+      { x: 300, y: 470, w: 140, h: 70, kind: 'fake' },
+      { x: 440, y: 470, w: 520, h: 70, kind: 'solid' }
+    ],
+    spikes: [{ x: 500, y: 414, w: 110, h: 56, hidden: true, triggerX: 450 }],
     arrows: []
   },
   {
-    name: '第八关 · 终极考验',
-    hint: '前面学的，全都要用上。',
-    width: 960,
-    spawn: [70, 380],
-    goal: { x: 890, y: 400, w: 46, h: 70 },
+    name: '4-2 · 抬头', hint: '这次上面也有东西。',
+    width: 960, spawn: [70, 380], jump: 900,
+    goal: { x: 880, y: 400, w: 46, h: 70 },
+    timeLimit: 7,
     platforms: [
-      { x: 0, y: 470, w: 240, h: 70, kind: 'solid' },
-      { x: 400, y: 470, w: 240, h: 70, kind: 'solid' },
-      { x: 640, y: 470, w: 130, h: 70, kind: 'fake' },   // 又是它
-      { x: 770, y: 470, w: 230, h: 70, kind: 'solid' }
+      { x: 0, y: 470, w: 340, h: 70, kind: 'solid' },
+      { x: 340, y: 470, w: 130, h: 70, kind: 'fake' },
+      { x: 470, y: 470, w: 490, h: 70, kind: 'solid' }
     ],
-    spikes: [
-      { x: 500, y: 470 - 56, w: 100, h: 56, hidden: true, triggerX: 420, dir: 'up' }
+    balls: [{ x: 200, bounces: 2 }, { x: 640, bounces: 3 }],
+    spikes: [], arrows: []
+  },
+  {
+    name: '4-3 · 反向', hint: '你的手会骗你。',
+    width: 960, spawn: [420, 380], jump: 900,
+    goal: { x: 880, y: 400, w: 46, h: 70 },
+    reverse: true, flipOnLand: true,
+    platforms: [{ x: 240, y: 470, w: 720, h: 70, kind: 'solid' }],
+    spikes: [], arrows: []
+  },
+  {
+    name: '4-4 · 三合一', hint: '刺、锯、活塞。都在。',
+    width: 960, spawn: [70, 380], jump: 900,
+    goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 340, h: 70, kind: 'solid' },
+      { x: 460, y: 470, w: 180, h: 70, kind: 'solid' },
+      { x: 760, y: 470, w: 200, h: 70, kind: 'solid' },
+      { x: 100, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 180, moveV: 560, moveTo: 340 }
     ],
+    saws: [{ x: 500, y: 442, r: 24, tx: 620, ty: 442, speed: 180 }],
+    spikes: [{ x: 300, y: 414, w: 110, h: 56, hidden: true, triggerX: 250 }],
+    arrows: []
+  },
+  {
+    name: '4-5 · 尽头', hint: '前面出现过的东西，都会再来一遍。',
+    width: 960, spawn: [70, 380], jump: 900,
+    goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 280, h: 70, kind: 'solid' },
+      { x: 280, y: 470, w: 120, h: 70, kind: 'fake' },
+      { x: 400, y: 470, w: 180, h: 70, kind: 'solid' },
+      { x: 700, y: 470, w: 260, h: 70, kind: 'solid' },
+      { x: 100, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 200, moveV: 560, moveTo: 400 }
+    ],
+    saws: [{ x: 720, y: 442, r: 24, tx: 900, ty: 442, speed: 200 }],
+    spikes: [{ x: 430, y: 414, w: 110, h: 56, hidden: true, triggerX: 400 }],
+    balls: [{ x: 600, bounces: 3 }],
     arrows: []
   }
 ];
@@ -513,6 +638,27 @@ function loadLevel(i) {
       spin: (s.spin === undefined ? 3.4 : s.spin) // 自转角速度
     };
   });
+  game.reverse = L.reverse ? -1 : 1;         // 反向关：一开始就是反的
+  game.flipOnLand = !!L.flipOnLand;          // 每次落地再反一次
+  game.wasOnGround = false;
+  game.goalReveal = L.fakeGoal ? 0 : 1;      // 真门的显现进度
+  game.revealStarted = false;
+  game.balls = (L.balls || []).map(function (b) {
+    return {
+      x: b.x, y: (b.y === undefined ? -50 : b.y), r: b.r || 18,
+      vy: b.vy || 0, vx: 0, bounce: 0, maxBounce: b.bounces || 3,
+      speed: b.speed || 300, homing: false, spin: 0
+    };
+  });
+  game.timeLimit = L.timeLimit || 0;         // 限时（秒），到点所有球开始追你
+  game.timeLeft = game.timeLimit;
+  game.coins = (L.coins || []).map(function (c) {
+    return { x: c.x, y: c.y, fake: !!c.fake, got: false, t: Math.random() * 6 };
+  });
+  game.keyThisLife = false;          // 这一命有没有捡到钥匙（决定死亡台词）
+  game.keys = (L.keys || []).map(function (k) {
+    return { x: k.x, y: k.y, got: false, t: 0 };
+  });
   game.arrows = L.arrows || [];
   game.cam = 0;
   game.particles = [];
@@ -523,7 +669,8 @@ function loadLevel(i) {
   game.coyote = 0;
 }
 
-function die() {
+/* kind: 'boom'（默认，爆尸体）| 'fall'（掉坑，不爆） */
+function die(kind) {
   if (game.state !== 'play') return;
   game.state = 'dead';
   game.timer = 0;
@@ -531,12 +678,21 @@ function die() {
   game.totalDeaths++;
   save.deaths++;               // 总死亡次数进存档（选关界面那只小幽灵看的就是它）
   writeSave();
-  game.taunt = TAUNTS[(Math.random() * TAUNTS.length) | 0];
+  // 死人话：如果这一命刚捡了钥匙就死了，换成血红色的"献祭"台词
+  if (game.keyThisLife) {
+    game.taunt = '你献祭了自己，这是你应得的';
+    game.tauntColor = '#c0392b';
+  } else {
+    game.taunt = TAUNTS[(Math.random() * TAUNTS.length) | 0];
+    game.tauntColor = PAL.warn;
+  }
   game.tauntT = 1.4;
   game.shake = 14;
-  Sound.sfxDeath();
+  if (kind !== 'fall') Sound.sfxDeath();
+  // 掉坑：不爆尸体，就是人没了（约定：除了掉坑，其它死法都爆尸体）
+  if (kind === 'fall') return;
+
   // 死亡粒子：全用火柴人自己那套黄，亮的那几颗当溅出来的尸块。
-  // 不再用五颜六色 —— 那样像撒彩纸，不像死了。
   var DEBRIS = ['#9c7a1e', '#b8901f', '#c9a02b', '#d8b02f', '#e8bb35', '#ffd23f', '#fff0a8'];
   var p = game.p;
   for (var i = 0; i < 32; i++) {
@@ -859,12 +1015,13 @@ function update(dt) {
     if (sp.shown && sp.anim < 1) sp.anim = Math.min(1, sp.anim + dt * 7);
   }
 
-  // 水平输入
+  // 水平输入（反向关：整体乘以 game.reverse，+1 正常 / -1 反向）
   var left = keys['left'];
   var right = keys['right'];
   p.vx = 0;
-  if (left) { p.vx = -MOVE; p.face = -1; }
-  if (right) { p.vx = MOVE; p.face = 1; }
+  var dirK = game.reverse || 1;
+  if (left)  { p.vx = -MOVE * dirK; p.face = -1 * dirK; }
+  if (right) { p.vx =  MOVE * dirK; p.face =  1 * dirK; }
 
   // 跳跃（土狼时间 + 输入缓冲 0.12s + 按住连跳）
   // 跳跃力是「每关」的：关卡数据里的 jump 覆盖默认值。
@@ -971,7 +1128,88 @@ function update(dt) {
   }
 
   // 掉出地图
-  if (p.y > VH + 120) { die(); return; }
+  if (p.y > VH + 120) { die('fall'); return; }
+
+  // 反向关：每次落地 → 震一下 + 方向再次翻转（给玩家一个身体上的提示）
+  if (game.flipOnLand && p.onGround && !game.wasOnGround) {
+    game.reverse = -(game.reverse || 1);
+    game.shake = Math.max(game.shake, 7);
+    Sound.sfxTrap();
+  }
+  game.wasOnGround = p.onGround;
+
+  // 限时：到点之后所有球开始追你
+  if (game.timeLimit > 0) {
+    game.timeLeft -= dt;
+    if (game.timeLeft <= 0) for (var bi0 = 0; bi0 < game.balls.length; bi0++) game.balls[bi0].homing = true;
+  }
+
+  // 落球：先垂直弹几下，弹够次数（或者限时到）之后直接朝玩家飞过来
+  for (var bi = 0; bi < game.balls.length; bi++) {
+    var bl = game.balls[bi];
+    bl.spin += dt * 6;
+    if (bl.homing) {
+      var bx = (p.x + p.w / 2) - bl.x, by = (p.y + p.h / 2) - bl.y;
+      var bd = Math.sqrt(bx * bx + by * by) || 1;
+      bl.x += bx / bd * bl.speed * dt;
+      bl.y += by / bd * bl.speed * dt;
+    } else {
+      bl.vy = Math.min(1200, bl.vy + GRAVITY * dt);
+      bl.y += bl.vy * dt;
+      // 落地反弹
+      if (bl.y + bl.r > 470) {
+        bl.y = 470 - bl.r;
+        bl.vy = -bl.vy * 0.62;
+        bl.bounce++;
+        if (bl.bounce === 1) Sound.sfxTrap();
+        if (bl.bounce >= bl.maxBounce) bl.homing = true;
+      }
+    }
+    if (Math.abs((p.x + p.w / 2) - bl.x) < bl.r + 9 && Math.abs((p.y + p.h / 2) - bl.y) < bl.r + 11) {
+      die(); return;
+    }
+  }
+
+  // 假终点：走到触发点开始计时，真门缓缓显形。
+  // 计时长度是按"玩家从触发点走到假门的时间"配的，所以真门几乎在他撞上假门那刻才出现。
+  var L6 = LEVELS[game.li];
+  if (L6.fakeGoal) {
+    if (!game.revealStarted && p.x + p.w / 2 > (L6.goalTriggerX || 0)) game.revealStarted = true;
+    if (game.revealStarted && game.goalReveal < 1) {
+      game.goalReveal = Math.min(1, game.goalReveal + dt / (L6.goalRevealTime || 1.1));
+    }
+    var fg = L6.fakeGoal;
+    if (p.x < fg.x + fg.w && p.x + p.w > fg.x && p.y < fg.y + fg.h && p.y + p.h > fg.y) {
+      die(); return;                     // 假门：碰到直接死（爆尸体）
+    }
+  }
+
+  // 金币：真的吃了给个清脆音效；假的一碰就炸（用音效吓你一跳）
+  for (var ci = 0; ci < game.coins.length; ci++) {
+    var co = game.coins[ci];
+    co.t += dt;
+    if (co.got) continue;
+    if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22) {
+      if (co.fake) { Sound.sfxBoom(); die(); return; }
+      co.got = true; Sound.sfxCoin();
+    }
+  }
+
+  // 捡钥匙：碰到就永久到手 —— 哪怕这一下你摔死了、或者踩刺死了，钥匙也留下
+  for (var ki = 0; ki < game.keys.length; ki++) {
+    var kk = game.keys[ki];
+    kk.t += dt;
+    if (kk.got) continue;
+    if (Math.abs(p.x + p.w / 2 - kk.x) < 22 && Math.abs(p.y + p.h / 2 - kk.y) < 24) {
+      kk.got = true;
+      game.keyThisLife = true;
+      save.keys[CUR.w] = 1;
+      writeSave();
+      Sound.sfxWin();
+      game.flash = '拿到钥匙了';
+      game.tauntT = 1.6;
+    }
+  }
 
   // 到达终点
   var g = LEVELS[game.li].goal;
@@ -1151,10 +1389,67 @@ function drawSaws() {
   }
 }
 
+/* 金币：真的金色发亮，假的……看起来一模一样（这就是坑） */
+function drawCoins() {
+  for (var i = 0; i < game.coins.length; i++) {
+    var c = game.coins[i];
+    if (c.got) continue;
+    var bob = Math.sin(c.t * 3) * 2.5;
+    ctx.fillStyle = '#ffd23f';
+    ctx.beginPath(); ctx.ellipse(c.x, c.y + bob, 9, 11, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#b8901f';
+    ctx.beginPath(); ctx.ellipse(c.x, c.y + bob, 5.5, 7, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.beginPath(); ctx.ellipse(c.x - 3, c.y + bob - 3.5, 2.2, 3, 0, 0, 7); ctx.fill();
+  }
+}
+
+/* 关卡里的钥匙：上下轻轻浮动 */
+function drawKeys() {
+  for (var i = 0; i < game.keys.length; i++) {
+    var k = game.keys[i];
+    if (k.got) continue;
+    keyIcon(k.x, k.y + Math.sin(k.t * 2.6) * 3, 1.5, PAL.player, true);
+  }
+}
+
+/* 落球：会反弹，弹够次数就朝你飞 */
+function drawBalls() {
+  for (var i = 0; i < game.balls.length; i++) {
+    var b = game.balls[i];
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.spin);
+    ctx.fillStyle = b.homing ? '#ff6b48' : PAL.spike;
+    // 带刺的球，看起来就不好惹
+    ctx.beginPath();
+    for (var k = 0; k < 10; k++) {
+      var a0 = (k / 10) * Math.PI * 2;
+      var a1 = ((k + 0.5) / 10) * Math.PI * 2;
+      ctx.lineTo(Math.cos(a0) * b.r, Math.sin(a0) * b.r);
+      ctx.lineTo(Math.cos(a1) * b.r * 0.72, Math.sin(a1) * b.r * 0.72);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = PAL.ink;
+    ctx.beginPath(); ctx.arc(0, 0, b.r * 0.30, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+}
+
 function drawGoal() {
-  var g = LEVELS[game.li].goal;
-  // 过关时门会横向收窄：k 从 1 收到 0
-  var k = (game.state === 'win' && game.winDoor) ? game.winDoor.k : 1;
+  var L = LEVELS[game.li];
+  // 假终点关：先画那扇假的（长得和真门一样），真门按进度淡入
+  if (L.fakeGoal) {
+    drawOneDoor(L.fakeGoal, 1);
+    drawOneDoor(L.goal, game.goalReveal);
+    return;
+  }
+  drawOneDoor(L.goal, (game.state === 'win' && game.winDoor) ? game.winDoor.k : 1);
+}
+
+function drawOneDoor(g, alpha) {
+  if (alpha <= 0.01) return;
+  var k = alpha;
   var w = g.w * k;
   if (w < 0.6) return;                       // 收成一条线之后就没了
   var x = g.x + (g.w - w) / 2;               // 从正中往两边收
@@ -1162,7 +1457,7 @@ function drawGoal() {
 
   // 门口透出来的光
   ctx.save();
-  ctx.globalAlpha = 0.22 * k;
+  ctx.globalAlpha = 0.22 * k * (alpha < 1 ? alpha : 1);
   ctx.fillStyle = PAL.door;
   ctx.beginPath(); ctx.ellipse(x + r, y + h * 0.55, w * 1.35, h * 0.85, 0, 0, 7); ctx.fill();
   ctx.restore();
@@ -1318,6 +1613,10 @@ function drawHUD() {
   text((CUR.w + 1) + ' - ' + (CUR.i + 1), 26, 56, 14, PAL.dim, 'left');
   text('死亡 ' + game.deaths, VW - 26, 30, 18, PAL.text, 'right', true);
   text('总计 ' + save.deaths, VW - 26, 56, 14, PAL.dim, 'right');
+  var kg = keyCount();
+  if (kg > 0) {
+    for (var k2 = 0; k2 < 3; k2++) keyIcon(VW - 150 + k2 * 24, 30, 0.9, k2 < kg ? PAL.player : PAL.faint, k2 < kg);
+  }
   // 死亡：嘲讽 + 按任意键继续（都跟着死亡时间淡入）
   if (game.state === 'dead') {
     var da = Math.min(1, game.timer * 4);
@@ -1325,7 +1624,7 @@ function drawHUD() {
     ctx.globalAlpha = da;
     ctx.translate(VW / 2, VH * 0.36);
     ctx.rotate((Math.random() - 0.5) * 0.035);
-    text(game.taunt, 0, 0, 36, PAL.warn, 'center', true);
+    text(game.taunt, 0, 0, 36, game.tauntColor || PAL.warn, 'center', true);
     ctx.restore();
     if (game.timer > 0.35) {
       var pl = 0.55 + 0.45 * Math.sin(performance.now() / 260);
@@ -2108,6 +2407,9 @@ function drawScene() {
   drawArrows();
   drawSpikes();
   drawSaws();
+  drawCoins();
+  drawKeys();
+  drawBalls();
   drawGoal();
   drawPlayer();
   if (game.state === 'win') drawWinCover();
