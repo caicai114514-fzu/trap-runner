@@ -747,10 +747,12 @@ function drawPlatforms() {
       ctx.strokeRect(p.x + 1, p.y + 1, p.w - 2, p.h - 2);
       ctx.setLineDash([]);
     } else {
-      // 活塞：裁掉地面以下的部分，看起来才像"从地里钻出来"
+      // 活塞：只保留地面以上的部分，看起来才像"从地里钻出来"。
+      // 注意裁剪下边界是「地面表面」= baseY + h，不是 baseY ——
+      // 写成 baseY 会把整根活塞都裁掉（活塞本体正好在 baseY ~ baseY+h 之间）。
       if (p.kind === 'piston') {
         ctx.beginPath();
-        ctx.rect(p.x - 2, 0, p.w + 4, p.baseY);
+        ctx.rect(p.x - 2, 0, p.w + 4, p.baseY + p.h);
         ctx.clip();
       }
       // 实心块 + 一条亮橙顶边
