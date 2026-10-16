@@ -266,10 +266,10 @@ var LEVELS = [
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
     // 第一段：身后地板左缘一路往右追（306px/s，你 315，跑得赢），追到 604 停
     // 中间那片：跑到 620 就先抖一下（虚晃一枪，其实不塌，站得住），
-    //          抖 0.45 秒后「所有平台」碰撞立刻失效、秒变坑，只有门留在原地
+    //          抖 0.24 秒后「所有平台」碰撞立刻失效、秒变坑，只有门留在原地
     // 唯一的活路：趁还在抖的时候起跳，整个人撞进门里
     shrinkFloor: { triggerX: 180, speed: 306, stopX: 604 },
-    quake: { triggerX: 620, shakeTime: 0.45, sinkTime: 0.10 },
+    quake: { triggerX: 620, shakeTime: 0.24, sinkTime: 0.08 },
     platforms: [
       { x: 0, y: 470, w: 660, h: 70, kind: 'solid' },       // 第一段：会从左边缩
       { x: 660, y: 470, w: 150, h: 70, kind: 'pitFloor' },  // 中间那片：先抖，再塌
