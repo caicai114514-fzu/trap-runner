@@ -1765,7 +1765,7 @@ function update(dt) {
   var g0 = LEVELS[game.li].goal;
   var LV2 = LEVELS[game.li];
   // 假门关（fakeGoal）：真门必须完全显现(goalReveal>=1)才能通关，否则就是"看不见的门"不算数
-  var canWin = !game.goalDead && (!LV2.fakeGoal || game.goalReveal > 0.02);   // 门一出现判定就生效
+  var canWin = !game.goalDead && game.goalReveal > 0.02;   // 门一出现判定就生效（普通关 goalReveal 恒 1）
   if (canWin) {
     var g = { x: g0.x, y: g0.y + (game.sinkY || 0), w: g0.w, h: g0.h };
     if (aabb(p, g)) { winLevel(); return; }
@@ -2171,7 +2171,7 @@ function drawGoal() {
   }
   if (!game.goalDead || game.sinkY > 0) {
     if (game.state === 'win' && game.winDoor) drawOneDoor(L.goal, 1, game.winDoor.k);
-    else drawOneDoor(L.goal, 1, 1);
+    else drawOneDoor(L.goal, L.goalHidden ? game.goalReveal : 1, 1);   // goalHidden 的门跟着显现进度淡入
   }
 }
 
