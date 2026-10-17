@@ -411,11 +411,11 @@ var LEVELS = [
     //   上端顶天花板(0)，沿顶部边框左右滑；下端长度固定(90)，绕转轴扫过地面
     wall: { pivotX: 250, pivotY: 380, w: 24, len: 90, upLen: 380 },
     button: { x: 430, y: 450, w: 40, h: 20 },
-    keys: [{ x: 810, y: -60, drop: true, dropY: 342 }],
+    keys: [{ x: 907, y: -60, drop: true, dropY: 347 }],
     platforms: [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
       { x: 60, y: 400, w: 200, h: 22, kind: 'solid' },      // 真门脚下的平台
-      { x: 760, y: 370, w: 100, h: 22, kind: 'solid' },      // 假门左上方的高平台（钥匙掉这儿）
+      { x: 855, y: 375, w: 105, h: 22, kind: 'solid', oneWay: true },      // 假门正上方悬空平台（单向：从下面能跳上来）
       { x: 238, y: 0, w: 24, h: 470, kind: 'solid', isWall: true }   // 墙（竖直，从天花板到地面）
     ],
     spikes: [], arrows: []
