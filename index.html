@@ -1609,7 +1609,6 @@ function update(dt) {
         var kt = ki / NK;
         var kx = gw0.upX + (gw0.ftX - gw0.upX) * kt;
         var ky = gw0.upY + (gw0.ftY - gw0.upY) * kt;
-        if (ky > L6.wall.pivotY) continue;    // 只判转轴上半部分的墙
         if (kx > p.x - 13 && kx < p.x + p.w + 13 && ky > p.y - 13 && ky < p.y + p.h + 13) { hitW = true; break; }
       }
       if (hitW) { die(); return; }
