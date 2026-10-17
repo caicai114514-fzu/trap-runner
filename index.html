@@ -421,18 +421,23 @@ var LEVELS = [
   },
   {
     name: '2-5 · 虚', hint: '这次有三种谎话一起说。',
-    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
-    platforms: [{ x: 0, y: 470, w: 960, h: 70, kind: 'solid' }],
-    spikes: [
-      { x: 160, y: 414, w: 110, h: 56, fake: true },
-      { x: 340, y: 414, w: 110, h: 56, hidden: true, triggerX: 300 },
-      { x: 560, y: 414, w: 110, h: 56, fake: true },
-      { x: 740, y: 414, w: 110, h: 56, hidden: true, triggerX: 700 }
+    width: 960, spawn: [90, 260], goal: { x: 890, y: 400, w: 46, h: 70 },
+    // 这一关全反着来：地上一踩就死，刺反而安全（可以踩）
+    platforms: [
+      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid', deadly: true },   // ★ 致命地面
+      { x: 0,   y: 300, w: 240, h: 22, kind: 'solid' },                 // 左边二楼（出生点）
+      { x: 300, y: 430, w: 110, h: 40, kind: 'solid' },                 // 安全岛 1
+      { x: 520, y: 430, w: 110, h: 40, kind: 'solid' },                 // 安全岛 2
+      { x: 740, y: 430, w: 110, h: 40, kind: 'solid' }                  // 安全岛 3
     ],
-    arrows: [{ x: 470, y: 438, dir: 'up' }]
+    spikes: [
+      // 安全岛上的刺：看着吓人，踩上去完全没事
+      { x: 300, y: 404, w: 110, h: 26, fake: true },
+      { x: 520, y: 404, w: 110, h: 26, fake: true },
+      { x: 740, y: 404, w: 110, h: 26, fake: true }
+    ],
+    arrows: []
   },
-
-  /* ================= 大关三 · 机关重重（活塞 / 锯片）================= */
   {
     name: '3-1 · 锯片', hint: '它比你快。但它的路线是死的。',
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
@@ -728,7 +733,8 @@ function loadLevel(i) {
       moveTo: p.moveTo || 0,
       baseY: p.y,               // 活塞：原始高度（升降都相对它算）
       phase: isPiston ? 'hidden' : '', phaseT: 0,
-      isWall: !!p.isWall
+      isWall: !!p.isWall,
+      deadly: !!p.deadly
     };
   });
   game.spikes = L.spikes.map(function (s) {
@@ -1590,6 +1596,9 @@ function update(dt) {
       Sound.sfxTrap();
     }
   }
+
+  // ===== 致命地面（2-5）：这关地面一踩就死，刺反而是安全的 =====
+  if (p.ground && p.ground.deadly) { die(); return; }
 
   // ===== 墙：靠【转速】形成时间压力 =====
   //   转的这 2.2 秒就是你的逃生窗口：墙转到底那一刻，还留在墙下端右边的人直接被压死。
