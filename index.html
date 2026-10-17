@@ -402,7 +402,7 @@ var LEVELS = [
   },
   {
     name: '2-4 · 镜花', hint: '门就在那儿。看着挺正常的。',
-    width: 960, spawn: [70, 380],
+    width: 960, spawn: [70, 440],
     goal: { x: 60, y: 330, w: 46, h: 70 },              // 真门：左上角
     fakeGoal: { x: 880, y: 400, w: 46, h: 70 },         // 假门：右下角，看着才是出口
     goalTriggerX: 640, goalRevealTime: 1.0,
@@ -1605,7 +1605,10 @@ function update(dt) {
 
   // 到达终点
   var g0 = LEVELS[game.li].goal;
-  if (!game.goalDead) {                       // 门被勾引掉之后，判定区也没了
+  var LV2 = LEVELS[game.li];
+  // 假门关（fakeGoal）：真门必须完全显现(goalReveal>=1)才能通关，否则就是"看不见的门"不算数
+  var canWin = !game.goalDead && (!LV2.fakeGoal || game.goalReveal >= 1);
+  if (canWin) {
     var g = { x: g0.x, y: g0.y + (game.sinkY || 0), w: g0.w, h: g0.h };
     if (aabb(p, g)) { winLevel(); return; }
   }
