@@ -1603,7 +1603,7 @@ function update(dt) {
     //   顶点：转轴(250,450) + 天花板左(250,0) + 天花板右(950,0)
     //   人在这片区域里 = 被扫到 → 死；跑到转轴左边（真门那一侧）才安全
     var gw0 = wallGeom();
-    if (gw0) {
+    if (gw0 && p.x + p.w > 100) {   // x<100 是真门侧的安全角：凹进去，横杆扫不到
       var NK = 34, hitW = false;
       for (var ki = 0; ki <= NK; ki++) {
         var kt = ki / NK;
