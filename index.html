@@ -1684,7 +1684,6 @@ function drawSpikes() {
     var n2 = Math.max(2, Math.round(sq.w / 26));
     var st2 = sq.w / n2;
     ctx.fillStyle = PAL.spike;
-    ctx.globalAlpha = 1 - sq.animT * 0.5;
     ctx.beginPath();
     for (var a2 = 0; a2 < n2; a2++) {
       var x2 = tx + a2 * st2;
@@ -1696,13 +1695,13 @@ function drawSpikes() {
       ctx.closePath();
     }
     ctx.fill();
-    ctx.globalAlpha = 1;
   }
 
   for (var i = 0; i < game.spikes.length; i++) {
     var sp = game.spikes[i];
     if (!sp.shown) continue;
     if (sp.onPop && !game.popFired) continue;      // 保险：没弹起来就不画
+    if (sp.moved && sp.animT < 1 && sp.moveTo) continue;   // 正在滑动：只画残影，本体先不画（否则会看成两个刺）
     var box = spikeBox(sp);
     var n = Math.max(2, Math.round(box.w / 26));
     var step = box.w / n;
