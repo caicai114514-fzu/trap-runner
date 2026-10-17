@@ -776,6 +776,7 @@ function loadLevel(i) {
   game.wallOn = false;                       // 墙是否开始旋转
   game.fakeGoalDead = false;                 // 假门是否已失效（按下按钮后）
   game.fakeGoalShown = false;                // 假门是否已经出现（人走近才现身）
+  game.newWallDone = false; game.newWallT = 0;  // 去假门后墙原位长出的新墙
   game.wallSweep = 0;
   if (typeof location !== 'undefined' && location.search.indexOf('wa=') >= 0) {
     game.wallAngle = parseInt(location.search.split('wa=')[1]) || 0; game.wallOn = true; game.buttonPressed = true;
@@ -1595,9 +1596,38 @@ function update(dt) {
   //   拿钥匙要绕到假门头顶的平台，回来必然来不及 → 死
   //   立刻往左跑过墙下端 → 活
   if (L6.wall && game.wallOn) {
-    if (game.wallAngle < 90) game.wallAngle = Math.min(90, game.wallAngle + dt * 55);   // 1.6 秒转完
-    // 墙整个压下来那一刻：还在墙右侧（x>100）的人被压死；真门在墙左边，才是活路
-    if (game.wallAngle >= 90 && p.x > 100) { die(); return; }
+    if (game.wallAngle < 90) game.wallAngle = Math.min(90, game.wallAngle + dt * 90);   // 1.0 秒转完
+    // 只有【碰到旋转中墙的上半段】才死（上段 = 转轴 → 天花板那截）
+    if (game.wallAngle > 4 && game.wallAngle < 90) {
+      var gU = wallGeom();
+      if (gU) {
+        var NU = 26, hitUp = false;
+        for (var ui = 0; ui <= NU; ui++) {
+          var ut = ui / NU;
+          var ux2 = L6.wall.pivotX + (gU.upX - L6.wall.pivotX) * ut;
+          var uy2 = L6.wall.pivotY + (gU.upY - L6.wall.pivotY) * ut;
+          if (ux2 > p.x - 10 && ux2 < p.x + p.w + 10 && uy2 > p.y - 10 && uy2 < p.y + p.h + 10) { hitUp = true; break; }
+        }
+        if (hitUp) { die(); return; }
+      }
+    }
+  }
+
+  // 3) 按按钮后跑到假门那边：原来墙的位置长出一堵新的墙，把回头路彻底堵死
+  if (L6.wall && game.buttonPressed && !game.newWallDone && p.x > 700) {
+    game.newWallDone = true;
+    game.newWallT = 0;
+    Sound.sfxTrap(); game.shake = 12;
+  }
+  if (game.newWallDone) {
+    game.newWallT += dt;
+    var nw = { x: 238, y: 0, w: 24, h: 470 };
+    // 新墙是实体：碰到就被挡住（水平推出），过不去
+    if (aabb(p, nw)) {
+      if (p.x + p.w / 2 > nw.x + nw.w / 2) p.x = nw.x + nw.w;
+      else p.x = nw.x - p.w;
+      p.vx = 0;
+    }
   }
 
   // ===== 假门（初始隐藏，走近才出现）=====
