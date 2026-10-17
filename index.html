@@ -311,7 +311,7 @@ var LEVELS = [
   },
   {
     name: '2-2 · 会走的刺', hint: '刺不一定是死的。',
-    width: 960, spawn: [700, 250], goal: { x: 890, y: 400, w: 46, h: 70 },
+    width: 960, spawn: [70, 380], goal: { x: 890, y: 400, w: 46, h: 70 },
     // 四根刺，一根比一根阴：
     // ① 你一跳，它往右挪到你的落点，正好在你落地时扎死你（横坐标触发）
     // ② 你习惯性多走一段再跳，它就往左挪到你身上（横坐标触发）
@@ -320,14 +320,14 @@ var LEVELS = [
     //    你会走没刺那条 —— 等你下落到一定高度，刺就挪到那条道上（竖坐标触发）
     platforms: [
       { x: 0, y: 470, w: 640, h: 70, kind: 'solid' },
-      { x: 640, y: 300, w: 320, h: 24, kind: 'solid' },
-      { x: 782, y: 300, w: 16, h: 190, kind: 'solid' }
+      { x: 640, y: 380, w: 320, h: 24, kind: 'solid' },
+      { x: 782, y: 380, w: 16, h: 110, kind: 'solid' }
     ],
     spikes: [
       { x: 300, y: 414, w: 100, h: 56, atX: 250, fallOnly: true, moveTo: [520, 414] },  // ① 只在你下落时右移到落点
       { x: 780, y: 414, w: 90, h: 56, atX: 640, moveTo: [660, 414] },    // ② 左移到你身上
       { x: 862, y: 414, w: 44, h: 56 },                                   // ③ 真的不动
-      { x: 700, y: 414, w: 56, h: 56, atY: 372, moveTo: [812, 414] }     // ④ 竖坐标触发，挪到没刺那条道
+      { x: 700, y: 414, w: 56, h: 56, atY: 392, needX: 700, moveTo: [812, 414] }  // ④ 竖坐标触发（且人得先上到二楼那片）
     ],
     arrows: []
   },
@@ -679,6 +679,7 @@ function loadLevel(i) {
       fallOnly: !!s.fallOnly,                          // 只在人下落时才认横坐标触发
       atXlt: (s.atXlt === undefined ? null : s.atXlt), // 横坐标触发（小于）
       atY: (s.atY === undefined ? null : s.atY),     // 竖坐标触发
+      needX: (s.needX === undefined ? null : s.needX), // 竖坐标触发还要求人已经过了这个 x
       moved: false, animT: 0, fromX: s.x, fromY: s.y,
       shown: !s.hidden && !s.onPop, anim: (s.hidden || s.onPop) ? 0 : 1
     };
@@ -1106,7 +1107,7 @@ function update(dt) {
       var falling = p.vy > 0 && !p.onGround;
       var fire = (sp.atX !== null && p.x + p.w / 2 > sp.atX && (!sp.fallOnly || falling)) ||
                  (sp.atXlt !== null && p.x + p.w / 2 < sp.atXlt) ||
-                 (sp.atY !== null && p.y > sp.atY);
+                 (sp.atY !== null && p.y > sp.atY && (sp.needX === null || p.x + p.w / 2 > sp.needX));
       if (fire) {
         sp.moved = true;
         sp.fromX = sp.x; sp.fromY = sp.y;          // 记住视觉起点
