@@ -410,7 +410,7 @@ var LEVELS = [
     // 墙：一根穿过转轴的长杆，它【自己转】（碰撞跟着转）。
     //   转轴在中间偏下(250,380)；上端贴天花板顺时针向右滑；下端长度固定 90，向左扫。
     //   竖直时把真门和玩家隔开；转开后路就通了。
-    wall: { pivotX: 250, pivotY: 450, w: 24, len: 250, slideMax: 700 },
+    wall: { pivotX: 250, pivotY: 380, w: 24, len: 250, slideMax: 700 },
     button: { x: 430, y: 450, w: 40, h: 20 },           // 按钮：贴地
     keys: [{ x: 880, y: -60, drop: true, dropY: 347, onPlatY: 375 }],
     platforms: [
@@ -1596,13 +1596,13 @@ function update(dt) {
   //   拿钥匙要绕到假门头顶的平台，回来必然来不及 → 死
   //   立刻往左跑过墙下端 → 活
   if (L6.wall && game.wallOn) {
-    if (game.wallAngle < 90) game.wallAngle = Math.min(90, game.wallAngle + dt * 75);   // 1.2 秒转到位后保持，永不停
+    game.wallAngle += dt * 75;   // 一直转，永不停（只有死亡或进真门才结束）
 
     // 转到位之后【不停】：墙压在这儿，右侧（x>100）的人持续被压死
     // 死亡区 = 墙的上半段扫过的那整片三角区域
     //   顶点：转轴(250,450) + 天花板左(250,0) + 天花板右(950,0)
     //   人在这片区域里 = 被扫到 → 死；跑到转轴左边（真门那一侧）才安全
-    if (game.wallAngle >= 90 && p.x > 925) { die(); return; }   // 转到位：压死区只在钥匙台最右端，路上/捡钥匙都不死
+    if (game.wallAngle >= 90 && game.wallAngle < 900 && p.x > 925) { die(); return; }   // 转过 90° 后：钥匙台最右端被压死
     // 拿到钥匙的代价：墙压下来（0.45 秒后必死）—— 这就是"不错的祭品"
     if (game.keyThisLife && game.keyGetT > 0.45 && game.keyGetT < 0.55) { die(); return; }
   }
