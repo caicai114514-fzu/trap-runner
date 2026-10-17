@@ -321,7 +321,9 @@ var LEVELS = [
     spikes: [
       { x: 280, y: 444, w: 65, h: 26, atX: 230, fallOnly: true, follow: true, followDist: 92 },  // ① 一离地就追到落点
       { x: 560, y: 444, w: 65, h: 26, atX: 500, moveTo: [470, 444] },                             // ② 走过 500 就左移贴过来
-      { x: 820, y: 444, w: 60, h: 26 }                                                              // ③ 真的不动
+      { x: 752, y: 444, w: 18, h: 26 },   // ③ 门口三根，都不动（总宽 60，起跳窗口 34px）
+      { x: 773, y: 444, w: 18, h: 26 },
+      { x: 794, y: 444, w: 18, h: 26 }
     ],
     arrows: []
   },
@@ -1691,13 +1693,17 @@ function drawSpikes() {
     ctx.beginPath();
     for (var a = 0; a < n; a++) {
       var x0 = sp.x + a * step;
+      // 尖不在正中，左右交替偏一点；再让高度轻微高低错落 —— 别像等边三角形
+      var lean = (a % 2 === 0) ? 0.33 : 0.67;
+      var trim = (a % 3 === 1) ? 0.86 : 1;
+      var tipY = box.y + box.h * (1 - trim);
       if (sp.dir === 'down') {
         ctx.moveTo(x0, box.y);
-        ctx.lineTo(x0 + step / 2, box.y + box.h);
+        ctx.lineTo(x0 + step * lean, box.y + box.h);
         ctx.lineTo(x0 + step, box.y);
       } else {
         ctx.moveTo(x0, box.y + box.h);
-        ctx.lineTo(x0 + step / 2, box.y);
+        ctx.lineTo(x0 + step * lean, tipY);
         ctx.lineTo(x0 + step, box.y + box.h);
       }
       ctx.closePath();
