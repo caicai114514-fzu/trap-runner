@@ -409,7 +409,7 @@ var LEVELS = [
     goalRevealTime: 3.5,
     // 墙：转轴在中间偏下(250,380)。一根长杆穿过转轴：
     //   上端顶天花板(0)，沿顶部边框左右滑；下端长度固定(90)，绕转轴扫过地面
-    wall: { pivotX: 250, pivotY: 380, w: 24, len: 90, upLen: 380 },
+    wall: { pivotX: 250, pivotY: 380, w: 24, len: 90, slideMax: 200 },
     button: { x: 430, y: 450, w: 40, h: 20 },
     keys: [{ x: 907, y: -60, drop: true, dropY: 347 }],
     platforms: [
@@ -1572,9 +1572,11 @@ function update(dt) {
     if (game.wallAngle < 90) {
       game.wallAngle = Math.min(90, game.wallAngle + dt * 22.5);   // 4 秒倒下
       // 倒下过程中：杆下端扫过地面，把墙右边的人压死
-      var rad2 = game.wallAngle * Math.PI / 180;
-      var ftX = wl.pivotX + wl.len * Math.sin(rad2);
-      if (game.wallAngle > 8 && p.x > wl.pivotX && p.x < ftX && p.y + p.h > 442) {
+      var prog2 = game.wallAngle / 90;
+      var sl2 = prog2 * (wl.slideMax || 200);
+      var Ls2 = Math.sqrt(sl2 * sl2 + wl.pivotY * wl.pivotY);
+      var ftX2 = wl.pivotX + wl.len * sl2 / Ls2;       // 下端 x（随滑动向右侧走）
+      if (prog2 > 0.1 && p.x > wl.pivotX && p.x < ftX2 && p.y + p.h > 442) {
         die(); return;
       }
     } else {
@@ -1934,17 +1936,21 @@ function drawButtonWall() {
     ctx.beginPath(); ctx.arc(b.x + b.w / 2, b.y + b.h - bh - 3, 3, 0, 7); ctx.fill();
   }
 
-  // 旋转的墙：一根穿过转轴的长杆。上端沿天花板边框滑，下端绕转轴扫
+  // 旋转的墙：一根穿过转轴的长杆。
+  // 上端【始终贴在 y=0 的天花板上】向左滑（上段长度随之变长），
+  // 下段长度固定(len)，绕转轴向右扫过地面。
   if (L.wall) {
     var w = L.wall;
-    var a = game.wallAngle * Math.PI / 180;
     var px = w.pivotX, py = w.pivotY;
-    // 上端：从转轴向上，沿天花板(y=0)滑动（角度越大越向左，像杠杆另一端翘上去）
-    var upX = px - w.upLen * Math.sin(a);
-    var upY = py - w.upLen * Math.cos(a);
-    // 下端：长度固定(len)，从转轴向下，向右扫
-    var ftX = px + w.len * Math.sin(a);
-    var ftY = py + w.len * Math.cos(a);
+    var prog = game.wallAngle / 90;                 // 0 → 1
+    var slide = prog * (w.slideMax || 200);         // 上端沿天花板滑动的距离
+    var tx = px - slide, ty = 0;                    // 上端：永远在天花板上
+    var Lseg = Math.sqrt(slide * slide + py * py);  // 上段长度（可变）
+    var ux = -slide / Lseg, uy = -py / Lseg;        // 从转轴指向天端的单位向量
+    // 下端 = 转轴沿反方向延伸 len（长度固定）
+    var ftX = px - w.len * ux;
+    var ftY = py - w.len * uy;
+    var upX = tx, upY = ty;
     ctx.lineCap = 'round';
     ctx.strokeStyle = PAL.ground;
     ctx.lineWidth = w.w;
