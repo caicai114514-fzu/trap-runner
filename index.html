@@ -312,17 +312,16 @@ var LEVELS = [
   {
     name: '2-2 · 会走的刺', hint: '刺不一定是死的。',
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
-    // 这关故意把跳跃力压得很低（600，默认 810）：
-    //   滞空 0.5s（默认 0.675s）、跳高 75px（默认 137px）、跳跃距离 157px（默认 213px）
-    // 人来不及在空中看清刺怎么动、再改落点。
-    jump: 600,
+    // 跳跃力压到 540（默认 810）：滞空只有 0.45s、跳高 61px、距离 141px
+    // 三根刺均匀分布（间隔 245px），每根都要独立处理
+    jump: 540,
     platforms: [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' }
     ],
     spikes: [
-      { x: 300, y: 440, w: 80, h: 30, atX: 250, fallOnly: true, follow: true, followDist: 150 },  // ① 一离地就追到落点
-      { x: 620, y: 440, w: 80, h: 30, atX: 560, moveTo: [516, 440] },                             // ② 多走一段就左移贴过来
-      { x: 780, y: 440, w: 70, h: 30 }                                                             // ③ 真的不动
+      { x: 300, y: 444, w: 65, h: 26, atX: 250, fallOnly: true, follow: true, followDist: 128 },  // ① 一离地就追到落点
+      { x: 545, y: 444, w: 65, h: 26, atX: 490, moveTo: [468, 444] },                             // ② 走过 490 就左移贴过来
+      { x: 790, y: 444, w: 65, h: 26 }                                                              // ③ 真的不动
     ],
     arrows: []
   },
@@ -1117,7 +1116,7 @@ function update(dt) {
         Sound.sfxTrap(); game.shake = Math.max(game.shake, 6);
       }
     }
-    if (sp.moved && sp.animT < 1) sp.animT = Math.min(1, sp.animT + dt * 9);
+    if (sp.moved && sp.animT < 1) sp.animT = Math.min(1, sp.animT + dt * 3);   // 0.33s 滑过去，别像瞬移
   }
 
   // 水平输入（反向关：整体乘以 game.reverse，+1 正常 / -1 反向）
