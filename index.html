@@ -775,7 +775,7 @@ function loadLevel(i) {
   game.wallAngle = 90;                       // 墙初始【竖直】(90°)；按按钮后匀速转起来
   game.wallOn = false;                       // 墙是否开始旋转
   game.fakeGoalDead = false;                 // 假门是否已失效（按下按钮后）
-  game.fakeGoalShown = false;                // 假门是否已经出现（人走近才现身）
+  game.fakeGoalShown = !!(L.fakeGoal && !L.fakeGoal.hidden);  // 假门一开始就在（除非显式 hidden）
   game.newWallDone = false; game.newWallT = 0; game.newWallRect = null;  // 碰假门后升起的新墙（死亡/重开要清掉）
   game.wallSweep = 0;
   if (typeof location !== 'undefined' && location.search.indexOf('wa=') >= 0) {
@@ -1642,7 +1642,9 @@ function update(dt) {
   // ===== 假门（初始隐藏，走近才出现）=====
   if (L6.fakeGoal) {
     var fg = L6.fakeGoal;
-    // 人走到 triggerX 才突然出现
+    // 没有 hidden 的假门：关卡一开始就在
+    if (!fg.hidden) game.fakeGoalShown = true;
+    // 有 hidden 的：人走到 triggerX 才突然出现
     if (!game.fakeGoalShown && p.x + p.w > (fg.triggerX || 700)) {
       game.fakeGoalShown = true;
       Sound.sfxTrap(); game.shake = 5;
@@ -1730,7 +1732,7 @@ function update(dt) {
   var g0 = LEVELS[game.li].goal;
   var LV2 = LEVELS[game.li];
   // 假门关（fakeGoal）：真门必须完全显现(goalReveal>=1)才能通关，否则就是"看不见的门"不算数
-  var canWin = !game.goalDead && (!LV2.fakeGoal || game.goalReveal >= 1);
+  var canWin = !game.goalDead && (!LV2.fakeGoal || game.goalReveal > 0.02);   // 门一出现判定就生效
   if (canWin) {
     var g = { x: g0.x, y: g0.y + (game.sinkY || 0), w: g0.w, h: g0.h };
     if (aabb(p, g)) { winLevel(); return; }
