@@ -840,7 +840,7 @@ function die(kind) {
   }
   game.tauntT = 1.4;
   game.shake = 14;
-  if (kind === 'saw') Sound.sfxChainsaw(); else Sound.sfxDeath();   // 被锯片锯死放链锯声
+  Sound.sfxDeath();                      // 统一用原版死亡音效
   // 掉坑：不爆尸体，就是人没了（约定：除了掉坑，其它死法都爆尸体）
   if (kind === 'fall') return;
 
