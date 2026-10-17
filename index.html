@@ -422,23 +422,17 @@ var LEVELS = [
   {
     name: '2-5 · 虚', hint: '这次有三种谎话一起说。',
     width: 960, spawn: [90, 260], goal: { x: 890, y: 400, w: 46, h: 70 },
-    // 全反着来：地板一踩就死，刺反而能踩（刺是可站立的实体，底座立在地板上）
+    // 地板整块是平的。有刺的那几段安全，其余地方一踩就死。
+    safeZones: [[295, 395], [505, 605], [715, 815]],
     platforms: [
-      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid', deadly: true },   // ★ 致命地板
-      { x: 0,   y: 300, w: 240, h: 22, kind: 'solid' },                 // 左边二楼（出生）
-      // 一排"刺"直接立在地板上：它们其实是能站的实体（底座 40 高）
-      { x: 300, y: 430, w: 45, h: 40, kind: 'solid' },
-      { x: 355, y: 430, w: 45, h: 40, kind: 'solid' },
-      { x: 470, y: 430, w: 45, h: 40, kind: 'solid' },
-      { x: 525, y: 430, w: 45, h: 40, kind: 'solid' },
-      { x: 640, y: 430, w: 45, h: 40, kind: 'solid' },
-      { x: 695, y: 430, w: 45, h: 40, kind: 'solid' }
+      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid', deadly: true },   // 致命地板（平地，不是岛屿）
+      { x: 0,   y: 300, w: 240, h: 22, kind: 'solid' }                  // 左边二楼（出生）
     ],
     spikes: [
-      // 刺直接画在地板上（安全，踩上去没事）
-      { x: 300, y: 404, w: 100, h: 26, fake: true },
-      { x: 470, y: 404, w: 100, h: 26, fake: true },
-      { x: 640, y: 404, w: 100, h: 26, fake: true }
+      // 三簇小刺直接立在地板上：有刺的那一段才安全
+      { x: 295, y: 444, w: 100, h: 26, fake: true },
+      { x: 505, y: 444, w: 100, h: 26, fake: true },
+      { x: 715, y: 444, w: 100, h: 26, fake: true }
     ],
     arrows: []
   },
@@ -1602,7 +1596,15 @@ function update(dt) {
   }
 
   // ===== 致命地面（2-5）：这关地面一踩就死，刺反而是安全的 =====
-  if (p.ground && p.ground.deadly) { die(); return; }
+  if (p.ground && p.ground.deadly) {
+    // 地板上"有刺的那几段"是安全的，其余地方一踩就死
+    var safeZones = LEVELS[game.li].safeZones || [];
+    var cx = p.x + p.w / 2, isSafe = false;
+    for (var szi = 0; szi < safeZones.length; szi++) {
+      if (cx >= safeZones[szi][0] && cx <= safeZones[szi][1]) { isSafe = true; break; }
+    }
+    if (!isSafe) { die(); return; }
+  }
 
   // ===== 墙：靠【转速】形成时间压力 =====
   //   转的这 2.2 秒就是你的逃生窗口：墙转到底那一刻，还留在墙下端右边的人直接被压死。
