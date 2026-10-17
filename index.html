@@ -402,15 +402,22 @@ var LEVELS = [
   },
   {
     name: '2-4 · 镜花', hint: '门就在那儿。看着挺正常的。',
-    width: 960, spawn: [70, 440],
-    goal: { x: 60, y: 330, w: 46, h: 70 },              // 真门：左上角
-    fakeGoal: { x: 880, y: 400, w: 46, h: 70 },         // 假门：右下角，看着才是出口
-    goalTriggerX: 640, goalRevealTime: 1.0,
-    keys: [{ x: 820, y: 300 }],                          // 钥匙：假门后面那条"死路"
+    sacrificeTaunt: '不错的祭品',
+    width: 960, spawn: [300, 440],
+    goal: { x: 60, y: 330, w: 46, h: 70 },              // 真门：左上，被墙挡着
+    fakeGoal: { x: 880, y: 400, w: 46, h: 70 },         // 假门：右下，看着才是出口
+    goalRevealTime: 3.5,
+    // 墙：挡在真门前面（玩家出生在墙右边）
+    wall: { x: 200, y: 250, w: 24, h: 220 },
+    // 按钮：去假门的路上。按了它，墙才倒、假门才失效、真门才计时、钥匙才掉
+    button: { x: 450, y: 442, w: 40, h: 28 },
+    // 钥匙：按钮按下后从天上掉到假门后面的死路里
+    keys: [{ x: 820, y: -60, drop: true, dropY: 320 }],
     platforms: [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
-      { x: 60, y: 400, w: 200, h: 22, kind: 'solid' },
-      { x: 700, y: 380, w: 260, h: 22, kind: 'solid' }
+      { x: 60, y: 400, w: 200, h: 22, kind: 'solid' },      // 真门脚下的平台
+      { x: 700, y: 380, w: 260, h: 22, kind: 'solid' },     // 假门后面的"死路"（钥匙掉这儿）
+      { x: 200, y: 250, w: 24, h: 220, kind: 'solid', isWall: true }   // 墙（竖直挡去真门的路）
     ],
     spikes: [], arrows: []
   },
@@ -722,7 +729,8 @@ function loadLevel(i) {
       moveV: p.moveV || 0,      // 会走的障碍：出现后自己移动，把玩家顶走
       moveTo: p.moveTo || 0,
       baseY: p.y,               // 活塞：原始高度（升降都相对它算）
-      phase: isPiston ? 'hidden' : '', phaseT: 0
+      phase: isPiston ? 'hidden' : '', phaseT: 0,
+      isWall: !!p.isWall
     };
   });
   game.spikes = L.spikes.map(function (s) {
@@ -765,6 +773,11 @@ function loadLevel(i) {
   game.flipOnLand = !!L.flipOnLand;          // 每次落地再反一次
   game.wasOnGround = false;
   game.goalReveal = L.fakeGoal ? 0 : 1;      // 真门的显现进度
+  game.buttonPressed = false;                // 按钮是否按下
+  game.wallAngle = 0;                        // 墙旋转角度 0(竖)~90(倒)
+  game.wallOn = false;                       // 墙是否开始旋转
+  game.fakeGoalDead = false;                 // 假门是否已失效（按下按钮后）
+  game.wallSweep = 0;                        // 墙倒下后向右扫的推进量
   game.revealStarted = false;
   game.balls = (L.balls || []).map(function (b) {
     return {
@@ -801,7 +814,8 @@ function loadLevel(i) {
       slideToX: (k.slideTo === undefined ? null : k.slideTo),   // 一路滑到这儿
       slideT: 0, slideTime: k.slideTime || 2.6, gone: false,
       armX: (k.armX === undefined ? null : k.armX),             // 检查点一：先得到过这儿
-      armed: false, started: false                              // 检查点二：再回到 triggerX 左边才启动
+      armed: false, started: false,                             // 检查点二：再回到 triggerX 左边才启动
+      drop: !!k.drop, dropY: (k.dropY === undefined ? null : k.dropY)  // 从天掉下来
     };
   });
   game.arrows = L.arrows || [];
@@ -831,7 +845,7 @@ function die(kind) {
   // 拿完钥匙跑很远才死的不算，那是自己作死，不是献祭。
   var sacrificed = game.keyThisLife && game.keyGetT < 2.6;
   if (sacrificed) {
-    game.taunt = '你献祭了自己，这是你应得的';
+    game.taunt = (LEVELS[game.li].sacrificeTaunt || '你献祭了自己，这是你应得的');
     game.tauntColor = '#c0392b';
     game.shake = 20;                    // 献祭额外震一下
   } else {
@@ -1539,15 +1553,52 @@ function update(dt) {
   // 假终点：走到触发点开始计时，真门缓缓显形。
   // 计时长度是按"玩家从触发点走到假门的时间"配的，所以真门几乎在他撞上假门那刻才出现。
   var L6 = LEVELS[game.li];
-  if (L6.fakeGoal) {
+
+  // ===== 按钮：碰一下触发整条连锁 =====
+  if (L6.button && !game.buttonPressed) {
+    var bt = L6.button;
+    if (p.x < bt.x + bt.w && p.x + p.w > bt.x && p.y < bt.y + bt.h && p.y + p.h > bt.y) {
+      game.buttonPressed = true;
+      game.wallOn = true;                 // 墙开始旋转
+      game.fakeGoalDead = true;           // 假门失效（碰了没反应）
+      game.shake = 8;
+      Sound.sfxTrap();
+    }
+  }
+
+  // ===== 墙旋转 + 压人 =====
+  if (L6.wall && game.wallOn) {
+    var wl = L6.wall;
+    if (game.wallAngle < 90) {
+      // 墙还在倒：墙顶在空中扫，地面的人不压（只有墙底一直挡路）。
+      game.wallAngle = Math.min(90, game.wallAngle + dt * 22.5);   // 4 秒转 90°
+    } else {
+      // 墙完全倒下：实体失效（去真门的路打开），然后像推土机一样向右扫，碾死墙右边的人
+      var wp = null;
+      for (var wi = 0; wi < game.plats.length; wi++) { if (game.plats[wi].isWall) wp = game.plats[wi]; }
+      if (wp) wp.noCollide = true;
+      game.wallSweep = (game.wallSweep || 0) + dt * 170;
+      var sweepRight = wl.x + wl.w + wl.h + game.wallSweep;   // 444 起，向右扫
+      // 只压墙右边（x > 墙右缘）的人；墙左边（去真门）安全
+      if (p.x > wl.x + wl.w && p.x < sweepRight && p.y + p.h > 420) {
+        die(); return;
+      }
+    }
+  }
+
+  // ===== 假门 =====
+  if (L6.fakeGoal && !game.fakeGoalDead) {
     if (!game.revealStarted && p.x + p.w / 2 > (L6.goalTriggerX || 0)) game.revealStarted = true;
     if (game.revealStarted && game.goalReveal < 1) {
       game.goalReveal = Math.min(1, game.goalReveal + dt / (L6.goalRevealTime || 1.1));
     }
     var fg = L6.fakeGoal;
     if (p.x < fg.x + fg.w && p.x + p.w > fg.x && p.y < fg.y + fg.h && p.y + p.h > fg.y) {
-      die(); return;                     // 假门：碰到直接死（爆尸体）
+      die(); return;                     // 假门：没按按钮，碰到直接死
     }
+  } else if (L6.fakeGoal && game.fakeGoalDead && game.goalReveal < 1) {
+    // 按了按钮：假门失效，真门按按钮后计时缓缓出现
+    game.goalReveal = Math.min(1, game.goalReveal + dt / (L6.goalRevealTime || 3.5));
   }
 
   // 金币：真的吃了给个清脆音效；假的一碰就炸（用音效吓你一跳）
@@ -1576,6 +1627,10 @@ function update(dt) {
       if (kk.armed && p.x + p.w / 2 < kk.triggerX) {
         kk.started = true; Sound.sfxTrap();          // 这时候才听到"机关响了"
       } else continue;
+    }
+    // 从天掉下来：按钮按下后，y 从起始(-50)一路掉到 dropY
+    if (kk.drop && kk.dropY !== undefined) {
+      if (game.buttonPressed) kk.y += (kk.dropY - kk.y) * Math.min(1, dt * 4);
     }
     if (kk.show < 1) {
       if (!kk.hidden) kk.show = 1;
@@ -1846,6 +1901,37 @@ function drawCoins() {
     ctx.beginPath(); ctx.ellipse(c.x, c.y + bob, 5.5, 7, 0, 0, 7); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.65)';
     ctx.beginPath(); ctx.ellipse(c.x - 3, c.y + bob - 3.5, 2.2, 3, 0, 0, 7); ctx.fill();
+  }
+}
+
+/* 按钮 + 会旋转的墙（2-4 用） */
+function drawButtonWall() {
+  var L = LEVELS[game.li];
+
+  // 按钮
+  if (L.button) {
+    var b = L.button;
+    var pressed = game.buttonPressed;
+    var bh = pressed ? 6 : 18;                     // 按下会扁下去
+    ctx.fillStyle = pressed ? '#5a4436' : PAL.ground;
+    ctx.fillRect(b.x, b.y + b.h - bh, b.w, bh);
+    ctx.fillStyle = pressed ? '#3a2a22' : PAL.groundTop;
+    ctx.fillRect(b.x, b.y + b.h - bh, b.w, 4);
+    ctx.fillStyle = '#ffd23f';
+    ctx.beginPath(); ctx.arc(b.x + b.w / 2, b.y + b.h - bh - 6, 4, 0, 7); ctx.fill();
+  }
+
+  // 旋转的墙
+  if (L.wall) {
+    var w = L.wall;
+    ctx.save();
+    ctx.translate(w.x + w.w / 2, w.y + w.h);       // 底部中心
+    ctx.rotate(game.wallAngle * Math.PI / 180);    // 顺时针倒下（向右压）
+    ctx.fillStyle = PAL.ground;
+    ctx.fillRect(-w.w / 2, -w.h, w.w, w.h);
+    ctx.fillStyle = PAL.groundTop;
+    ctx.fillRect(-w.w / 2, -w.h, w.w, 4);
+    ctx.restore();
   }
 }
 
@@ -2889,6 +2975,7 @@ function drawScene() {
   drawSpikes();
   drawSaws();
   drawCoins();
+  drawButtonWall();
   drawKeys();
   drawBalls();
   drawGoal();
