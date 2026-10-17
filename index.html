@@ -410,7 +410,7 @@ var LEVELS = [
     // 墙：一根穿过转轴的长杆，它【自己转】（碰撞跟着转）。
     //   转轴在中间偏下(250,380)；上端贴天花板顺时针向右滑；下端长度固定 90，向左扫。
     //   竖直时把真门和玩家隔开；转开后路就通了。
-    wall: { pivotX: 250, pivotY: 380, w: 24, len: 90, slideMax: 200 },
+    wall: { pivotX: 250, pivotY: 380, w: 24, len: 90, slideMax: 700 },
     button: { x: 430, y: 450, w: 40, h: 20 },           // 按钮：贴地
     keys: [{ x: 907, y: -60, drop: true, dropY: 347 }],
     platforms: [
@@ -1279,15 +1279,13 @@ function update(dt) {
 
   // ===== 墙本体碰撞：墙转到哪，碰撞就在哪 =====
   //   静止时是"挡路的墙"（水平推出），转动过程中扫到人就压死。
-  if (LEVELS[game.li].wall && game.wallAngle < 88) {
+  if (LEVELS[game.li].wall && !game.wallOn) {
+    // 墙没转之前是实体挡路；一旦开始转，身体让开（压死交给转完那一刻判定）
     var wbs = wallBlocks();
     var hitWall = false;
     for (var wb = 0; wb < wbs.length; wb++) { if (aabb(p, wbs[wb])) { hitWall = true; break; } }
     if (hitWall) {
-      if (game.wallOn && game.wallAngle > 2) {
-        die(); return;                       // 墙在转 → 压死
-      }
-      // 没转的墙：把人水平推出去（挡路，不致命）
+      // 墙只负责【挡路】（水平推出），压死由旋转的死亡区判定，别在这儿直接判死
       for (var wb2 = 0; wb2 < wbs.length; wb2++) {
         var blk = wbs[wb2];
         if (aabb(p, blk)) {
@@ -1590,9 +1588,17 @@ function update(dt) {
     }
   }
 
-  // ===== 墙：它自己转（角度推进），碰撞在物理里用 wallBlocks 处理 =====
-  if (L6.wall && game.wallOn && game.wallAngle < 90) {
-    game.wallAngle = Math.min(90, game.wallAngle + dt * 41);     // 2.2 秒转完
+  // ===== 墙：靠【转速】形成时间压力 =====
+  //   转的这 2.2 秒就是你的逃生窗口：墙转到底那一刻，还留在墙下端右边的人直接被压死。
+  //   拿钥匙要绕到假门头顶的平台，回来必然来不及 → 死
+  //   立刻往左跑过墙下端 → 活
+  if (L6.wall && game.wallOn) {
+    if (game.wallAngle < 90) game.wallAngle = Math.min(90, game.wallAngle + dt * 41);   // 2.2 秒转完
+    if (game.wallAngle >= 90) {
+      var gW = wallGeom();
+      // 墙下端落地的 x：站在它右边（还没跑出去）就被压死
+      if (gW && p.x > gW.ftX + 6) { die(); return; }
+    }
   }
 
   // ===== 假门（初始隐藏，走近才出现）=====
