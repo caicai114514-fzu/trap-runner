@@ -1687,7 +1687,7 @@ function drawSpikes() {
     if (!sp.shown) continue;
     if (sp.onPop && !game.popFired) continue;      // 保险：没弹起来就不画
     var box = spikeBox(sp);
-    var n = Math.max(2, Math.round(box.w / 16));
+    var n = Math.max(1, Math.round(box.w / 16));   // 15px 的窄刺就画 1 根，49px 画 3 根
     var step = box.w / n;
     // 纯色三角，一次画完，没有描边也没有高光
     ctx.fillStyle = PAL.spike;
