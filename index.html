@@ -404,19 +404,18 @@ var LEVELS = [
     name: '2-4 · 镜花', hint: '门就在那儿。看着挺正常的。',
     sacrificeTaunt: '不错的祭品',
     width: 960, spawn: [350, 440],
-    goal: { x: 60, y: 330, w: 46, h: 70 },              // 真门：左上（墙左边）
-    fakeGoal: { x: 880, y: 400, w: 46, h: 70, hidden: true, triggerX: 700 },  // 假门：右边贴地，走近才出现
+    goal: { x: 60, y: 400, w: 46, h: 70 },              // 真门：左上，贴地（不放在平台上）
+    fakeGoal: { x: 880, y: 400, w: 46, h: 70, hidden: true, triggerX: 700 },  // 假门：右边贴地
     goalRevealTime: 3.5,
-    // 墙：转轴在中间偏下(250,380)。一根长杆穿过转轴：
-    //   上端顶天花板(0)，沿顶部边框左右滑；下端长度固定(90)，绕转轴扫过地面
+    // 墙：一根穿过转轴的长杆，它【自己转】（碰撞跟着转）。
+    //   转轴在中间偏下(250,380)；上端贴天花板顺时针向右滑；下端长度固定 90，向左扫。
+    //   竖直时把真门和玩家隔开；转开后路就通了。
     wall: { pivotX: 250, pivotY: 380, w: 24, len: 90, slideMax: 200 },
-    button: { x: 430, y: 450, w: 40, h: 20 },
+    button: { x: 430, y: 450, w: 40, h: 20 },           // 按钮：贴地
     keys: [{ x: 907, y: -60, drop: true, dropY: 347 }],
     platforms: [
-      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
-      { x: 60, y: 400, w: 200, h: 22, kind: 'solid' },      // 真门脚下的平台
-      { x: 855, y: 375, w: 105, h: 22, kind: 'solid', oneWay: true },      // 假门正上方悬空平台（单向：从下面能跳上来）
-      { x: 238, y: 0, w: 24, h: 470, kind: 'solid', isWall: true }   // 墙（竖直，从天花板到地面）
+      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },      // 地面（真门/按钮都直接贴这块地）
+      { x: 855, y: 375, w: 105, h: 22, kind: 'solid', oneWay: true }   // 假门头顶的悬空平台（钥匙掉这儿）
     ],
     spikes: [], arrows: []
   },
@@ -1275,6 +1274,28 @@ function update(dt) {
     }
   }
 
+  // ===== 墙本体碰撞：墙转到哪，碰撞就在哪 =====
+  //   静止时是"挡路的墙"（水平推出），转动过程中扫到人就压死。
+  if (LEVELS[game.li].wall && game.wallAngle < 88) {
+    var wbs = wallBlocks();
+    var hitWall = false;
+    for (var wb = 0; wb < wbs.length; wb++) { if (aabb(p, wbs[wb])) { hitWall = true; break; } }
+    if (hitWall) {
+      if (game.wallOn && game.wallAngle > 2) {
+        die(); return;                       // 墙在转 → 压死
+      }
+      // 没转的墙：把人水平推出去（挡路，不致命）
+      for (var wb2 = 0; wb2 < wbs.length; wb2++) {
+        var blk = wbs[wb2];
+        if (aabb(p, blk)) {
+          if (p.x + p.w / 2 > blk.x + blk.w / 2) p.x = blk.x + blk.w;
+          else p.x = blk.x - p.w;
+          p.vx = 0;
+        }
+      }
+    }
+  }
+
   // 假地板：踩上只撑 0.12 秒 —— 走是绝对走不过去的，踩上去就得往下掉
   // 会塌的板（假地板 / 消失板）：行为完全统一 ——
   // 踩上去「立刻」开始往左缩进去，左缘钉死、宽度收到 0。
@@ -1566,30 +1587,9 @@ function update(dt) {
     }
   }
 
-  // ===== 墙旋转 + 压人（绕顶部转轴）=====
-  if (L6.wall && game.wallOn) {
-    var wl = L6.wall;
-    if (game.wallAngle < 90) {
-      game.wallAngle = Math.min(90, game.wallAngle + dt * 22.5);   // 4 秒倒下
-      // 倒下过程中：杆下端扫过地面，把墙右边的人压死
-      var prog2 = game.wallAngle / 90;
-      var sl2 = prog2 * (wl.slideMax || 200);
-      var Ls2 = Math.sqrt(sl2 * sl2 + wl.pivotY * wl.pivotY);
-      var ftX2 = wl.pivotX - wl.len * sl2 / Ls2;       // 顺时针：下端向左走
-      if (prog2 > 0.1 && p.x < wl.pivotX && p.x > ftX2 && p.y + p.h > 442) {
-        die(); return;
-      }
-    } else {
-      // 墙完全倒下：实体失效（路打开），然后向右扫，碾死墙右边的人
-      var wp = null;
-      for (var wi = 0; wi < game.plats.length; wi++) { if (game.plats[wi].isWall) wp = game.plats[wi]; }
-      if (wp) wp.noCollide = true;
-      game.wallSweep = (game.wallSweep || 0) + dt * 170;
-      var sweepRight = wl.pivotX + wl.len + game.wallSweep;   // 转轴+下端长 起，向右扫
-      if (p.x > wl.pivotX && p.x < sweepRight && p.y + p.h > 430) {
-        die(); return;
-      }
-    }
+  // ===== 墙：它自己转（角度推进），碰撞在物理里用 wallBlocks 处理 =====
+  if (L6.wall && game.wallOn && game.wallAngle < 90) {
+    game.wallAngle = Math.min(90, game.wallAngle + dt * 22.5);   // 4 秒转完
   }
 
   // ===== 假门（初始隐藏，走近才出现）=====
@@ -1920,6 +1920,41 @@ function drawCoins() {
 }
 
 /* 按钮 + 会旋转的墙（2-4 用） */
+// 墙的真实几何：上端贴天花板滑动、下端长度固定。返回 {upX,upY,ftX,ftY}
+function wallGeom() {
+  var L = LEVELS[game.li];
+  if (!L.wall) return null;
+  var w = L.wall;
+  var prog = game.wallAngle / 90;
+  var slide = prog * (w.slideMax || 200);
+  var tx = w.pivotX + slide, ty = 0;                       // 上端：永远在天花板上（顺时针→向右滑）
+  var Lseg = Math.sqrt(slide * slide + w.pivotY * w.pivotY);
+  var ux = slide / Lseg, uy = -w.pivotY / Lseg;            // 转轴→上端 的单位向量
+  return {
+    upX: tx, upY: ty,
+    ftX: w.pivotX - w.len * ux,                            // 下端：反方向，长度固定
+    ftY: w.pivotY - w.len * uy,
+    w: w.w
+  };
+}
+
+// 把墙切成若干小方块（用于碰撞）：墙自己转，碰撞跟着转
+function wallBlocks() {
+  var g = wallGeom();
+  if (!g) return [];
+  var N = 12, out = [], hw = g.w / 2;
+  for (var i = 0; i < N; i++) {
+    var t0 = i / N, t1 = (i + 1) / N;
+    var x0 = g.upX + (g.ftX - g.upX) * t0, y0 = g.upY + (g.ftY - g.upY) * t0;
+    var x1 = g.upX + (g.ftX - g.upX) * t1, y1 = g.upY + (g.ftY - g.upY) * t1;
+    out.push({
+      x: Math.min(x0, x1) - hw, y: Math.min(y0, y1) - hw,
+      w: Math.abs(x1 - x0) + g.w, h: Math.abs(y1 - y0) + g.w
+    });
+  }
+  return out;
+}
+
 function drawButtonWall() {
   var L = LEVELS[game.li];
 
@@ -1936,21 +1971,15 @@ function drawButtonWall() {
     ctx.beginPath(); ctx.arc(b.x + b.w / 2, b.y + b.h - bh - 3, 3, 0, 7); ctx.fill();
   }
 
-  // 旋转的墙：一根穿过转轴的长杆。
-  // 上端【始终贴在 y=0 的天花板上】向左滑（上段长度随之变长），
-  // 下段长度固定(len)，绕转轴向右扫过地面。
+  // 墙：一根从天花板斜下来的杆，它自己转（碰撞跟着转）
   if (L.wall) {
+    var g = wallGeom();
     var w = L.wall;
     var px = w.pivotX, py = w.pivotY;
-    var prog = game.wallAngle / 90;                 // 0 → 1
-    var slide = prog * (w.slideMax || 200);         // 上端沿天花板滑动的距离
-    var tx = px + slide, ty = 0;                    // 上端：永远在天花板上（顺时针→向右滑）
-    var Lseg = Math.sqrt(slide * slide + py * py);  // 上段长度（可变）
-    var ux = slide / Lseg, uy = -py / Lseg;         // 从转轴指向天端的单位向量
-    // 下端 = 转轴沿反方向延伸 len（长度固定）→ 向左扫
-    var ftX = px - w.len * ux;
-    var ftY = py - w.len * uy;
-    var upX = tx, upY = ty;
+    var upX = g.upX, upY = g.upY, ftX = g.ftX, ftY = g.ftY;
+    var fade = game.wallAngle >= 88 ? Math.max(0, 1 - (game.wallAngle - 88) / 2) : 1;
+    if (fade <= 0.01) { ctx.restore && 0; }
+    ctx.globalAlpha = fade;
     ctx.lineCap = 'round';
     ctx.strokeStyle = PAL.ground;
     ctx.lineWidth = w.w;
@@ -1961,6 +1990,7 @@ function drawButtonWall() {
     // 转轴点（看得见支点）
     ctx.fillStyle = PAL.ink;
     ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
   }
 }
 
