@@ -403,22 +403,20 @@ var LEVELS = [
   {
     name: '2-4 · 镜花', hint: '门就在那儿。看着挺正常的。',
     sacrificeTaunt: '不错的祭品',
-    width: 960, spawn: [300, 440],
-    goal: { x: 60, y: 330, w: 46, h: 70 },              // 真门：左上，按钮后计时浮现
-    // 假门：右下，贴地（不放在平台上），初始隐藏，人走近(>700)才突然出现
-    fakeGoal: { x: 880, y: 400, w: 46, h: 70, hidden: true, triggerX: 700 },
+    width: 960, spawn: [350, 440],
+    goal: { x: 60, y: 330, w: 46, h: 70 },              // 真门：左上（墙左边）
+    fakeGoal: { x: 880, y: 400, w: 46, h: 70, hidden: true, triggerX: 700 },  // 假门：右边贴地，走近才出现
     goalRevealTime: 3.5,
-    // 墙：转轴在顶部(540,60)，墙长 410（从顶部垂到地面），初始竖直，把玩家和假门隔开
-    //      按钮后绕顶部转轴倒下（上端一直顶在天花板/转轴上），下端扫向右压人
-    wall: { pivotX: 540, pivotY: 60, w: 24, len: 410 },
-    // 按钮：贴地，无高台
+    // 墙：转轴在中间偏下(250,380)。一根长杆穿过转轴：
+    //   上端顶天花板(0)，沿顶部边框左右滑；下端长度固定(90)，绕转轴扫过地面
+    wall: { pivotX: 250, pivotY: 380, w: 24, len: 90, upLen: 380 },
     button: { x: 430, y: 450, w: 40, h: 20 },
-    // 钥匙：按钮后从天上掉到假门后面（贴地）
-    keys: [{ x: 820, y: -60, drop: true, dropY: 442 }],
+    keys: [{ x: 810, y: -60, drop: true, dropY: 342 }],
     platforms: [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
       { x: 60, y: 400, w: 200, h: 22, kind: 'solid' },      // 真门脚下的平台
-      { x: 528, y: 60, w: 24, h: 410, kind: 'solid', isWall: true }   // 墙（竖直，转轴在顶）
+      { x: 760, y: 370, w: 100, h: 22, kind: 'solid' },      // 假门左上方的高平台（钥匙掉这儿）
+      { x: 238, y: 0, w: 24, h: 470, kind: 'solid', isWall: true }   // 墙（竖直，从天花板到地面）
     ],
     spikes: [], arrows: []
   },
@@ -1573,13 +1571,19 @@ function update(dt) {
     var wl = L6.wall;
     if (game.wallAngle < 90) {
       game.wallAngle = Math.min(90, game.wallAngle + dt * 22.5);   // 4 秒倒下
+      // 倒下过程中：杆下端扫过地面，把墙右边的人压死
+      var rad2 = game.wallAngle * Math.PI / 180;
+      var ftX = wl.pivotX + wl.len * Math.sin(rad2);
+      if (game.wallAngle > 8 && p.x > wl.pivotX && p.x < ftX && p.y + p.h > 442) {
+        die(); return;
+      }
     } else {
-      // 墙完全倒下：实体失效（路打开），然后像推土机向右扫，碾死墙右边的人
+      // 墙完全倒下：实体失效（路打开），然后向右扫，碾死墙右边的人
       var wp = null;
       for (var wi = 0; wi < game.plats.length; wi++) { if (game.plats[wi].isWall) wp = game.plats[wi]; }
       if (wp) wp.noCollide = true;
       game.wallSweep = (game.wallSweep || 0) + dt * 170;
-      var sweepRight = wl.pivotX + wl.len + game.wallSweep;   // 转轴+墙长 起，向右扫
+      var sweepRight = wl.pivotX + wl.len + game.wallSweep;   // 转轴+下端长 起，向右扫
       if (p.x > wl.pivotX && p.x < sweepRight && p.y + p.h > 430) {
         die(); return;
       }
@@ -1930,17 +1934,27 @@ function drawButtonWall() {
     ctx.beginPath(); ctx.arc(b.x + b.w / 2, b.y + b.h - bh - 3, 3, 0, 7); ctx.fill();
   }
 
-  // 旋转的墙：绕顶部转轴（上端固定顶在天花板，下端向右扫）
+  // 旋转的墙：一根穿过转轴的长杆。上端沿天花板边框滑，下端绕转轴扫
   if (L.wall) {
     var w = L.wall;
-    ctx.save();
-    ctx.translate(w.pivotX, w.pivotY);              // 顶部转轴
-    ctx.rotate(game.wallAngle * Math.PI / 180);     // 顺时针倒下（下端向右扫）
-    ctx.fillStyle = PAL.ground;
-    ctx.fillRect(-w.w / 2, 0, w.w, w.len);          // 从转轴向下延伸
-    ctx.fillStyle = PAL.groundTop;
-    ctx.fillRect(-w.w / 2, 0, w.w, 4);
-    ctx.restore();
+    var a = game.wallAngle * Math.PI / 180;
+    var px = w.pivotX, py = w.pivotY;
+    // 上端：从转轴向上，沿天花板(y=0)滑动（角度越大越向左，像杠杆另一端翘上去）
+    var upX = px - w.upLen * Math.sin(a);
+    var upY = py - w.upLen * Math.cos(a);
+    // 下端：长度固定(len)，从转轴向下，向右扫
+    var ftX = px + w.len * Math.sin(a);
+    var ftY = py + w.len * Math.cos(a);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = PAL.ground;
+    ctx.lineWidth = w.w;
+    ctx.beginPath(); ctx.moveTo(upX, upY); ctx.lineTo(ftX, ftY); ctx.stroke();
+    ctx.strokeStyle = PAL.groundTop;
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(upX, upY); ctx.lineTo(ftX, ftY); ctx.stroke();
+    // 转轴点（看得见支点）
+    ctx.fillStyle = PAL.ink;
+    ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill();
   }
 }
 
