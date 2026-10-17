@@ -403,7 +403,7 @@ var LEVELS = [
   {
     name: '2-4 · 镜花', hint: '门就在那儿。看着挺正常的。',
     sacrificeTaunt: '不错的祭品',
-    width: 960, spawn: [350, 440],
+    width: 960, spawn: [560, 440],
     goal: { x: 60, y: 400, w: 46, h: 70 },              // 真门：左上，贴地（不放在平台上）
     fakeGoal: { x: 880, y: 400, w: 46, h: 70, hidden: true, triggerX: 700 },  // 假门：右边贴地
     goalRevealTime: 3.5,
@@ -411,7 +411,7 @@ var LEVELS = [
     //   转轴在中间偏下(250,380)；上端贴天花板顺时针向右滑；下端长度固定 90，向左扫。
     //   竖直时把真门和玩家隔开；转开后路就通了。
     wall: { pivotX: 480, pivotY: 380, w: 26, len: 470, spin: 100 },
-    button: { x: 430, y: 450, w: 40, h: 20 },           // 按钮：贴地
+    button: { x: 660, y: 450, w: 40, h: 20 },           // 按钮：贴地，墙右边的路上
     keys: [{ x: 880, y: -60, drop: true, dropY: 347, onPlatY: 375 }],
     platforms: [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },      // 地面（真门/按钮都直接贴这块地）
@@ -772,7 +772,7 @@ function loadLevel(i) {
   game.wasOnGround = false;
   game.goalReveal = L.fakeGoal ? 0 : 1;      // 真门的显现进度
   game.buttonPressed = false;                // 按钮是否按下
-  game.wallAngle = 0;                        // 墙旋转角度 0(竖)~90(倒)
+  game.wallAngle = 90;                       // 墙初始【竖直】(90°)；按按钮后匀速转起来
   game.wallOn = false;                       // 墙是否开始旋转
   game.fakeGoalDead = false;                 // 假门是否已失效（按下按钮后）
   game.fakeGoalShown = false;                // 假门是否已经出现（人走近才现身）
