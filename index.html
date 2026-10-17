@@ -2155,6 +2155,7 @@ function drawOneDoor(g, alpha, closeK) {
   ctx.beginPath(); ctx.ellipse(x + r, y + h * 0.55, w * 1.35, h * 0.85, 0, 0, 7); ctx.fill();
   ctx.restore();
 
+  ctx.globalAlpha = k;                       // 整个门跟着 alpha 一起淡入
   // 门框（比门洞大一圈）
   ctx.beginPath();
   ctx.moveTo(x - 4, y + h + 4); ctx.lineTo(x - 4, y + r);
@@ -2187,6 +2188,7 @@ function drawOneDoor(g, alpha, closeK) {
   ctx.lineTo(x + w, y + h);
   ctx.closePath(); ctx.fill();
   ctx.restore();
+  ctx.globalAlpha = 1;   // 恢复
 }
 
 function drawArrows() {
