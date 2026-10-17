@@ -114,6 +114,20 @@ var Sound = {
     this.noise(t, 0.06, 0.07);
   },
 
+  sfxChainsaw: function () {       // 链锯：低频锯齿 + 抖动 + 噪声
+    if (!this.ac) return;
+    var t = this.ac.currentTime;
+    var o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.type = 'sawtooth';
+    for (var i = 0; i < 24; i++) {
+      o.frequency.setValueAtTime(85 + Math.random() * 45, t + i * 0.022);
+    }
+    g.gain.setValueAtTime(0.32, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.62);
+    this.noise(t, 0.55, 0.33);
+  },
+
   sfxCoin: function () {          // 吃真金币：两音上行，清脆
     if (!this.ac) return;
     var t = this.ac.currentTime;
@@ -354,7 +368,7 @@ var LEVELS = [
     saws: [
       // 上面那条死路：一个大到跳不过去的锯片，贴着二楼表面从左往右来回碾
       // r=90（直径 180）> 跳跃水平距离 137 → 你跳也跳不过，只能被碾死
-      { x: 300, y: 270, r: 90, tx: 660, ty: 270, speed: 190, hidden: true, showOnPlatY: 360, once: true }
+      { x: -120, y: 270, r: 90, tx: 1080, ty: 270, speed: 820, hidden: true, showOnPlatY: 360, once: true }
     ],
     arrows: [
       { x: 250, y: 438, dir: 'up' }                          // 箭头在地面，指着二楼
@@ -800,7 +814,7 @@ function die(kind) {
   }
   game.tauntT = 1.4;
   game.shake = 14;
-  Sound.sfxDeath();                     // 掉坑也要有音效（只是不爆尸体）
+  if (kind === 'saw') Sound.sfxChainsaw(); else Sound.sfxDeath();   // 被锯片锯死放链锯声
   // 掉坑：不爆尸体，就是人没了（约定：除了掉坑，其它死法都爆尸体）
   if (kind === 'fall') return;
 
@@ -1279,6 +1293,7 @@ function update(dt) {
       }
     }
     if (!sw.shown) continue;                    // 没现身：不画不判定
+    if (sw.shown && !sw.done) game.shake = Math.max(game.shake, 5);   // 移动时持续震屏
     if (sw.speed > 0 && !sw.done) {
       var len = Math.sqrt((sw.tx - sw.x0) * (sw.tx - sw.x0) + (sw.ty - sw.y0) * (sw.ty - sw.y0)) || 1;
       sw.t += sw.dir * (sw.speed / len) * dt;
@@ -1292,7 +1307,7 @@ function update(dt) {
       sw.y = sw.y0 + (sw.ty - sw.y0) * sw.t;
     }
     var ddx = pcx - sw.x, ddy = pcy - sw.y;
-    if (Math.sqrt(ddx * ddx + ddy * ddy) < sw.r * 0.80 + 8) { die(); return; }
+    if (Math.sqrt(ddx * ddx + ddy * ddy) < sw.r * 0.80 + 8) { die('saw'); return; }
   }
 
   // onPop 的刺：每帧强制跟 popFired 同步 —— 没被弹起来之前绝对不显示。
