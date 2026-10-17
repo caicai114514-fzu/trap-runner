@@ -114,18 +114,36 @@ var Sound = {
     this.noise(t, 0.06, 0.07);
   },
 
-  sfxChainsaw: function () {       // 链锯：低频锯齿 + 抖动 + 噪声
+  sfxChainsaw: function () {       // 链锯：三层叠——刺耳高频锯齿 + 中频抖动 + 噪声
     if (!this.ac) return;
     var t = this.ac.currentTime;
-    var o = this.ac.createOscillator(), g = this.ac.createGain();
-    o.type = 'sawtooth';
-    for (var i = 0; i < 24; i++) {
-      o.frequency.setValueAtTime(85 + Math.random() * 45, t + i * 0.022);
-    }
-    g.gain.setValueAtTime(0.32, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
-    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.62);
-    this.noise(t, 0.55, 0.33);
+
+    // 第一层：高频方波抖动（最尖锐的部分）
+    var o1 = this.ac.createOscillator(), g1 = this.ac.createGain();
+    o1.type = 'square';
+    for (var i = 0; i < 34; i++) o1.frequency.setValueAtTime(1600 + Math.random() * 1400, t + i * 0.014);
+    g1.gain.setValueAtTime(0.20, t);
+    g1.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+    o1.connect(g1); g1.connect(this.sfxGain); o1.start(t); o1.stop(t + 0.55);
+
+    // 第二层：中频锯齿（锯齿的"咬合"感）
+    var o2 = this.ac.createOscillator(), g2 = this.ac.createGain();
+    o2.type = 'sawtooth';
+    for (var j = 0; j < 30; j++) o2.frequency.setValueAtTime(320 + Math.random() * 260, t + j * 0.017);
+    g2.gain.setValueAtTime(0.26, t);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.58);
+    o2.connect(g2); g2.connect(this.sfxGain); o2.start(t); o2.stop(t + 0.6);
+
+    // 第三层：高通噪声（"滋啦"的摩擦声）
+    var n = Math.floor(this.ac.sampleRate * 0.55);
+    var buf = this.ac.createBuffer(1, n, this.ac.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var k = 0; k < n; k++) d[k] = (Math.random() * 2 - 1) * (1 - k / n);
+    var src = this.ac.createBufferSource(); src.buffer = buf;
+    var hp = this.ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2600;
+    var g3 = this.ac.createGain(); g3.gain.value = 0.30;
+    src.connect(hp); hp.connect(g3); g3.connect(this.sfxGain);
+    src.start(t);
   },
 
   sfxCoin: function () {          // 吃真金币：两音上行，清脆
