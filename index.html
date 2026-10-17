@@ -319,9 +319,9 @@ var LEVELS = [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' }
     ],
     spikes: [
-      { x: 300, y: 444, w: 65, h: 26, atX: 250, fallOnly: true, follow: true, followDist: 128 },  // ① 一离地就追到落点
-      { x: 545, y: 444, w: 65, h: 26, atX: 490, moveTo: [468, 444] },                             // ② 走过 490 就左移贴过来
-      { x: 790, y: 444, w: 65, h: 26 }                                                              // ③ 真的不动
+      { x: 280, y: 444, w: 65, h: 26, atX: 230, fallOnly: true, follow: true, followDist: 92 },  // ① 一离地就追到落点
+      { x: 560, y: 444, w: 65, h: 26, atX: 500, moveTo: [470, 444] },                             // ② 走过 500 就左移贴过来
+      { x: 820, y: 444, w: 60, h: 26 }                                                              // ③ 真的不动
     ],
     arrows: []
   },
@@ -1105,18 +1105,24 @@ function update(dt) {
                  (sp.atY !== null && p.y > sp.atY && (sp.needX === null || p.x + p.w / 2 > sp.needX));
       if (fire) {
         sp.moved = true;
-        sp.fromX = sp.x; sp.fromY = sp.y;          // 记住视觉起点
+        sp.fromX = sp.x; sp.fromY = sp.y;          // 起点
         if (sp.follow) {
-          sp.x = p.x + sp.followDist;              // 动态追到玩家落点
-          sp.y = sp.y;                              // y 不变
+          sp.targetX = p.x + sp.followDist;        // 目标：追到玩家落点
+          sp.targetY = sp.y;
         } else {
-          sp.x = sp.moveTo[0]; sp.y = sp.moveTo[1]; // 固定目标
+          sp.targetX = sp.moveTo[0]; sp.targetY = sp.moveTo[1];
         }
         sp.animT = 0; sp.shown = true; sp.anim = 1;
         Sound.sfxTrap(); game.shake = Math.max(game.shake, 6);
       }
     }
-    if (sp.moved && sp.animT < 1) sp.animT = Math.min(1, sp.animT + dt * 3);   // 0.33s 滑过去，别像瞬移
+    // 判定和动画一起动：位置每帧从起点插值到目标，碰撞用的就是当前位置
+    if (sp.moved && sp.animT < 1) {
+      sp.animT = Math.min(1, sp.animT + dt * 2.6);                     // 0.38s 走完
+      var ee = sp.animT * sp.animT * (3 - 2 * sp.animT);               // smoothstep
+      sp.x = sp.fromX + (sp.targetX - sp.fromX) * ee;
+      sp.y = sp.fromY + (sp.targetY - sp.fromY) * ee;
+    }
   }
 
   // 水平输入（反向关：整体乘以 game.reverse，+1 正常 / -1 反向）
@@ -1673,33 +1679,10 @@ function drawPlatforms() {
 }
 
 function drawSpikes() {
-  // 先画"正在平移"的残影（视觉上从旧位置滑到新位置）
-  for (var si = 0; si < game.spikes.length; si++) {
-    var sq = game.spikes[si];
-    if (!sq.moved || sq.animT >= 1 || !sq.moveTo) continue;
-    var tx = sq.fromX + (sq.x - sq.fromX) * sq.animT;
-    var ty = sq.fromY + (sq.y - sq.fromY) * sq.animT;
-    var n2 = Math.max(2, Math.round(sq.w / 26));
-    var st2 = sq.w / n2;
-    ctx.fillStyle = PAL.spike;
-    ctx.beginPath();
-    for (var a2 = 0; a2 < n2; a2++) {
-      var x2 = tx + a2 * st2;
-      if (sq.dir === 'down') {
-        ctx.moveTo(x2, ty); ctx.lineTo(x2 + st2 / 2, ty + sq.h); ctx.lineTo(x2 + st2, ty);
-      } else {
-        ctx.moveTo(x2, ty + sq.h); ctx.lineTo(x2 + st2 / 2, ty); ctx.lineTo(x2 + st2, ty + sq.h);
-      }
-      ctx.closePath();
-    }
-    ctx.fill();
-  }
-
   for (var i = 0; i < game.spikes.length; i++) {
     var sp = game.spikes[i];
     if (!sp.shown) continue;
     if (sp.onPop && !game.popFired) continue;      // 保险：没弹起来就不画
-    if (sp.moved && sp.animT < 1 && sp.moveTo) continue;   // 正在滑动：只画残影，本体先不画（否则会看成两个刺）
     var box = spikeBox(sp);
     var n = Math.max(2, Math.round(box.w / 26));
     var step = box.w / n;
