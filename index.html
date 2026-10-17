@@ -1575,8 +1575,8 @@ function update(dt) {
       var prog2 = game.wallAngle / 90;
       var sl2 = prog2 * (wl.slideMax || 200);
       var Ls2 = Math.sqrt(sl2 * sl2 + wl.pivotY * wl.pivotY);
-      var ftX2 = wl.pivotX + wl.len * sl2 / Ls2;       // 下端 x（随滑动向右侧走）
-      if (prog2 > 0.1 && p.x > wl.pivotX && p.x < ftX2 && p.y + p.h > 442) {
+      var ftX2 = wl.pivotX - wl.len * sl2 / Ls2;       // 顺时针：下端向左走
+      if (prog2 > 0.1 && p.x < wl.pivotX && p.x > ftX2 && p.y + p.h > 442) {
         die(); return;
       }
     } else {
@@ -1944,10 +1944,10 @@ function drawButtonWall() {
     var px = w.pivotX, py = w.pivotY;
     var prog = game.wallAngle / 90;                 // 0 → 1
     var slide = prog * (w.slideMax || 200);         // 上端沿天花板滑动的距离
-    var tx = px - slide, ty = 0;                    // 上端：永远在天花板上
+    var tx = px + slide, ty = 0;                    // 上端：永远在天花板上（顺时针→向右滑）
     var Lseg = Math.sqrt(slide * slide + py * py);  // 上段长度（可变）
-    var ux = -slide / Lseg, uy = -py / Lseg;        // 从转轴指向天端的单位向量
-    // 下端 = 转轴沿反方向延伸 len（长度固定）
+    var ux = slide / Lseg, uy = -py / Lseg;         // 从转轴指向天端的单位向量
+    // 下端 = 转轴沿反方向延伸 len（长度固定）→ 向左扫
     var ftX = px - w.len * ux;
     var ftY = py - w.len * uy;
     var upX = tx, upY = ty;
