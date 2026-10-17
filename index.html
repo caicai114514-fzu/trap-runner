@@ -422,19 +422,18 @@ var LEVELS = [
   {
     name: '2-5 · 虚', hint: '这次有三种谎话一起说。',
     width: 960, spawn: [90, 260], goal: { x: 890, y: 400, w: 46, h: 70 },
-    goalHidden: true,                    // ★ 一开始连门都没有（美术/代码都没有）
-    goalRevealTime: 1.6,
-    safeZones: [[505, 605]],             // 反转后只有"第二个刺"那段仍然安全
+    goalHidden: true, goalRevealTime: 1.6,
+    safeZones: [[505, 605]],
     platforms: [
       { x: 0,   y: 470, w: 960, h: 70, kind: 'solid', deadly: true },   // 致命地板（反转后变安全）
       { x: 0,   y: 300, w: 240, h: 22, kind: 'solid' },                  // 左边二楼（出生）
-      { x: 505, y: 190, w: 130, h: 22, kind: 'solid' }                   // 第二个刺头顶的平台
+      { x: 505, y: 300, w: 130, h: 22, kind: 'appear', triggerX: 505 }   // ★ 头顶平台：站到第二个刺上才长出来
     ],
-    button: { x: 550, y: 214, w: 40, h: 20, upsideDown: true },          // 倒着的按钮（平台下方）
+    button: { x: 550, y: 322, w: 40, h: 20, upsideDown: true },          // 倒按钮（平台下沿，跳得到）
     spikes: [
-      { x: 295, y: 444, w: 100, h: 26, fake: true },                     // 第一个刺（反转后变危险）
-      { x: 505, y: 444, w: 100, h: 26, fake: true, keepSafe: true },     // ★ 第二个刺：始终安全
-      { x: 715, y: 444, w: 100, h: 26, fake: true }                      // 第三个刺（反转后变危险）
+      { x: 295, y: 444, w: 100, h: 26, fake: true },
+      { x: 505, y: 444, w: 100, h: 26, fake: true, keepSafe: true },     // 第二个刺：始终安全
+      { x: 715, y: 444, w: 100, h: 26, fake: true }
     ],
     arrows: []
   },
@@ -784,7 +783,8 @@ function loadLevel(i) {
   game.fakeGoalDead = false;                 // 假门是否已失效（按下按钮后）
   game.fakeGoalShown = !!(L.fakeGoal && !L.fakeGoal.hidden);  // 假门一开始就在（除非显式 hidden）
   game.newWallDone = false; game.newWallT = 0; game.newWallRect = null;
-  game.reversed = false;   // 2-5：按下按钮后世界规则反转（刺危险/地板安全）  // 碰假门后升起的新墙（死亡/重开要清掉）
+  game.reversed = false;   // 2-5：按下按钮后世界规则反转（刺危险/地板安全）
+  game.buttonVisible = false;  // 平台从空气长出来之后，按钮才显示  // 碰假门后升起的新墙（死亡/重开要清掉）
   game.wallSweep = 0;
   if (typeof location !== 'undefined' && location.search.indexOf('wa=') >= 0) {
     game.wallAngle = parseInt(location.search.split('wa=')[1]) || 0; game.wallOn = true; game.buttonPressed = true;
@@ -1170,8 +1170,9 @@ function update(dt) {
       continue;
     }
 
-    if (pl.kind === 'appear' && pl.state === 'hidden' && p.x + p.w > pl.triggerX) {
-      pl.state = 'active'; pl.appeared = 0.18;
+    if (pl.kind === 'appear' && pl.state === 'hidden' && p.onGround && p.x + p.w > pl.triggerX && p.x < pl.triggerX + 140) {
+      pl.state = 'active'; pl.appeared = 0.18;   // 从空气里长出来
+      game.buttonVisible = true;                // 按钮跟着平台一起出现
       Sound.sfxTrap(); game.shake = 5;
     }
     if (pl.appeared > 0) pl.appeared -= dt;
@@ -2041,8 +2042,8 @@ function wallBlocks() {
 function drawButtonWall() {
   var L = LEVELS[game.li];
 
-  // 按钮
-  if (L.button) {
+  // 按钮（2-5：等平台从空气里长出来才显示）
+  if (L.button && game.buttonVisible) {
     var b = L.button;
     var pressed = game.buttonPressed;
     var bh = pressed ? 6 : 18;                     // 按下会扁下去
