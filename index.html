@@ -777,7 +777,9 @@ function loadLevel(i) {
   game.fakeGoalDead = false;                 // 假门是否已失效（按下按钮后）
   game.fakeGoalShown = false;                // 假门是否已经出现（人走近才现身）
   game.wallSweep = 0;
-  if (location.search.indexOf('wa=')>=0) { game.wallAngle = parseInt(location.search.split('wa=')[1])||0; game.wallOn = true; game.buttonPressed = true; }                        // 墙倒下后向右扫的推进量
+  if (typeof location !== 'undefined' && location.search.indexOf('wa=') >= 0) {
+    game.wallAngle = parseInt(location.search.split('wa=')[1]) || 0; game.wallOn = true; game.buttonPressed = true;
+  }
   game.revealStarted = false;
   game.balls = (L.balls || []).map(function (b) {
     return {
@@ -3076,7 +3078,7 @@ window.__TRAP__ = {
 loadSave();
 loadLevel(0);
 game.state = 'title';
-if (location.search.indexOf('lv=')>=0) { var _lv = parseInt(location.search.split('lv=')[1])||0; loadLevel(_lv); game.state='play'; applyWorldPalette(Math.floor(_lv/5)); }
+if (typeof location !== 'undefined' && location.search.indexOf('lv=') >= 0) { var _lv = parseInt(location.search.split('lv=')[1]) || 0; loadLevel(_lv); game.state = 'play'; applyWorldPalette(Math.floor(_lv / 5)); }
 
 /* 调试：?screen=world|levels|demon|play|win  可以直接跳到某个界面看效果
          ?w=0..3   指定大关（play / win 用）
