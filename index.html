@@ -410,9 +410,9 @@ var LEVELS = [
     // 墙：一根穿过转轴的长杆，它【自己转】（碰撞跟着转）。
     //   转轴在中间偏下(250,380)；上端贴天花板顺时针向右滑；下端长度固定 90，向左扫。
     //   竖直时把真门和玩家隔开；转开后路就通了。
-    wall: { pivotX: 250, pivotY: 380, w: 24, len: 90, slideMax: 700 },
+    wall: { pivotX: 250, pivotY: 300, w: 24, len: 250, slideMax: 700 },
     button: { x: 430, y: 450, w: 40, h: 20 },           // 按钮：贴地
-    keys: [{ x: 907, y: -60, drop: true, dropY: 347 }],
+    keys: [{ x: 907, y: -60, drop: true, dropY: 347, onPlatY: 375 }],
     platforms: [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },      // 地面（真门/按钮都直接贴这块地）
       { x: 855, y: 375, w: 105, h: 22, kind: 'solid', oneWay: true }   // 假门头顶的悬空平台（钥匙掉这儿）
@@ -817,7 +817,8 @@ function loadLevel(i) {
       slideT: 0, slideTime: k.slideTime || 2.6, gone: false,
       armX: (k.armX === undefined ? null : k.armX),             // 检查点一：先得到过这儿
       armed: false, started: false,                             // 检查点二：再回到 triggerX 左边才启动
-      drop: !!k.drop, dropY: (k.dropY === undefined ? null : k.dropY)  // 从天掉下来
+      drop: !!k.drop, dropY: (k.dropY === undefined ? null : k.dropY),  // 从天掉下来
+      onPlatY: (k.onPlatY === undefined ? null : k.onPlatY), started: false  // 站上这个高度的平台才掉
     };
   });
   game.arrows = L.arrows || [];
@@ -1285,7 +1286,8 @@ function update(dt) {
     var hitWall = false;
     for (var wb = 0; wb < wbs.length; wb++) { if (aabb(p, wbs[wb])) { hitWall = true; break; } }
     if (hitWall) {
-      // 墙只负责【挡路】（水平推出），压死由旋转的死亡区判定，别在这儿直接判死
+      if (game.wallOn) { die(); return; }      // 墙在转 → 碰到就被压死
+      // 没转的墙：只挡路（水平推出）
       for (var wb2 = 0; wb2 < wbs.length; wb2++) {
         var blk = wbs[wb2];
         if (aabb(p, blk)) {
@@ -1593,12 +1595,9 @@ function update(dt) {
   //   拿钥匙要绕到假门头顶的平台，回来必然来不及 → 死
   //   立刻往左跑过墙下端 → 活
   if (L6.wall && game.wallOn) {
-    if (game.wallAngle < 90) game.wallAngle = Math.min(90, game.wallAngle + dt * 41);   // 2.2 秒转完
-    if (game.wallAngle >= 90) {
-      var gW = wallGeom();
-      // 墙下端落地的 x：站在它右边（还没跑出去）就被压死
-      if (gW && p.x > gW.ftX + 6) { die(); return; }
-    }
+    if (game.wallAngle < 90) game.wallAngle = Math.min(90, game.wallAngle + dt * 55);   // 1.6 秒转完
+    // 墙整个压下来那一刻：还在墙右侧（x>100）的人被压死；真门在墙左边，才是活路
+    if (game.wallAngle >= 90 && p.x > 100) { die(); return; }
   }
 
   // ===== 假门（初始隐藏，走近才出现）=====
@@ -1654,7 +1653,13 @@ function update(dt) {
     }
     // 从天掉下来：按钮按下后，y 从起始(-50)一路掉到 dropY
     if (kk.drop && kk.dropY !== undefined) {
-      if (game.buttonPressed) kk.y += (kk.dropY - kk.y) * Math.min(1, dt * 4);
+      if (kk.onPlatY !== null) {
+        // 站到指定高度的平台上才出现
+        if (!kk.started && p.ground && Math.abs(p.ground.y - kk.onPlatY) < 6) kk.started = true;
+        if (kk.started) kk.y += (kk.dropY - kk.y) * Math.min(1, dt * 6);
+      } else if (game.buttonPressed) {
+        kk.y += (kk.dropY - kk.y) * Math.min(1, dt * 4);
+      }
     }
     if (kk.show < 1) {
       if (!kk.hidden) kk.show = 1;
