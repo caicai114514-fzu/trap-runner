@@ -320,7 +320,7 @@ var LEVELS = [
     ],
     spikes: [
       { x: 280, y: 444, w: 49, h: 26, atX: 230, fallOnly: true, follow: true, followDist: 92 },  // ① 一离地就追到落点
-      { x: 600, y: 444, w: 49, h: 26, atX: 390, follow: true, followDist: 130 },                   // ② 走过 390 就堵到你落点
+      { x: 620, y: 444, w: 49, h: 26, atX: 470, follow: true, followDist: 128, moveSpeed: 4.2 },  // ② 走过 470 才触发，且动得更快
       { x: 750, y: 444, w: 15, h: 26 },   // ③ 门口三根，都不动（总宽 49px）
       { x: 767, y: 444, w: 15, h: 26 },
       { x: 784, y: 444, w: 15, h: 26 }
@@ -678,6 +678,7 @@ function loadLevel(i) {
       needX: (s.needX === undefined ? null : s.needX), // 竖坐标触发还要求人已经过了这个 x
       moved: false, animT: 0, fromX: s.x, fromY: s.y,
       follow: !!s.follow, followDist: (s.followDist === undefined ? 200 : s.followDist),
+      moveSpeed: (s.moveSpeed === undefined ? 2.6 : s.moveSpeed),
       shown: !s.hidden && !s.onPop, anim: (s.hidden || s.onPop) ? 0 : 1
     };
   });
@@ -1120,7 +1121,7 @@ function update(dt) {
     }
     // 判定和动画一起动：位置每帧从起点插值到目标，碰撞用的就是当前位置
     if (sp.moved && sp.animT < 1) {
-      sp.animT = Math.min(1, sp.animT + dt * 2.6);                     // 0.38s 走完
+      sp.animT = Math.min(1, sp.animT + dt * sp.moveSpeed);            // 默认 2.6 ≈ 0.38s
       var ee = sp.animT * sp.animT * (3 - 2 * sp.animT);               // smoothstep
       sp.x = sp.fromX + (sp.targetX - sp.fromX) * ee;
       sp.y = sp.fromY + (sp.targetY - sp.fromY) * ee;
@@ -1696,15 +1697,16 @@ function drawSpikes() {
       // 尖不在正中，左右交替偏一点；再让高度轻微高低错落 —— 别像等边三角形
       var lean = (a % 2 === 0) ? 0.33 : 0.67;
       var trim = (a % 3 === 1) ? 0.86 : 1;
+      var gapW = step * 0.12;        // 每根之间留缝，看起来是一根根独立的窄刺
       var tipY = box.y + box.h * (1 - trim);
       if (sp.dir === 'down') {
         ctx.moveTo(x0, box.y);
         ctx.lineTo(x0 + step * lean, box.y + box.h);
         ctx.lineTo(x0 + step, box.y);
       } else {
-        ctx.moveTo(x0, box.y + box.h);
+        ctx.moveTo(x0 + gapW, box.y + box.h);
         ctx.lineTo(x0 + step * lean, tipY);
-        ctx.lineTo(x0 + step, box.y + box.h);
+        ctx.lineTo(x0 + step - gapW, box.y + box.h);
       }
       ctx.closePath();
     }
