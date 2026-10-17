@@ -1596,7 +1596,7 @@ function update(dt) {
   //   拿钥匙要绕到假门头顶的平台，回来必然来不及 → 死
   //   立刻往左跑过墙下端 → 活
   if (L6.wall && game.wallOn) {
-    if (game.wallAngle < 90) game.wallAngle = Math.min(90, game.wallAngle + dt * 90);   // 1.0 秒转完
+    if (game.wallAngle < 90) game.wallAngle = Math.min(90, game.wallAngle + dt * 75);   // 1.2 秒转完
     // 旋转中：碰到墙的上半段就死（上段 = 转轴 → 天花板那截）
     if (game.wallAngle > 4 && game.wallAngle < 90) {
       var gU = wallGeom();
@@ -1612,7 +1612,7 @@ function update(dt) {
       }
     }
     // 转到位之后【不停】：墙压在这儿，右侧（x>100）的人持续被压死
-    if (game.wallAngle >= 90 && p.x > 100) { die(); return; }
+    if (game.wallAngle >= 90 && p.x > 95) { die(); return; }
   }
 
   // 3) 按按钮后跑到假门那边：原来墙的位置长出一堵新的墙，把回头路彻底堵死
