@@ -1618,10 +1618,14 @@ function update(dt) {
   }
 
   // 3) 按按钮后跑到假门那边：原来墙的位置长出一堵新的墙，把回头路彻底堵死
-  if (L6.wall && game.buttonPressed && !game.newWallDone && p.x > 700) {
-    game.newWallDone = true;
-    game.newWallT = 0;
-    Sound.sfxTrap(); game.shake = 12;
+  // 新墙：按完按钮 + 人真的走到假门那儿，才会从地面升起来堵死退路
+  if (L6.wall && game.buttonPressed && !game.newWallDone && L6.fakeGoal) {
+    var fg0 = L6.fakeGoal;
+    if (p.x < fg0.x + fg0.w && p.x + p.w > fg0.x && p.y < fg0.y + fg0.h && p.y + p.h > fg0.y) {
+      game.newWallDone = true;
+      game.newWallT = 0;
+      Sound.sfxTrap(); game.shake = 12;
+    }
   }
   if (game.newWallDone) {
     game.newWallT += dt;
