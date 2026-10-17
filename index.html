@@ -410,7 +410,7 @@ var LEVELS = [
     // 墙：一根穿过转轴的长杆，它【自己转】（碰撞跟着转）。
     //   转轴在中间偏下(250,380)；上端贴天花板顺时针向右滑；下端长度固定 90，向左扫。
     //   竖直时把真门和玩家隔开；转开后路就通了。
-    wall: { pivotX: 480, pivotY: 380, w: 26, len: 470, spin: 100 },
+    wall: { pivotX: 480, pivotY: 380, w: 26, len: 470, spin: 55 },
     button: { x: 660, y: 450, w: 40, h: 20 },           // 按钮：贴地，墙右边的路上
     keys: [{ x: 880, y: -60, drop: true, dropY: 347, onPlatY: 375 }],
     platforms: [
@@ -1603,12 +1603,13 @@ function update(dt) {
     //   顶点：转轴(250,450) + 天花板左(250,0) + 天花板右(950,0)
     //   人在这片区域里 = 被扫到 → 死；跑到转轴左边（真门那一侧）才安全
     var gw0 = wallGeom();
-    if (gw0 && p.x + p.w > 100) {   // x<100 是真门侧的安全角：凹进去，横杆扫不到
+    if (gw0) {   // 没有安全区：只判【转轴上半部分】的杆（下半部分可以从下面钻过去）
       var NK = 34, hitW = false;
       for (var ki = 0; ki <= NK; ki++) {
         var kt = ki / NK;
         var kx = gw0.upX + (gw0.ftX - gw0.upX) * kt;
         var ky = gw0.upY + (gw0.ftY - gw0.upY) * kt;
+        if (ky > L6.wall.pivotY) continue;    // 只判转轴上半部分的墙
         if (kx > p.x - 13 && kx < p.x + p.w + 13 && ky > p.y - 13 && ky < p.y + p.h + 13) { hitW = true; break; }
       }
       if (hitW) { die(); return; }
