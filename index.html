@@ -422,17 +422,19 @@ var LEVELS = [
   {
     name: '2-5 · 虚', hint: '这次有三种谎话一起说。',
     width: 960, spawn: [90, 260], goal: { x: 890, y: 400, w: 46, h: 70 },
-    // 地板整块是平的。有刺的那几段安全，其余地方一踩就死。
-    safeZones: [[295, 395], [505, 605], [715, 815]],
+    goalHidden: true,                    // ★ 一开始连门都没有（美术/代码都没有）
+    goalRevealTime: 1.6,
+    safeZones: [[505, 605]],             // 反转后只有"第二个刺"那段仍然安全
     platforms: [
-      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid', deadly: true },   // 致命地板（平地，不是岛屿）
-      { x: 0,   y: 300, w: 240, h: 22, kind: 'solid' }                  // 左边二楼（出生）
+      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid', deadly: true },   // 致命地板（反转后变安全）
+      { x: 0,   y: 300, w: 240, h: 22, kind: 'solid' },                  // 左边二楼（出生）
+      { x: 505, y: 190, w: 130, h: 22, kind: 'solid' }                   // 第二个刺头顶的平台
     ],
+    button: { x: 550, y: 214, w: 40, h: 20, upsideDown: true },          // 倒着的按钮（平台下方）
     spikes: [
-      // 三簇小刺直接立在地板上：有刺的那一段才安全
-      { x: 295, y: 444, w: 100, h: 26, fake: true },
-      { x: 505, y: 444, w: 100, h: 26, fake: true },
-      { x: 715, y: 444, w: 100, h: 26, fake: true }
+      { x: 295, y: 444, w: 100, h: 26, fake: true },                     // 第一个刺（反转后变危险）
+      { x: 505, y: 444, w: 100, h: 26, fake: true, keepSafe: true },     // ★ 第二个刺：始终安全
+      { x: 715, y: 444, w: 100, h: 26, fake: true }                      // 第三个刺（反转后变危险）
     ],
     arrows: []
   },
@@ -740,6 +742,7 @@ function loadLevel(i) {
       x: s.x, y: s.y, w: s.w, h: s.h, hidden: !!s.hidden,
       triggerX: s.triggerX || 0, dir: s.dir || 'up',
       fake: !!s.fake,           // 假刺：长得一模一样，但不致命
+      keepSafe: !!s.keepSafe,   // 反转后仍安全（2-5 的第二个刺）
       onPop: !!s.onPop,         // 等跳板把人弹起来之后才长出来
       moveTo: s.moveTo || null, // 触发后瞬移到这里（判定立刻过去，视觉上快速平移）
       atX: (s.atX === undefined ? null : s.atX),     // 横坐标触发
@@ -774,13 +777,14 @@ function loadLevel(i) {
   game.reverse = L.reverse ? -1 : 1;         // 反向关：一开始就是反的
   game.flipOnLand = !!L.flipOnLand;          // 每次落地再反一次
   game.wasOnGround = false;
-  game.goalReveal = L.fakeGoal ? 0 : 1;      // 真门的显现进度
+  game.goalReveal = (L.fakeGoal || L.goalHidden) ? 0 : 1;   // 真门的显现进度（goalHidden = 一开始连门都没有）
   game.buttonPressed = false;                // 按钮是否按下
   game.wallAngle = 90;                       // 墙初始【竖直】(90°)；按按钮后匀速转起来
   game.wallOn = false;                       // 墙是否开始旋转
   game.fakeGoalDead = false;                 // 假门是否已失效（按下按钮后）
   game.fakeGoalShown = !!(L.fakeGoal && !L.fakeGoal.hidden);  // 假门一开始就在（除非显式 hidden）
-  game.newWallDone = false; game.newWallT = 0; game.newWallRect = null;  // 碰假门后升起的新墙（死亡/重开要清掉）
+  game.newWallDone = false; game.newWallT = 0; game.newWallRect = null;
+  game.reversed = false;   // 2-5：按下按钮后世界规则反转（刺危险/地板安全）  // 碰假门后升起的新墙（死亡/重开要清掉）
   game.wallSweep = 0;
   if (typeof location !== 'undefined' && location.search.indexOf('wa=') >= 0) {
     game.wallAngle = parseInt(location.search.split('wa=')[1]) || 0; game.wallOn = true; game.buttonPressed = true;
@@ -1393,7 +1397,9 @@ function update(dt) {
   // 尖刺致死（假刺长得一样，但踩上去没事——这是骗人的）
   for (var s = 0; s < game.spikes.length; s++) {
     var sp2 = game.spikes[s];
-    if (!sp2.shown || sp2.fake) continue;
+    if (!sp2.shown) continue;
+    // 反转后（2-5 按完按钮）：假刺变成真刺，只有 keepSafe 那簇还安全
+    if (sp2.fake && !(game.reversed && !sp2.keepSafe)) continue;
     var box = spikeBox(sp2);
     if (aabb(p, box)) { die(); return; }
   }
@@ -1588,17 +1594,23 @@ function update(dt) {
     var bt = L6.button;
     if (p.x < bt.x + bt.w && p.x + p.w > bt.x && p.y < bt.y + bt.h && p.y + p.h > bt.y) {
       game.buttonPressed = true;
-      game.wallOn = true;                 // 墙开始旋转
+      game.wallOn = true;                 // 墙开始旋转（有墙的关才用）
       game.fakeGoalDead = true;           // 假门失效（碰了没反应）
+      game.reversed = true;               // ★ 2-5：世界规则反转
       game.shake = 8;
       Sound.sfxTrap();
     }
   }
 
   // ===== 致命地面（2-5）：这关地面一踩就死，刺反而是安全的 =====
-  if (p.ground && p.ground.deadly) {
+  if (p.ground && p.ground.deadly && !game.reversed) {
     // 地板上"有刺的那几段"是安全的，其余地方一踩就死
+    // 反转前：所有刺下面都安全；反转后：只剩"第二个刺"(keepSafe)那一段安全
     var safeZones = LEVELS[game.li].safeZones || [];
+    if (!game.reversed) {
+      safeZones = game.spikes.filter(function (sp) { return sp.fake; })
+        .map(function (sp) { return [sp.x, sp.x + sp.w + 15]; });
+    }
     var cx = p.x + p.w / 2, isSafe = false;
     for (var szi = 0; szi < safeZones.length; szi++) {
       if (cx >= safeZones[szi][0] && cx <= safeZones[szi][1]) { isSafe = true; break; }
@@ -1652,6 +1664,11 @@ function update(dt) {
       else p.x = nw.x - p.w;
       p.vx = 0;
     }
+  }
+
+  // ===== goalHidden（2-5）：一开始连门都没有，按下按钮后才显现 =====
+  if (L6.goalHidden && game.buttonPressed && game.goalReveal < 1) {
+    game.goalReveal = Math.min(1, game.goalReveal + dt / (L6.goalRevealTime || 1.6));
   }
 
   // ===== 假门（初始隐藏，走近才出现）=====
@@ -2029,10 +2046,12 @@ function drawButtonWall() {
     var b = L.button;
     var pressed = game.buttonPressed;
     var bh = pressed ? 6 : 18;                     // 按下会扁下去
-    ctx.fillStyle = pressed ? '#8c2f22' : '#e0432f';      // 红色按钮，和地板区分开
-    ctx.fillRect(b.x, b.y + b.h - bh, b.w, bh);
-    ctx.fillStyle = pressed ? '#5a1c14' : '#ff6b52';      // 顶面更亮
-    ctx.fillRect(b.x, b.y + b.h - bh, b.w, 5);
+    var isUp = !!b.upsideDown;
+    var by = isUp ? b.y : b.y + b.h - bh;   // 倒按钮贴着平台下沿
+    ctx.fillStyle = pressed ? '#8c2f22' : '#e0432f';
+    ctx.fillRect(b.x, by, b.w, bh);
+    ctx.fillStyle = pressed ? '#5a1c14' : '#ff6b52';
+    ctx.fillRect(b.x, isUp ? by + bh - 5 : by, b.w, 5);
     ctx.fillStyle = '#ffd23f';
     ctx.beginPath(); ctx.arc(b.x + b.w / 2, b.y + b.h - bh - 3, 3, 0, 7); ctx.fill();
   }
