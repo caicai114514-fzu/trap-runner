@@ -320,7 +320,7 @@ var LEVELS = [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' }
     ],
     spikes: [
-      { x: 300, y: 414, w: 100, h: 56, atX: 250, fallOnly: true, moveTo: [492, 414] },  // ① 下落时右移到你落点
+      { x: 300, y: 414, w: 100, h: 56, atX: 250, fallOnly: true, follow: true, followDist: 205 },  // ① 一离地就追到落点
       { x: 640, y: 414, w: 90, h: 56, atX: 580, moveTo: [520, 414] },                   // ② 多走一段就左移贴过来
       { x: 790, y: 414, w: 70, h: 56 }                                                   // ③ 真的不动
     ],
@@ -676,6 +676,7 @@ function loadLevel(i) {
       atY: (s.atY === undefined ? null : s.atY),     // 竖坐标触发
       needX: (s.needX === undefined ? null : s.needX), // 竖坐标触发还要求人已经过了这个 x
       moved: false, animT: 0, fromX: s.x, fromY: s.y,
+      follow: !!s.follow, followDist: (s.followDist === undefined ? 200 : s.followDist),
       shown: !s.hidden && !s.onPop, anim: (s.hidden || s.onPop) ? 0 : 1
     };
   });
@@ -1098,15 +1099,20 @@ function update(dt) {
     if (sp.shown && sp.anim < 1) sp.anim = Math.min(1, sp.anim + dt * 7);
 
     // 瞬移：判定立刻到新位置，视觉上从旧位置快速平移过去
-    if (sp.moveTo && !sp.moved) {
-      var falling = p.vy > 0 && !p.onGround;
-      var fire = (sp.atX !== null && p.x + p.w / 2 > sp.atX && (!sp.fallOnly || falling)) ||
+    if (!sp.moved && (sp.moveTo || sp.follow)) {
+      var air = !p.onGround;
+      var fire = (sp.atX !== null && p.x + p.w / 2 > sp.atX && (!sp.fallOnly || air)) ||
                  (sp.atXlt !== null && p.x + p.w / 2 < sp.atXlt) ||
                  (sp.atY !== null && p.y > sp.atY && (sp.needX === null || p.x + p.w / 2 > sp.needX));
       if (fire) {
         sp.moved = true;
         sp.fromX = sp.x; sp.fromY = sp.y;          // 记住视觉起点
-        sp.x = sp.moveTo[0]; sp.y = sp.moveTo[1];  // 判定立刻搬过去
+        if (sp.follow) {
+          sp.x = p.x + sp.followDist;              // 动态追到玩家落点
+          sp.y = sp.y;                              // y 不变
+        } else {
+          sp.x = sp.moveTo[0]; sp.y = sp.moveTo[1]; // 固定目标
+        }
         sp.animT = 0; sp.shown = true; sp.anim = 1;
         Sound.sfxTrap(); game.shake = Math.max(game.shake, 6);
       }
