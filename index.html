@@ -310,19 +310,24 @@ var LEVELS = [
     arrows: []
   },
   {
-    name: '2-2 · 假刺阵', hint: '前面几片都是假的。大概吧。',
-    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
-    // 六片刺，长得全部一模一样。
-    // 前四片都是假的 —— 走过去完全没事，玩家会彻底相信"这种刺可以踩"。
-    // 第五片是真的。第六片又变回假的（万一你命大）。
-    platforms: [{ x: 0, y: 470, w: 960, h: 70, kind: 'solid' }],
+    name: '2-2 · 会走的刺', hint: '刺不一定是死的。',
+    width: 960, spawn: [700, 250], goal: { x: 890, y: 400, w: 46, h: 70 },
+    // 四根刺，一根比一根阴：
+    // ① 你一跳，它往右挪到你的落点，正好在你落地时扎死你（横坐标触发）
+    // ② 你习惯性多走一段再跳，它就往左挪到你身上（横坐标触发）
+    // ③ 这根是真的不会动，老老实实跳过去就行
+    // ④ 二楼跳下来，两条道中间有墙隔着，一条底下有刺。
+    //    你会走没刺那条 —— 等你下落到一定高度，刺就挪到那条道上（竖坐标触发）
+    platforms: [
+      { x: 0, y: 470, w: 640, h: 70, kind: 'solid' },
+      { x: 640, y: 300, w: 320, h: 24, kind: 'solid' },
+      { x: 782, y: 300, w: 16, h: 190, kind: 'solid' }
+    ],
     spikes: [
-      { x: 120, y: 414, w: 100, h: 56, fake: true },
-      { x: 260, y: 414, w: 100, h: 56, fake: true },
-      { x: 400, y: 414, w: 100, h: 56, fake: true },
-      { x: 540, y: 414, w: 100, h: 56, fake: true },
-      { x: 680, y: 414, w: 110, h: 56 },            // ← 这根是真的
-      { x: 830, y: 414, w: 60, h: 56, fake: true }
+      { x: 300, y: 414, w: 100, h: 56, atX: 250, fallOnly: true, moveTo: [520, 414] },  // ① 只在你下落时右移到落点
+      { x: 780, y: 414, w: 90, h: 56, atX: 640, moveTo: [660, 414] },    // ② 左移到你身上
+      { x: 862, y: 414, w: 44, h: 56 },                                   // ③ 真的不动
+      { x: 700, y: 414, w: 56, h: 56, atY: 372, moveTo: [812, 414] }     // ④ 竖坐标触发，挪到没刺那条道
     ],
     arrows: []
   },
@@ -669,6 +674,12 @@ function loadLevel(i) {
       triggerX: s.triggerX || 0, dir: s.dir || 'up',
       fake: !!s.fake,           // 假刺：长得一模一样，但不致命
       onPop: !!s.onPop,         // 等跳板把人弹起来之后才长出来
+      moveTo: s.moveTo || null, // 触发后瞬移到这里（判定立刻过去，视觉上快速平移）
+      atX: (s.atX === undefined ? null : s.atX),     // 横坐标触发
+      fallOnly: !!s.fallOnly,                          // 只在人下落时才认横坐标触发
+      atXlt: (s.atXlt === undefined ? null : s.atXlt), // 横坐标触发（小于）
+      atY: (s.atY === undefined ? null : s.atY),     // 竖坐标触发
+      moved: false, animT: 0, fromX: s.x, fromY: s.y,
       shown: !s.hidden && !s.onPop, anim: (s.hidden || s.onPop) ? 0 : 1
     };
   });
@@ -1089,6 +1100,22 @@ function update(dt) {
       sp.shown = true; Sound.sfxTrap(); game.shake = 5;
     }
     if (sp.shown && sp.anim < 1) sp.anim = Math.min(1, sp.anim + dt * 7);
+
+    // 瞬移：判定立刻到新位置，视觉上从旧位置快速平移过去
+    if (sp.moveTo && !sp.moved) {
+      var falling = p.vy > 0 && !p.onGround;
+      var fire = (sp.atX !== null && p.x + p.w / 2 > sp.atX && (!sp.fallOnly || falling)) ||
+                 (sp.atXlt !== null && p.x + p.w / 2 < sp.atXlt) ||
+                 (sp.atY !== null && p.y > sp.atY);
+      if (fire) {
+        sp.moved = true;
+        sp.fromX = sp.x; sp.fromY = sp.y;          // 记住视觉起点
+        sp.x = sp.moveTo[0]; sp.y = sp.moveTo[1];  // 判定立刻搬过去
+        sp.animT = 0; sp.shown = true; sp.anim = 1;
+        Sound.sfxTrap(); game.shake = Math.max(game.shake, 6);
+      }
+    }
+    if (sp.moved && sp.animT < 1) sp.animT = Math.min(1, sp.animT + dt * 9);
   }
 
   // 水平输入（反向关：整体乘以 game.reverse，+1 正常 / -1 反向）
@@ -1645,6 +1672,30 @@ function drawPlatforms() {
 }
 
 function drawSpikes() {
+  // 先画"正在平移"的残影（视觉上从旧位置滑到新位置）
+  for (var si = 0; si < game.spikes.length; si++) {
+    var sq = game.spikes[si];
+    if (!sq.moved || sq.animT >= 1 || !sq.moveTo) continue;
+    var tx = sq.fromX + (sq.x - sq.fromX) * sq.animT;
+    var ty = sq.fromY + (sq.y - sq.fromY) * sq.animT;
+    var n2 = Math.max(2, Math.round(sq.w / 26));
+    var st2 = sq.w / n2;
+    ctx.fillStyle = PAL.spike;
+    ctx.globalAlpha = 1 - sq.animT * 0.5;
+    ctx.beginPath();
+    for (var a2 = 0; a2 < n2; a2++) {
+      var x2 = tx + a2 * st2;
+      if (sq.dir === 'down') {
+        ctx.moveTo(x2, ty); ctx.lineTo(x2 + st2 / 2, ty + sq.h); ctx.lineTo(x2 + st2, ty);
+      } else {
+        ctx.moveTo(x2, ty + sq.h); ctx.lineTo(x2 + st2 / 2, ty); ctx.lineTo(x2 + st2, ty + sq.h);
+      }
+      ctx.closePath();
+    }
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
   for (var i = 0; i < game.spikes.length; i++) {
     var sp = game.spikes[i];
     if (!sp.shown) continue;
