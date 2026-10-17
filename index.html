@@ -337,14 +337,23 @@ var LEVELS = [
   {
     name: '2-3 · 上下', hint: '上面那条路看着平坦多了。',
     width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    // 两条路：
+    //   下面 —— 地面中间有个 100px 的坑，跳过去（正常路，安全）
+    //   上面 —— 一条平平稳稳的二楼，箭头就在下面指着它，勾你上去
+    //          但你一上二楼，天花板立刻垂下 240px 的刺
+    // ★ 关键是：走下面（y ≥ 360）时，天花板刺完全不出现
     platforms: [
-      { x: 0, y: 470, w: 340, h: 70, kind: 'solid' },
-      { x: 340, y: 470, w: 90, h: 70, kind: 'fake' },
-      { x: 430, y: 470, w: 530, h: 70, kind: 'solid' },
-      { x: 380, y: 330, w: 380, h: 22, kind: 'solid' }
+      { x: 0, y: 470, w: 400, h: 70, kind: 'solid' },       // 地面左
+      { x: 500, y: 470, w: 460, h: 70, kind: 'solid' },     // 地面右（中间 100px 是坑）
+      { x: 370, y: 380, w: 380, h: 22, kind: 'solid' }      // 二楼（470→380 只高 90px，跳得上去）
     ],
-    spikes: [{ x: 380, y: 120, w: 380, h: 210, hidden: true, triggerX: 300 }],
-    arrows: [{ x: 470, y: 296, dir: 'down' }]
+    spikes: [
+      // 天花板刺：只有当玩家爬到二楼高度（y < 360）才长出来
+      { x: 370, y: 110, w: 380, h: 262, dir: 'down', hidden: true, onPlatY: 380 }
+    ],
+    arrows: [
+      { x: 300, y: 438, dir: 'up' }                          // 箭头在下面，指着二楼
+    ]
   },
   {
     name: '2-4 · 镜花', hint: '门就在那儿。看着挺正常的。',
@@ -683,6 +692,8 @@ function loadLevel(i) {
       atXlt: (s.atXlt === undefined ? null : s.atXlt), // 横坐标触发（小于）
       atY: (s.atY === undefined ? null : s.atY),     // 竖坐标触发
       needX: (s.needX === undefined ? null : s.needX), // 竖坐标触发还要求人已经过了这个 x
+      atYlt: (s.atYlt === undefined ? null : s.atYlt), // 玩家在这一高度以上才触发（走下面不触发）
+      onPlatY: (s.onPlatY === undefined ? null : s.onPlatY), // 只有站在 y≈这个值的平台上才触发
       moved: false, animT: 0, fromX: s.x, fromY: s.y,
       follow: !!s.follow, followDist: (s.followDist === undefined ? 200 : s.followDist),
       moveSpeed: (s.moveSpeed === undefined ? 2.6 : s.moveSpeed),
@@ -1102,8 +1113,12 @@ function update(dt) {
   for (var k = 0; k < game.spikes.length; k++) {
     var sp = game.spikes[k];
     if (sp.onPop) continue;                    // onPop 的刺由 popFired 单独管，别在这里抢
-    if (!sp.shown && p.x + p.w > sp.triggerX) {
-      sp.shown = true; Sound.sfxTrap(); game.shake = 5;
+    if (!sp.shown) {
+      var reveal = false;
+      if (sp.onPlatY !== null) reveal = !!(p.ground && Math.abs(p.ground.y - sp.onPlatY) < 6);  // 站在二楼平台上才露头
+      else if (sp.atYlt !== null) reveal = (p.y < sp.atYlt);      // 只有上到高处才露头
+      else reveal = (p.x + p.w > sp.triggerX);
+      if (reveal) { sp.shown = true; Sound.sfxTrap(); game.shake = 5; }
     }
     if (sp.shown && sp.anim < 1) sp.anim = Math.min(1, sp.anim + dt * 7);
 
@@ -1112,7 +1127,8 @@ function update(dt) {
       var air = !p.onGround;
       var fire = (sp.atX !== null && p.x + p.w / 2 > sp.atX && (!sp.fallOnly || air)) ||
                  (sp.atXlt !== null && p.x + p.w / 2 < sp.atXlt) ||
-                 (sp.atY !== null && p.y > sp.atY && (sp.needX === null || p.x + p.w / 2 > sp.needX));
+                 (sp.atY !== null && p.y > sp.atY && (sp.needX === null || p.x + p.w / 2 > sp.needX)) ||
+                 (sp.atYlt !== null && p.y < sp.atYlt);
       if (fire) {
         sp.moved = true;
         sp.fromX = sp.x; sp.fromY = sp.y;          // 起点
