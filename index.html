@@ -776,7 +776,7 @@ function loadLevel(i) {
   game.wallOn = false;                       // 墙是否开始旋转
   game.fakeGoalDead = false;                 // 假门是否已失效（按下按钮后）
   game.fakeGoalShown = false;                // 假门是否已经出现（人走近才现身）
-  game.newWallDone = false; game.newWallT = 0;  // 去假门后墙原位长出的新墙
+  game.newWallDone = false; game.newWallT = 0; game.newWallRect = null;  // 碰假门后升起的新墙（死亡/重开要清掉）
   game.wallSweep = 0;
   if (typeof location !== 'undefined' && location.search.indexOf('wa=') >= 0) {
     game.wallAngle = parseInt(location.search.split('wa=')[1]) || 0; game.wallOn = true; game.buttonPressed = true;
