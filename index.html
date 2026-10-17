@@ -412,7 +412,7 @@ var LEVELS = [
     //   竖直时把真门和玩家隔开；转开后路就通了。
     wall: { pivotX: 250, pivotY: 300, w: 24, len: 250, slideMax: 700 },
     button: { x: 430, y: 450, w: 40, h: 20 },           // 按钮：贴地
-    keys: [{ x: 907, y: -60, drop: true, dropY: 347, onPlatY: 375 }],
+    keys: [{ x: 880, y: -60, drop: true, dropY: 347, onPlatY: 375 }],
     platforms: [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },      // 地面（真门/按钮都直接贴这块地）
       { x: 855, y: 375, w: 105, h: 22, kind: 'solid', oneWay: true }   // 假门头顶的悬空平台（钥匙掉这儿）
@@ -1612,7 +1612,9 @@ function update(dt) {
       }
     }
     // 转到位之后【不停】：墙压在这儿，右侧（x>100）的人持续被压死
-    if (game.wallAngle >= 90 && p.x > 95) { die(); return; }
+    if (game.wallAngle >= 90 && p.x > 900) { die(); return; }   // 压死区只在钥匙台那块，路上不死
+    // 拿到钥匙的代价：墙压下来（0.45 秒后必死）—— 这就是"不错的祭品"
+    if (game.keyThisLife && game.keyGetT > 0.45 && game.keyGetT < 0.55) { die(); return; }
   }
 
   // 3) 按按钮后跑到假门那边：原来墙的位置长出一堵新的墙，把回头路彻底堵死
