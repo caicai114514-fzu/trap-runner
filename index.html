@@ -2034,9 +2034,6 @@ function drawButtonWall() {
     ctx.strokeStyle = PAL.groundTop;
     ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(upX, upY); ctx.lineTo(ftX, ftY); ctx.stroke();
-    // 转轴点（看得见支点）
-    ctx.fillStyle = PAL.ink;
-    ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill();
   }
 
   // 新墙：从地面伸出来（把回头路堵死）
@@ -2139,15 +2136,14 @@ function drawGoal() {
 function drawOneDoor(g, alpha) {
   if (alpha <= 0.01) return;
   g = { x: g.x, y: g.y + (game.sinkY || 0), w: g.w, h: g.h };   // 门跟着一起沉
-  var k = alpha;
-  var w = g.w * k;
-  if (w < 0.6) return;                       // 收成一条线之后就没了
-  var x = g.x + (g.w - w) / 2;               // 从正中往两边收
+  var k = Math.max(0, Math.min(1, alpha));
+  var w = g.w;                               // 门保持完整宽度，用透明度渐显
+  var x = g.x;
   var y = g.y, h = g.h, r = w / 2;
 
   // 门口透出来的光
   ctx.save();
-  ctx.globalAlpha = 0.22 * k * (alpha < 1 ? alpha : 1);
+  ctx.globalAlpha = 0.22 * k;
   ctx.fillStyle = PAL.door;
   ctx.beginPath(); ctx.ellipse(x + r, y + h * 0.55, w * 1.35, h * 0.85, 0, 0, 7); ctx.fill();
   ctx.restore();
