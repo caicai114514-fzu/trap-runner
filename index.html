@@ -114,47 +114,44 @@ var Sound = {
     this.noise(t, 0.06, 0.07);
   },
 
-  sfxChainsaw: function () {       // 链锯：0.7 秒的持续"嗡——滋滋"，高频刺耳 + 低频引擎
+  sfxChainsaw: function () {       // 链锯：照参考音频——中低频锯齿，4 次间歇"嗡——嗡——嗡"
     if (!this.ac) return;
-    var t = this.ac.currentTime, dur = 0.70;
+    var t = this.ac.currentTime;
 
-    // ① 高频"滋"——锯齿波在 1700~2500Hz 之间快速随机跳，持续整段
-    var o1 = this.ac.createOscillator(), g1 = this.ac.createGain();
-    o1.type = 'sawtooth';
-    for (var i = 0; i < 42; i++) o1.frequency.setValueAtTime(1700 + Math.random() * 800, t + i * 0.016);
-    g1.gain.setValueAtTime(0.22, t);
-    g1.gain.setValueAtTime(0.22, t + dur - 0.18);
-    g1.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o1.connect(g1); g1.connect(this.sfxGain); o1.start(t); o1.stop(t + dur + 0.02);
+    // 4 次爆发，每次间隔 0.9 秒（参考音频包络：1.8/2.8/3.7/4.6s 各有一次峰值）
+    for (var burst = 0; burst < 4; burst++) {
+      var bt = t + burst * 0.9;
 
-    // ② 高八度，把"滋"再往上顶一层
-    var o2 = this.ac.createOscillator(), g2 = this.ac.createGain();
-    o2.type = 'square';
-    for (var j = 0; j < 35; j++) o2.frequency.setValueAtTime(3400 + Math.random() * 1600, t + j * 0.02);
-    g2.gain.setValueAtTime(0.075, t);
-    g2.gain.setValueAtTime(0.075, t + dur - 0.2);
-    g2.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o2.connect(g2); g2.connect(this.sfxGain); o2.start(t); o2.stop(t + dur + 0.02);
+      // 主音：350Hz 锯齿（参考频谱最强峰），转速不稳地抖
+      (function (bt) {
+        var o = this.ac.createOscillator(), g = this.ac.createGain();
+        o.type = 'sawtooth';
+        for (var i = 0; i < 16; i++) {
+          o.frequency.setValueAtTime(330 + Math.random() * 60, bt + i * 0.018);
+        }
+        g.gain.setValueAtTime(0.0001, bt);
+        g.gain.exponentialRampToValueAtTime(0.30, bt + 0.05);   // 快速起音
+        g.gain.setValueAtTime(0.30, bt + 0.15);
+        g.gain.exponentialRampToValueAtTime(0.0001, bt + 0.30); // 渐弱收尾
+        o.connect(g); g.connect(this.sfxGain);
+        o.start(bt); o.stop(bt + 0.32);
+      }).call(this, bt);
 
-    // ③ 低频引擎"嗡"——90Hz 方波，转速不稳地抖，这是"链锯"的体感
-    var o3 = this.ac.createOscillator(), g3 = this.ac.createGain();
-    o3.type = 'square';
-    for (var k = 0; k < 22; k++) o3.frequency.setValueAtTime(88 + Math.random() * 22, t + k * 0.032);
-    g3.gain.setValueAtTime(0.16, t);
-    g3.gain.setValueAtTime(0.16, t + dur - 0.2);
-    g3.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o3.connect(g3); g3.connect(this.sfxGain); o3.start(t); o3.stop(t + dur + 0.02);
-
-    // ④ 摩擦噪声：整段铺底，高通 2200Hz，音量压低
-    var n = Math.floor(this.ac.sampleRate * dur);
-    var buf = this.ac.createBuffer(1, n, this.ac.sampleRate);
-    var d = buf.getChannelData(0);
-    for (var m = 0; m < n; m++) d[m] = (Math.random() * 2 - 1) * (1 - m / n);
-    var src = this.ac.createBufferSource(); src.buffer = buf;
-    var hp = this.ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2200;
-    var g4 = this.ac.createGain(); g4.gain.value = 0.13;
-    src.connect(hp); hp.connect(g4); g4.connect(this.sfxGain);
-    src.start(t);
+      // 次音：150Hz 方波（低八度，参考频谱第二强峰），给"轰鸣"打底
+      (function (bt) {
+        var o = this.ac.createOscillator(), g = this.ac.createGain();
+        o.type = 'square';
+        for (var i = 0; i < 16; i++) {
+          o.frequency.setValueAtTime(145 + Math.random() * 20, bt + i * 0.02);
+        }
+        g.gain.setValueAtTime(0.0001, bt);
+        g.gain.exponentialRampToValueAtTime(0.20, bt + 0.06);
+        g.gain.setValueAtTime(0.20, bt + 0.15);
+        g.gain.exponentialRampToValueAtTime(0.0001, bt + 0.30);
+        o.connect(g); g.connect(this.sfxGain);
+        o.start(bt); o.stop(bt + 0.32);
+      }).call(this, bt);
+    }
   },
 
   sfxCoin: function () {          // 吃真金币：两音上行，清脆

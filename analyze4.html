@@ -1,0 +1,21 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><script>
+function send(s){ fetch('http://localhost:9001/result',{method:'POST',body:s}).catch(()=>{}); }
+fetch('chainsaw.m4a').then(r=>r.arrayBuffer()).then(buf=>{
+  var AC = window.AudioContext || window.webkitAudioContext;
+  var ac = new AC();
+  ac.decodeAudioData(buf).then(function(a){
+    var ch=a.getChannelData(0), sr=a.sampleRate, N=a.length;
+    var dur=a.duration;
+    // 包络
+    var env=[]; for(var t=0;t<dur;t+=0.1){var s=Math.floor(t*sr),e=Math.floor((t+0.1)*sr),sm=0;for(var j=s;j<e;j++)sm+=ch[j]*ch[j];env.push(Math.sqrt(sm/(e-s)).toFixed(2));}
+    // 频谱（Goertzel）
+    var fft=8192, mid=Math.floor(N/2), seg=new Float32Array(fft); for(var i=0;i<fft;i++)seg[i]=ch[mid+i];
+    function g(f){var w=2*Math.PI*f/sr,c=2*Math.cos(w),s0=0,s1=0,s2=0;for(var i=0;i<fft;i++){s0=seg[i]+c*s1-s2;s2=s1;s1=s0;}return s1*s1+s2*s2-c*s1*s2;}
+    var pk=[]; for(var f=50;f<=6000;f+=50)pk.push([f,g(f)]); pk.sort((a,b)=>b[1]-a[1]);
+    var mx=pk[0][1], top=[]; for(var i=0;i<15;i++)top.push(pk[i][0]+':'+(pk[i][1]/mx).toFixed(2));
+    var out='dur='+dur.toFixed(2)+'\nENV='+env.join(' ')+'\nPEAKS='+top.join(' ');
+    send(out);
+    document.title='DONE';
+  }).catch(function(e){ send('DECODE_ERR '+e); });
+}).catch(function(e){ send('FETCH_ERR '+e); });
+</script></body></html>
