@@ -319,8 +319,8 @@ var LEVELS = [
       { x: 0, y: 470, w: 960, h: 70, kind: 'solid' }
     ],
     spikes: [
-      { x: 280, y: 444, w: 65, h: 26, atX: 230, fallOnly: true, follow: true, followDist: 92 },  // ① 一离地就追到落点
-      { x: 560, y: 444, w: 65, h: 26, atX: 500, moveTo: [470, 444] },                             // ② 走过 500 就左移贴过来
+      { x: 280, y: 444, w: 49, h: 26, atX: 230, fallOnly: true, follow: true, followDist: 92 },  // ① 一离地就追到落点
+      { x: 560, y: 444, w: 49, h: 26, atX: 500, moveTo: [470, 444] },                             // ② 走过 500 就左移贴过来
       { x: 750, y: 444, w: 15, h: 26 },   // ③ 门口三根，都不动（总宽 49px）
       { x: 767, y: 444, w: 15, h: 26 },
       { x: 784, y: 444, w: 15, h: 26 }
@@ -1686,7 +1686,7 @@ function drawSpikes() {
     if (!sp.shown) continue;
     if (sp.onPop && !game.popFired) continue;      // 保险：没弹起来就不画
     var box = spikeBox(sp);
-    var n = Math.max(2, Math.round(box.w / 26));
+    var n = Math.max(2, Math.round(box.w / 16));
     var step = box.w / n;
     // 纯色三角，一次画完，没有描边也没有高光
     ctx.fillStyle = PAL.spike;
