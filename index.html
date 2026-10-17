@@ -1695,17 +1695,15 @@ function drawSpikes() {
     for (var a = 0; a < n; a++) {
       var x0 = sp.x + a * step;
       // 尖不在正中，左右交替偏一点；再让高度轻微高低错落 —— 别像等边三角形
-      var lean = (a % 2 === 0) ? 0.33 : 0.67;
-      var trim = (a % 3 === 1) ? 0.86 : 1;
-      var gapW = step * 0.12;        // 每根之间留缝，看起来是一根根独立的窄刺
-      var tipY = box.y + box.h * (1 - trim);
+      var lean = (a % 2 === 0) ? 0.34 : 0.66;   // 尖还是左右交替偏一点
+      var gapW = step * 0.15;                   // 间隙 15%，和门口那排一致
       if (sp.dir === 'down') {
-        ctx.moveTo(x0, box.y);
+        ctx.moveTo(x0 + gapW, box.y);
         ctx.lineTo(x0 + step * lean, box.y + box.h);
-        ctx.lineTo(x0 + step, box.y);
+        ctx.lineTo(x0 + step - gapW, box.y);
       } else {
         ctx.moveTo(x0 + gapW, box.y + box.h);
-        ctx.lineTo(x0 + step * lean, tipY);
+        ctx.lineTo(x0 + step * lean, box.y);          // 全部等高（整齐）
         ctx.lineTo(x0 + step - gapW, box.y + box.h);
       }
       ctx.closePath();
