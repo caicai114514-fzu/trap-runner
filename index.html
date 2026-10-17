@@ -1696,7 +1696,7 @@ function update(dt) {
     if (kk.drop && kk.dropY !== undefined) {
       if (kk.onPlatY !== null) {
         // 站到指定高度的平台上才出现
-        if (!kk.started && p.ground && Math.abs(p.ground.y - kk.onPlatY) < 6) kk.started = true;
+        if (!kk.started && game.buttonPressed && p.ground && Math.abs(p.ground.y - kk.onPlatY) < 6) kk.started = true;
         if (kk.started) kk.y += (kk.dropY - kk.y) * Math.min(1, dt * 6);
       } else if (game.buttonPressed) {
         kk.y += (kk.dropY - kk.y) * Math.min(1, dt * 4);
@@ -2014,10 +2014,10 @@ function drawButtonWall() {
     var b = L.button;
     var pressed = game.buttonPressed;
     var bh = pressed ? 6 : 18;                     // 按下会扁下去
-    ctx.fillStyle = pressed ? '#5a4436' : PAL.ground;
+    ctx.fillStyle = pressed ? '#8c2f22' : '#e0432f';      // 红色按钮，和地板区分开
     ctx.fillRect(b.x, b.y + b.h - bh, b.w, bh);
-    ctx.fillStyle = pressed ? '#3a2a22' : PAL.groundTop;
-    ctx.fillRect(b.x, b.y + b.h - bh, b.w, 4);
+    ctx.fillStyle = pressed ? '#5a1c14' : '#ff6b52';      // 顶面更亮
+    ctx.fillRect(b.x, b.y + b.h - bh, b.w, 5);
     ctx.fillStyle = '#ffd23f';
     ctx.beginPath(); ctx.arc(b.x + b.w / 2, b.y + b.h - bh - 3, 3, 0, 7); ctx.fill();
   }
