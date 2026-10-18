@@ -1920,7 +1920,7 @@ function update(dt) {
         var rk = game.gRiseT * game.gRiseT * (3 - 2 * game.gRiseT);
         ris0.y = game.gRiseFrom + (game.gRiseTo - game.gRiseFrom) * rk;
         if (p.ground === ris0 || Math.abs((p.y + p.h) - ris0.y) < 90) { p.y = ris0.y - p.h; p.vy = 0; p.onGround = true; p.ground = ris0; }
-        if (game.gRiseT >= 1) {
+        if (game.gRiseT >= 1 || Math.abs(ris0.y - game.gRiseTo) < 0.8) {
           ris0.y = game.gRiseTo;
           if (game.gRiseTo <= 250.5) game.gBtns = false;   // 升到顶：按钮不再出现
           game.gRiseTo = null; game.gRiseFrom = undefined; game.gRiseT = 0;
