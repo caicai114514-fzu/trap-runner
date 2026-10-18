@@ -1845,7 +1845,7 @@ function update(dt) {
       // ===== 代码层：删掉右边那扇门，在玩家脚下新建一扇 =====
       var oldGX = game.goalX;
       game.goalDead2 = true;                                        // 旧门删除（立刻不可碰）
-      game.goalX = p.x + p.w / 2 - LEVELS[game.li].goal.w / 2;      // 新门建在玩家位置
+      game.goalX = LEVELS[game.li].spawn[0] - 50;                   // 新门建在出生点偏左
       // goalDead2 保持 true：等门飞到位才允许进入
       // ===== 美术层：门炸成粒子，飞到新位置再重组成门 =====
       game.goalFly = { t: 0, fromX: oldGX, toX: game.goalX, parts: [] };
