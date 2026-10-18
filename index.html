@@ -1937,7 +1937,10 @@ function update(dt) {
       // 按钮收回动画
       if (game.gRetract) {
         game.btnAnim = Math.max(0, game.btnAnim - dt * 3.5);
-        if (game.btnAnim <= 0) { game.gRetract = false; game.gDelay = 0.5; }   // 收回后停 0.5 秒
+        if (game.btnAnim <= 0) {
+          game.gRetract = false; game.gDelay = 0.5;   // 收回后停 0.5 秒
+          if (game.gWrongPending !== null) game.gBtns = false;   // 按错的：收完才永久隐藏
+        }
       }
       // 收回后等 0.5 秒，地板才开始升
       if (game.gDelay > 0) {
@@ -2004,8 +2007,7 @@ function update(dt) {
           // ===== 按错：先和按对一样收按钮+停 0.5s，再执行惩罚 =====
           game.gBtnLock = true;
           game.gWrong = game.gRound;
-          game.gRetract = true;                 // 两个按钮一起收回去
-          game.gBtns = false;                   // 按错之后按钮永久不再出现
+          game.gRetract = true;                 // 两个按钮先慢慢收回去（动画）
           game.gWrongPending = game.gRound;     // 记住错在第几轮
           Sound.sfxCoin();                      // 和按对一样的音效
         }
