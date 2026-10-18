@@ -1715,7 +1715,8 @@ function update(dt) {
     if (lb3) {
       lb3.asPlatform = true;
       lb3.frozen = true;                                  // 不再弹跳
-      if (lb3.y < 470 + lb3.r + 8) lb3.y = Math.min(470 + lb3.r + 8, lb3.y + dt * 260);   // 往下沉
+      var sinkTo = 470 + lb3.r + 6;
+      if (lb3.y < sinkTo) lb3.y = Math.min(sinkTo, lb3.y + dt * 620);   // 沉到球顶略低于地板
     }
   }
 
