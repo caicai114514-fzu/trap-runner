@@ -3147,72 +3147,6 @@ function drawGear(cx, cy, r) {
 }
 function drawSettings(dt) {
   // 齿轮只在菜单类界面出现（一级目录 / 二级选关 / 标题 / 通关），关卡里不显示
-  // ===== 成就面板 =====
-  if (game.achOpen) game.achT = Math.min(1, (game.achT || 0) + (1 / 60) * 5);
-  else game.achT = Math.max(0, (game.achT || 0) - (1 / 60) * 12);
-  if ((game.achT || 0) > 0 && !game.resetOpen) {
-    var at = game.achT, ae = at * at * (3 - 2 * at);
-    var AW = 620, AH = 420, AX = (VW - AW) / 2, AY = (VH - AH) / 2 + (1 - ae) * 320;
-    ctx.save();
-    ctx.globalAlpha = ae;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, VW, VH);
-    ctx.fillStyle = '#1a0a06'; ctx.fillRect(AX, AY, AW, AH);
-    ctx.strokeStyle = '#c9884a'; ctx.lineWidth = 3; ctx.strokeRect(AX, AY, AW, AH);
-    // 关闭叉
-    var axx = AX + AW - 26, axy = AY + 26;
-    ctx.strokeStyle = '#e8b98a'; ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(axx - 8, axy - 8); ctx.lineTo(axx + 8, axy + 8);
-    ctx.moveTo(axx + 8, axy - 8); ctx.lineTo(axx - 8, axy + 8);
-    ctx.stroke();
-    // 8 个图标：4 列 × 2 行
-    var cellW = (AW - 80) / 4, cellH = (AH - 120) / 2, isz = Math.min(cellW, cellH) - 24;
-    for (var ai = 0; ai < 8; ai++) {
-      var col = ai % 4, row = (ai / 4) | 0;
-      var cx2 = AX + 40 + cellW * col + cellW / 2;
-      var cy2 = AY + 60 + cellH * row + cellH / 2;
-      var got = !!(save.achievements && save.achievements[ACH_META[ai].key]);
-      var im = ACH_IMG[ai] ? (got ? ACH_IMG[ai].on : ACH_IMG[ai].off) : null;
-      if (im && im.complete && im.naturalWidth) {
-        // 等比例缩放（取最大内接正方形，保持长宽比）
-        var iw = im.naturalWidth, ih = im.naturalHeight;
-        var sc = Math.min(isz / iw, isz / ih);
-        ctx.drawImage(im, cx2 - iw * sc / 2, cy2 - ih * sc / 2, iw * sc, ih * sc);
-      } else {
-        ctx.fillStyle = '#2a1410'; ctx.fillRect(cx2 - isz / 2, cy2 - isz / 2, isz, isz);
-      }
-      ACH_META[ai]._x = cx2; ACH_META[ai]._y = cy2; ACH_META[ai]._r = isz / 2;
-      text(ACH_META[ai].name, cx2, cy2 + isz / 2 + 16, 13, got ? '#ffd23f' : '#8a6050', 'center', true);
-    }
-    ctx.restore();
-  }
-
-  // ===== 成就详情（点某个图标）=====
-  if (game.achSel !== null && game.achSel !== undefined) {
-    var d = ACH_META[game.achSel];
-    var gotD = !!(save.achievements && save.achievements[d.key]);
-    var DW = 400, DH = 300, DX = (VW - DW) / 2, DY = (VH - DH) / 2;
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(0, 0, VW, VH);
-    ctx.fillStyle = '#1a0a06'; ctx.fillRect(DX, DY, DW, DH);
-    ctx.strokeStyle = '#c9884a'; ctx.lineWidth = 3; ctx.strokeRect(DX, DY, DW, DH);
-    // 关闭叉
-    ctx.strokeStyle = '#e8b98a'; ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(DX + DW - 34, DY + 16); ctx.lineTo(DX + DW - 18, DY + 32);
-    ctx.moveTo(DX + DW - 18, DY + 16); ctx.lineTo(DX + DW - 34, DY + 32);
-    ctx.stroke();
-    // 大图标（等比例）
-    var dm = ACH_IMG[game.achSel] ? (gotD ? ACH_IMG[game.achSel].on : ACH_IMG[game.achSel].off) : null;
-    if (dm && dm.complete && dm.naturalWidth) {
-      var dsz = 150, sc2 = Math.min(dsz / dm.naturalWidth, dsz / dm.naturalHeight);
-      ctx.drawImage(dm, VW / 2 - dm.naturalWidth * sc2 / 2, DY + 40, dm.naturalWidth * sc2, dm.naturalHeight * sc2);
-    }
-    text(d.name, VW / 2, DY + 220, 22, gotD ? '#ffd23f' : '#8a6050', 'center', true);
-    text(gotD ? d.on : d.off, VW / 2, DY + 256, 15, '#c9a888', 'center');
-    ctx.restore();
-  }
-
   drawGear(34, VH - 34, 20);   // 所有界面都有齿轮
 
   if (!game.settingsOpen && (game.settingsT || 0) <= 0) return;
@@ -3355,6 +3289,72 @@ function drawSettings(dt) {
     ctx.restore();
   }
 }
+
+  // ===== 成就面板 =====
+  if (game.achOpen) game.achT = Math.min(1, (game.achT || 0) + (1 / 60) * 5);
+  else game.achT = Math.max(0, (game.achT || 0) - (1 / 60) * 12);
+  if ((game.achT || 0) > 0 && !game.resetOpen) {
+    var at = game.achT, ae = at * at * (3 - 2 * at);
+    var AW = 620, AH = 420, AX = (VW - AW) / 2, AY = (VH - AH) / 2 + (1 - ae) * 320;
+    ctx.save();
+    ctx.globalAlpha = ae;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, VW, VH);
+    ctx.fillStyle = '#1a0a06'; ctx.fillRect(AX, AY, AW, AH);
+    ctx.strokeStyle = '#c9884a'; ctx.lineWidth = 3; ctx.strokeRect(AX, AY, AW, AH);
+    // 关闭叉
+    var axx = AX + AW - 26, axy = AY + 26;
+    ctx.strokeStyle = '#e8b98a'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(axx - 8, axy - 8); ctx.lineTo(axx + 8, axy + 8);
+    ctx.moveTo(axx + 8, axy - 8); ctx.lineTo(axx - 8, axy + 8);
+    ctx.stroke();
+    // 8 个图标：4 列 × 2 行
+    var cellW = (AW - 80) / 4, cellH = (AH - 120) / 2, isz = Math.min(cellW, cellH) - 24;
+    for (var ai = 0; ai < 8; ai++) {
+      var col = ai % 4, row = (ai / 4) | 0;
+      var cx2 = AX + 40 + cellW * col + cellW / 2;
+      var cy2 = AY + 60 + cellH * row + cellH / 2;
+      var got = !!(save.achievements && save.achievements[ACH_META[ai].key]);
+      var im = ACH_IMG[ai] ? (got ? ACH_IMG[ai].on : ACH_IMG[ai].off) : null;
+      if (im && im.complete && im.naturalWidth) {
+        // 等比例缩放（取最大内接正方形，保持长宽比）
+        var iw = im.naturalWidth, ih = im.naturalHeight;
+        var sc = Math.min(isz / iw, isz / ih);
+        ctx.drawImage(im, cx2 - iw * sc / 2, cy2 - ih * sc / 2, iw * sc, ih * sc);
+      } else {
+        ctx.fillStyle = '#2a1410'; ctx.fillRect(cx2 - isz / 2, cy2 - isz / 2, isz, isz);
+      }
+      ACH_META[ai]._x = cx2; ACH_META[ai]._y = cy2; ACH_META[ai]._r = isz / 2;
+      text(ACH_META[ai].name, cx2, cy2 + isz / 2 + 16, 13, got ? '#ffd23f' : '#8a6050', 'center', true);
+    }
+    ctx.restore();
+  }
+
+  // ===== 成就详情（点某个图标）=====
+  if (game.achSel !== null && game.achSel !== undefined) {
+    var d = ACH_META[game.achSel];
+    var gotD = !!(save.achievements && save.achievements[d.key]);
+    var DW = 400, DH = 300, DX = (VW - DW) / 2, DY = (VH - DH) / 2;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(0, 0, VW, VH);
+    ctx.fillStyle = '#1a0a06'; ctx.fillRect(DX, DY, DW, DH);
+    ctx.strokeStyle = '#c9884a'; ctx.lineWidth = 3; ctx.strokeRect(DX, DY, DW, DH);
+    // 关闭叉
+    ctx.strokeStyle = '#e8b98a'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(DX + DW - 34, DY + 16); ctx.lineTo(DX + DW - 18, DY + 32);
+    ctx.moveTo(DX + DW - 18, DY + 16); ctx.lineTo(DX + DW - 34, DY + 32);
+    ctx.stroke();
+    // 大图标（等比例）
+    var dm = ACH_IMG[game.achSel] ? (gotD ? ACH_IMG[game.achSel].on : ACH_IMG[game.achSel].off) : null;
+    if (dm && dm.complete && dm.naturalWidth) {
+      var dsz = 150, sc2 = Math.min(dsz / dm.naturalWidth, dsz / dm.naturalHeight);
+      ctx.drawImage(dm, VW / 2 - dm.naturalWidth * sc2 / 2, DY + 40, dm.naturalWidth * sc2, dm.naturalHeight * sc2);
+    }
+    text(d.name, VW / 2, DY + 220, 22, gotD ? '#ffd23f' : '#8a6050', 'center', true);
+    text(gotD ? d.on : d.off, VW / 2, DY + 256, 15, '#c9a888', 'center');
+    ctx.restore();
+  }
 
 function drawButtonWall() {
   var L = LEVELS[game.li];
