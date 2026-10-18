@@ -858,6 +858,7 @@ function loadLevel(i) {
   game.ring = null;        // 3-4 七球绕人一圈 → 加速旋转 → 贯穿
   game.goalFly = null;     // 3-4 门的粒子传送（美术层）
   game.gRound = 0;         // 3-5 博弈：当前第几轮
+  game.gBtns = false;      // 3-5 按钮：站到中间地板上才出现
   game.gambleDone = false;  // 3-5 博弈结束
   game.goalDead2 = false;  // 3-4 旧门已删除（代码层，碰不到）
   game.buttonVisible = !(L.button && L.button.hidden);  // 默认显示；hidden 的按钮(2-5)等平台出现才显示
@@ -1882,7 +1883,8 @@ function update(dt) {
   // ===== 3-5 博弈：每轮左右二选一，按对地板升，按错死 =====
   var GM = L6.gamble;
   if (GM && !game.gambleDone) {
-    var gb = L6.gambleButtons || [];
+    if (p.ground && p.ground.riser) game.gBtns = true;   // 站上中间地板，按钮才出现
+    var gb = game.gBtns ? (L6.gambleButtons || []) : [];
     for (var gbi = 0; gbi < gb.length; gbi++) {
       var bb = gb[gbi];
       if (p.x < bb.x + bb.w && p.x + p.w > bb.x && p.y < bb.y + bb.h && p.y + p.h > bb.y) {
@@ -2439,6 +2441,19 @@ function drawButtonWall() {
     ctx.fillRect(b.x, isUp ? by + bh - 5 : by, b.w, 5);
     ctx.fillStyle = '#ffd23f';
     ctx.beginPath(); ctx.arc(b.x + b.w / 2, b.y + b.h - bh - 3, 3, 0, 7); ctx.fill();
+  }
+
+  // 3-5 博弈按钮：站上地板后才出现
+  if (L.gambleButtons && game.gBtns) {
+    for (var gbi2 = 0; gbi2 < L.gambleButtons.length; gbi2++) {
+      var gb2 = L.gambleButtons[gbi2];
+      ctx.fillStyle = '#e0432f';
+      ctx.fillRect(gb2.x, gb2.y, gb2.w, gb2.h);
+      ctx.fillStyle = '#ff6b52';
+      ctx.fillRect(gb2.x, gb2.y, gb2.w, 5);
+      ctx.fillStyle = '#ffd23f';
+      ctx.beginPath(); ctx.arc(gb2.x + gb2.w / 2, gb2.y + gb2.h + 5, 3, 0, 7); ctx.fill();
+    }
   }
 
   // 墙：一根从天花板斜下来的杆，它自己转（碰撞跟着转）
