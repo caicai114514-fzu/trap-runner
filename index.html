@@ -948,15 +948,7 @@ function loadLevel(i) {
   game.flipOnLand = !!L.flipOnLand;          // 每次落地再反一次
   game.wasOnGround = false;
   game.goalReveal = (L.fakeGoal || L.goalHidden) ? 0 : 1;   // 真门的显现进度
-  if (L.goalTeleportOnTouch && game.goalTpedOnce) {
-    // 4-1：门的传送已经触发过 —— 重生后门还在最左边，导弹也还在追
-    game.goalX = 16;
-    game.goalHide = false;
-    game.missileSpawned = true;
-    game.missiles = [{ x: L.spawn[0] + 300, y: (L.spawn[1] || 300) + 14, speed: 280, t: 1 }];
-  } else {
-    game.goalX = L.goal.x;                                  // 会走的门：当前 x
-  }
+  game.goalX = L.goal.x;                                  // 会走的门：当前 x（重生 = 门回原位）
   game.goalDone = false; game.goalMoving = false;
   game.buttonPressed = false;                // 按钮是否按下
   game.wallAngle = 90;                       // 墙初始【竖直】(90°)；按按钮后匀速转起来
@@ -970,6 +962,8 @@ function loadLevel(i) {
   game.ring = null;        // 3-4 七球绕人一圈 → 加速旋转 → 贯穿
   game.goalFly = null;     // 3-4 门的粒子传送（美术层）
   game.missileSpawned = false;   // 4-1 门传送后那枚导弹只放一次
+  game.goalTpedOnce = false;     // 4-1 门传送标记（重开要清）
+  game.goalHide = false;
   game.gotCoins = 0;       // 4-1 金币计数（重开要清零）
   game.floorRetract = false;  // 4-1 左2地板是否在收
   game.floorDone = false;     // 4-1 地板收伸只发生一次
@@ -990,11 +984,7 @@ function loadLevel(i) {
   game.gFinal = false;     // 3-5 第四轮：按钮收完就撤地板，玩家必须立刻跳
   game.passedShortcut = false;  // 表魔王：是否经过了正常路线的检查点
   game.gFinalDelay = undefined;  // 第四轮的反应时间
-  game.missiles = [];      // 3-5 四个黑球绕人（半径周期变化）
-  // 4-1：门的传送触发过 → 重生后导弹继续追（要在清空之后补，否则被覆盖）
-  if (L.goalTeleportOnTouch && game.goalTpedOnce) {
-    game.missiles = [{ x: (L.spawn[0] || 100) + 300, y: (L.spawn[1] || 300) + 14, speed: 280, t: 1 }];
-  }
+  game.missiles = [];      // 3-5 四个黑球绕人（半径周期变化）；重生 = 导弹清零
   if (game.ring3) {
     var R3d = game.ring3;
     var baseR = 110 + Math.sin(R3d.t * 3.2) * 46;      // 半径来回伸缩
