@@ -577,6 +577,7 @@ var LEVELS = [
   /* ================= 大关四 · 险路尽头（全部叠起来）================= */
   {
     name: '4-1 · 表魔王', hint: '墙里有一条路。',
+    invertColors: true,   // 4-1：深浅反转（原来的路变墙、墙变路）
     width: 960, spawn: [90, 175],
     goal: { x: 862, y: 230, w: 44, h: 75 },
     hiddenPathY: 130,
@@ -594,11 +595,6 @@ var LEVELS = [
       { x: 60,  y: 70,  w: 780, h: 34,  kind: 'solid', hiddenPath: true },
       { x: 860, y: 70,  w: 36,  h: 240, kind: 'solid', hiddenPath: true },
       { x: 20,  y: 250, w: 40,  h: 10,  kind: 'bounce', power: 1600, popTime: 0.10, secretPad: true }
-    ],
-    coins: [
-      { x: 400, y: 220 },
-      { x: 560, y: 220 },
-      { x: 720, y: 220, fake: true }
     ],
     spikes: [], arrows: []
   },
@@ -2544,6 +2540,12 @@ function drawBackground() {
 }
 
 function drawPlatforms() {
+  var INV = !!(LEVELS[game.li] && LEVELS[game.li].invertColors);
+  // 反转关：整屏背景画成"路"的颜色（浅），平台画成"墙"的颜色（深）
+  if (INV) {
+    ctx.fillStyle = PAL.ground;
+    ctx.fillRect(0, 0, VW, VH);
+  }
   for (var i = 0; i < game.plats.length; i++) {
     var p = game.plats[i];
     if (p.state === 'hidden') continue;
