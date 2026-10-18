@@ -580,6 +580,7 @@ var LEVELS = [
     width: 960, spawn: [147, 220],
     goal: { x: 804, y: 200, w: 46, h: 70 },   // 门卡在右边第二级阶梯下，下边缘贴地板(270)
     goalTeleportOnTouch: true,               // 第三层陷阱：第一次碰门 → 门自己传送到最左边
+    missileAfterGoalTp: true,                // 门传送完，身后飞来一枚导弹追你
     platforms: [
       { x: 0,   y: 270, w: 90,  h: 270, kind: 'solid' },                // 地板左1
       { x: 90,  y: 270, w: 90,  h: 270, kind: 'solid', retractFloor: true },  // 左2阶梯对应地板（会收）
@@ -960,6 +961,7 @@ function loadLevel(i) {
   game.tp = null;          // 3-4 传送动画状态
   game.ring = null;        // 3-4 七球绕人一圈 → 加速旋转 → 贯穿
   game.goalFly = null;     // 3-4 门的粒子传送（美术层）
+  game.missileSpawned = false;   // 4-1 门传送后那枚导弹只放一次
   game.gotCoins = 0;       // 4-1 金币计数（重开要清零）
   game.floorRetract = false;  // 4-1 左2地板是否在收
   game.floorDone = false;     // 4-1 地板收伸只发生一次
@@ -1438,6 +1440,12 @@ function update(dt) {
       game.goalX = game.goalFly.toX;
       game.goalHide = false;                                      // 尾帧：门在最左边出现
       game.goalFly = null; game.goalDead2 = false;
+      // 第三层陷阱后续：门刚落到左边，身后就飞来一枚导弹（速度略慢于玩家）
+      if (LEVELS[game.li].missileAfterGoalTp && !game.missileSpawned) {
+        game.missileSpawned = true;
+        game.missiles.push({ x: p.x + p.w / 2 + 170, y: p.y + p.h / 2, speed: 280, t: 1 });
+        Sound.sfxTrap(); game.shake = 8;
+      }
     }
   }
 
