@@ -1432,8 +1432,14 @@ function update(dt) {
   // 门的传送动画（3-4）：飞行途中门还不存在，落位之后才生效
   if (game.goalFly) {
     game.goalFly.t += dt;
-    game.goalDead2 = true;                       // ★ 飞一半不能被碰到
-    if (game.goalFly.t >= 0.55) { game.goalFly = null; game.goalDead2 = false; }
+    game.goalDead2 = true;                                        // ★ 飞一半不能被碰到
+    var gfk = Math.min(1, game.goalFly.t / 0.55);
+    var gfe = gfk * gfk * (3 - 2 * gfk);                          // smoothstep，飞得有点质感
+    game.goalX = game.goalFly.fromX + (game.goalFly.toX - game.goalFly.fromX) * gfe;
+    if (game.goalFly.t >= 0.55) {
+      game.goalX = game.goalFly.toX;
+      game.goalFly = null; game.goalDead2 = false;
+    }
   }
 
   // 传送+绕环期间：人死死钉在屏幕正中，不受重力也不受按键
@@ -2578,7 +2584,6 @@ function update(dt) {
         game.goalTpedOnce = true;
         game.goalDead2 = true;
         var fromX = game.goalX, toX = 16;
-        game.goalX = toX;
         game.goalFly = { t: 0, fromX: fromX, toX: toX, parts: [] };
         var GPC = ['#2f8f5b', '#3fae6f', '#59c98a', '#8fe8b4', '#d8ffe9'];
         for (var gpi = 0; gpi < 26; gpi++) {
