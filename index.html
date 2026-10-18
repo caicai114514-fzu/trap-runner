@@ -2759,6 +2759,7 @@ function update(dt) {
       kk.x = kk.fx + (kk.slideToX - kk.fx) * sk;
       if (sk >= 1) { kk.gone = true; continue; }   // 滑过去了就没了，只能等下一命
     }
+    if (kk.gone) continue;   // 已经拿过的钥匙不再触发
     var kcx = kk.fx + (kk.x - kk.fx) * kk.show;
     var kcy = kk.fy + (kk.y - kk.fy) * kk.show;
     if (Math.abs(p.x + p.w / 2 - kcx) < 26 && Math.abs(p.y + p.h / 2 - kcy) < 28) {
@@ -2769,12 +2770,11 @@ function update(dt) {
       writeSave();
       Sound.sfxWin();
       // 隐藏成就：第一次拿钥匙 / 三把拿满（立即播报，因为拿完马上就死了）
-      unlockAchievement('save', true);
+      var achShown = unlockAchievement('save', true);
       var keyN = 0;
       for (var kw = 0; kw < 3; kw++) if (save.keys[kw]) keyN++;
-      if (keyN >= 3) unlockAchievement('sacrifice', true);
-      game.flash = '拿到钥匙了';
-      game.tauntT = 1.6;
+      if (keyN >= 3) achShown = unlockAchievement('sacrifice', true) || achShown;
+      if (!achShown) { game.flash = '拿到钥匙了'; game.tauntT = 1.6; }   // 已经有成就播报就别覆盖
     }
   }
 
