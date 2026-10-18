@@ -746,7 +746,8 @@ function loadLevel(i) {
       phase: isPiston ? 'hidden' : '', phaseT: 0,
       isWall: !!p.isWall,
       deadly: !!p.deadly,
-      riseT: 0, risePhase: 'idle', riseY: 0   // riseWall：升起的墙
+      riseT: 0, risePhase: 'idle', riseY: 0,  // riseWall：升起的墙
+      slideWall: !!p.slideWall            // 3-3：会往左缩进的下半堵墙
     };
   });
   game.spikes = L.spikes.map(function (s) {
@@ -803,6 +804,7 @@ function loadLevel(i) {
   game.fakeGoalShown = !!(L.fakeGoal && !L.fakeGoal.hidden);  // 假门一开始就在（除非显式 hidden）
   game.newWallDone = false; game.newWallT = 0; game.newWallRect = null;
   game.reversed = false;   // 2-5：按下按钮后世界规则反转（刺危险/地板安全）
+  game.keyReveal = false;  // 3-3：左墙缩进后，隐藏的钥匙才显现
   game.buttonVisible = !(L.button && L.button.hidden);  // 默认显示；hidden 的按钮(2-5)等平台出现才显示
   game.wallSweep = 0;
   if (typeof location !== 'undefined' && location.search.indexOf('wa=') >= 0) {
