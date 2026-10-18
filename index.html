@@ -1166,6 +1166,7 @@ function die(kind) {
   if (game.state !== 'play') return;
   game.state = 'dead';
   game.timer = 0;
+  game.flash = '';   // 死亡清掉旧通知，避免它跟着每次死亡重复显示
   game.deaths++;
   game.totalDeaths++;
   save.deaths++;               // 总死亡次数进存档（选关界面那只小幽灵看的就是它）
