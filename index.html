@@ -1045,7 +1045,7 @@ function winLevel() {
   var gx = (game.goalX !== undefined) ? game.goalX : g.x;   // 会走的门：用当前真实位置
   game.winDoor = { k: 1, cx: gx + g.w / 2, cy: g.y + g.h / 2 };
   game.winFrom = { x: game.p.x, y: game.p.y };
-  if (CUR.w === 3 && CUR.i === LEVELS_PER_WORLD - 1) {
+  if (CUR.w === 3 && CUR.i === 1) {   // 第四大关只有两关，通关里魔王即全通
     game.state = 'complete';
     Sound.sfxAllClear();
     return;
