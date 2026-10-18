@@ -2721,8 +2721,8 @@ function update(dt) {
     var swp = null;
     for (var si2 = 0; si2 < game.plats.length; si2++) if (game.plats[si2].slideWall) swp = game.plats[si2];
     if (swp && save.keys[2]) {
-      // 钥匙已经拿过：这堵墙永久保持缩进状态，不再缩、也不挡路
-      swp.x = -40; swp.noCollide = true; game.keyReveal = true;
+      // 钥匙已经拿过：墙放回原位（保持挡路），不再缩进
+      swp.x = 0; swp.noCollide = false;
     } else if (swp && p.y > 400 && p.x + p.w / 2 < 190) {
       swp.x = Math.max(-40, swp.x - dt * 220);          // 往左缩进
       if (swp.x <= -39) { swp.noCollide = true; }
