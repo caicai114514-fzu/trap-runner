@@ -1261,12 +1261,21 @@ function update(dt) {
       for (var pj = 0; pj < game.particles.length; pj++) {
         var qp = game.particles[pj];
         if (!qp.debris || !qp.pulled) continue;
-        qp.vx += (tcx - qp.x) * 90 * dt - qp.vx * 9 * dt;
-        qp.vy += (tcy - qp.y) * 90 * dt - qp.vy * 9 * dt;
+        qp.vx += (tcx - qp.x) * 260 * dt - qp.vx * 16 * dt;
+        qp.vy += (tcy - qp.y) * 260 * dt - qp.vy * 16 * dt;
       }
     }
     for (var pj2 = 0; pj2 < game.particles.length; pj2++) {
       if (game.particles[pj2].debris) game.particles[pj2].pulled = true;
+    }
+    // 0.55 秒后碎片全部吸附到中心点（收缩成一个光点），避免看起来还散着
+    if (game.tp.t > 0.55) {
+      for (var ps2 = 0; ps2 < game.particles.length; ps2++) {
+        var qs = game.particles[ps2];
+        if (!qs.debris) continue;
+        qs.x += (tcx - qs.x) * Math.min(1, (game.tp.t - 0.55) * 40);
+        qs.y += (tcy - qs.y) * Math.min(1, (game.tp.t - 0.55) * 40);
+      }
     }
     // 0.62 秒后重组成人，出现在正中
     if (game.tp.t > 0.75) {
