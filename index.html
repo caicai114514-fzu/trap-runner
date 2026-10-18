@@ -599,13 +599,13 @@ var LEVELS = [
     ],
     spikes: [
       // ② 通道地上一排刺：走到 x>350 才一起伸出来，持续 1.5 秒再收回
-      { x: 380, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, holdTime: 1.5 },
-      { x: 405, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, holdTime: 1.5 },
-      { x: 430, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, holdTime: 1.5 },
-      { x: 455, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, holdTime: 1.5 },
-      { x: 480, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, holdTime: 1.5 },
-      { x: 505, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, holdTime: 1.5 },
-      { x: 530, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, holdTime: 1.5 }
+      { x: 380, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 },
+      { x: 405, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 },
+      { x: 430, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 },
+      { x: 455, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 },
+      { x: 480, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 },
+      { x: 505, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 },
+      { x: 530, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 }
     ],
     // ② 距离触发的按钮：离门一定距离就伸出，按了传回出生点
     button: { x: 700, y: 250, w: 40, h: 20, hidden: true, revealDist: 120, tpOnPress: true },
@@ -886,6 +886,7 @@ function loadLevel(i) {
       fake: !!s.fake,           // 假刺：长得一模一样，但不致命
       keepSafe: !!s.keepSafe,   // 反转后仍安全（2-5 的第二个刺）
       holdTime: (s.holdTime === undefined ? 0 : s.holdTime),   // 伸出后持续这么久再收回（0=不收回）
+      needFloorDone: !!s.needFloorDone,   // 4-1：必须等左边地板收伸完成一次才触发
       holdT: 0, retracted: false,
       onPop: !!s.onPop,         // 等跳板把人弹起来之后才长出来
       moveTo: s.moveTo || null, // 触发后瞬移到这里（判定立刻过去，视觉上快速平移）
@@ -1566,7 +1567,7 @@ function update(dt) {
       if (sp.onPlatY !== null) reveal = !!(p.ground && Math.abs(p.ground.y - sp.onPlatY) < 6);  // 站在二楼平台上才露头
       else if (sp.atXlt !== null) reveal = (p.x + p.w / 2 < sp.atXlt);   // 玩家往左走到某点才露头
       else if (sp.atYlt !== null) reveal = (p.y < sp.atYlt);      // 只有上到高处才露头
-      else reveal = (p.x + p.w > sp.triggerX);
+      else reveal = (p.x + p.w > sp.triggerX) && (!sp.needFloorDone || game.floorDone);
       if (reveal) { sp.shown = true; Sound.sfxTrap(); game.shake = 5; }
       // 4-1：伸出后持续 holdTime 秒，然后整体收进去
       if (sp.shown && sp.holdTime > 0 && !sp.retracted) {
