@@ -180,6 +180,35 @@ var Sound = {
     seq.forEach(function (m, i) { self.note(m, t + i * 0.09, 0.3, 'triangle', 0.3, self.sfxGain); });
   },
 
+  sfxTeleport: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime, ac = this.ac;
+    // 1) 炸开：短促噪声
+    this.noise(t, 0.10, 0.26);
+    // 2) 下沉：低频 square 快速滑落
+    var o1 = ac.createOscillator(), g1 = ac.createGain();
+    o1.type = 'square';
+    o1.frequency.setValueAtTime(320, t);
+    o1.frequency.exponentialRampToValueAtTime(55, t + 0.22);
+    g1.gain.setValueAtTime(0.001, t);
+    g1.gain.exponentialRampToValueAtTime(0.20, t + 0.015);
+    g1.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+    o1.connect(g1); g1.connect(this.sfxGain);
+    o1.start(t); o1.stop(t + 0.26);
+    // 3) 聚拢：上行扫频（像被吸回去）
+    var o2 = ac.createOscillator(), g2 = ac.createGain();
+    o2.type = 'sawtooth';
+    o2.frequency.setValueAtTime(180, t + 0.20);
+    o2.frequency.exponentialRampToValueAtTime(1400, t + 0.58);
+    g2.gain.setValueAtTime(0.001, t + 0.20);
+    g2.gain.exponentialRampToValueAtTime(0.18, t + 0.30);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.62);
+    o2.connect(g2); g2.connect(this.sfxGain);
+    o2.start(t + 0.20); o2.stop(t + 0.64);
+    // 4) 重组：一记清脆高音
+    this.note(84, t + 0.60, 0.18, 'triangle', 0.20, this.sfxGain);
+  },
+
   sfxTrap: function () {
     if (!this.ac) return;
     var t = this.ac.currentTime;
@@ -1768,7 +1797,7 @@ function update(dt) {
             debris: true, pulled: false
           });
         }
-        Sound.sfxDeath();
+        Sound.sfxTeleport();
         game.shake = 14;
       }
       game.shake = 8;
