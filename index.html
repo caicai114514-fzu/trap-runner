@@ -3622,6 +3622,12 @@ function drawComplete() {
   text(game.totalDeaths <= 15 ? '这身手，有点东西。' :
        game.totalDeaths <= 40 ? '坑是踩出来的，路是走出来的。' :
        '……你和这个游戏，都挺倔的。', VW / 2, VH / 2 + 56, 18, PAL.text, 'center');
+  // 成就播报（通关 4-1 时刚解锁的那一条）
+  if (game.tauntT > 0 && game.flash) {
+    ctx.save(); ctx.globalAlpha = Math.min(1, game.tauntT / 0.4);
+    text(game.flash, VW / 2, VH / 2 - 140, 24, PAL.player, 'center', true);
+    ctx.restore();
+  }
   var a = 0.5 + 0.5 * Math.sin(t * 3);
   ctx.globalAlpha = a;
   text('按 空格 再玩一次', VW / 2, VH / 2 + 128, 23, PAL.good, 'center', true);
