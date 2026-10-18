@@ -1181,7 +1181,8 @@ function enterWorld(w) {
   }
   game.levelsWorld = w;
   game.cursorL = 0;
-  for (var i = 0; i < LEVELS_PER_WORLD; i++) if (!isCleared(w, i)) { game.cursorL = i; break; }
+  var slotN = (w === 3 ? 2 : LEVELS_PER_WORLD);   // 第四大关只有 2 个入口
+  for (var i = 0; i < slotN; i++) if (!isCleared(w, i)) { game.cursorL = i; break; }
   game.state = 'levels';
   Sound.sfxWin();
 }
