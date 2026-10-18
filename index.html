@@ -1984,14 +1984,18 @@ function update(dt) {
     var ris0 = null;
     for (var rj = 0; rj < game.plats.length; rj++) if (game.plats[rj].riser) ris0 = game.plats[rj];
     if (ris0) {
+      var risPrevY = ris0.y, wasOnRiser = (p.ground === ris0);   // 记住上一帧
       if (!game.riserSank && p.ground === ris0) { game.riserSank = true; game.gBtns = true; game.jumpLocked = true; Sound.sfxTrap(); game.shake = 6; }
       if (game.riserSank && !game.riserSunk) {
         ris0.y = Math.min(470, ris0.y + dt * 190);
         if (ris0.y >= 470 - 0.5) game.riserSunk = true;   // 沉到底就停，之后按钮才能把它升上去
       }
-      // 人站在地板上：像坐电梯一样跟着地板走（不弹不甩）
-      if (p.x + p.w > ris0.x && p.x < ris0.x + ris0.w && Math.abs((p.y + p.h) - ris0.y) < 80 && p.vy >= 0) {
-        p.y = ris0.y - p.h; p.vy = 0; p.onGround = true; p.ground = ris0;   // 人贴在地板上，像电梯
+      // 人站在地板上：按地板的位移量带着走（不会被甩出去）
+      var risDy = ris0.y - risPrevY;
+      if (wasOnRiser && Math.abs(risDy) > 0.001) {
+        p.y += risDy; p.vy = 0; p.onGround = true; p.ground = ris0;
+      } else if (p.x + p.w > ris0.x && p.x < ris0.x + ris0.w && Math.abs((p.y + p.h) - ris0.y) < 40 && p.vy >= 0) {
+        p.y = ris0.y - p.h; p.vy = 0; p.onGround = true; p.ground = ris0;   // 刚踩上来时吸附
       }
       // 第四轮：反应时间到 → 撤地板
       if (game.gFinalDelay > 0) {
