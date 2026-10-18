@@ -868,6 +868,7 @@ function loadLevel(i) {
   game.jumpLocked = false; // 地板在动的期间禁止跳跃（也不响音效）
   game.gShrink = false;    // 3-5 按错：地板从两边往中间收
   game.gWrongPending = null; // 3-5 按错了，等按钮收完+0.5s 再执行惩罚
+  game.missiles = [];      // 3-5 追踪导弹
   game.btnAnim = -1;       // 3-5 按钮弹出动画（-1=未开始, 0~1=进度）
   game.gambleDone = false;  // 3-5 博弈结束
   game.goalDead2 = false;  // 3-4 旧门已删除（代码层，碰不到）
@@ -1892,6 +1893,26 @@ function update(dt) {
     }
   }
 
+  // 3-5 追踪导弹：从天上掉下来，然后一路咬着你
+  for (var mi = game.missiles.length - 1; mi >= 0; mi--) {
+    var ms = game.missiles[mi];
+    ms.t += dt;
+    if (ms.y < 40 && ms.t < 0.45) {
+      ms.y += 620 * dt;                      // 先直直砸下来
+    } else {
+      var mdx = (p.x + p.w / 2) - ms.x, mdy = (p.y + p.h / 2) - ms.y;
+      var md = Math.sqrt(mdx * mdx + mdy * mdy) || 1;
+      ms.x += mdx / md * ms.speed * dt;      // 之后锁着你追
+      ms.y += mdy / md * ms.speed * dt;
+    }
+    if (Math.abs(ms.x - (p.x + p.w / 2)) < 20 && Math.abs(ms.y - (p.y + p.h / 2)) < 22) {
+      game.missiles.length = 0;
+      Sound.sfxBoom ? Sound.sfxBoom() : Sound.sfxDeath();
+      game.shake = 22;
+      die(); return;
+    }
+  }
+
   // ===== 3-5 博弈：每轮左右二选一，按对地板升，按错死 =====
   var GM = L6.gamble;
   if (GM && !game.gambleDone) {
@@ -1929,9 +1950,11 @@ function update(dt) {
               game.gShrink = true; game.gShrinkX = ris0.x; game.gShrinkW = ris0.w;   // 地板从两边往中间收
               Sound.sfxTrap(); game.shake = 16;
             } else if (wr === 1) {
-              ris0.state = 'gone'; ris0.noCollide = true;                            // 地板没了 + 变刺
-              game.spikes.push({ x: ris0.x, y: ris0.y - 26, w: ris0.w, h: 26 });
-              Sound.sfxTrap(); game.shake = 18; die();
+              // 惊喜二：从天而降的追踪导弹
+              game.missiles.push({ x: p.x + p.w / 2, y: -60, speed: 430, t: 0 });
+              game.missiles.push({ x: p.x + p.w / 2 + 180, y: -160, speed: 470, t: 0 });
+              game.missiles.push({ x: p.x + p.w / 2 - 180, y: -120, speed: 450, t: 0 });
+              Sound.sfxTrap(); game.shake = 10;
             } else {
               Sound.sfxTrap(); game.shake = 18; die();
             }
@@ -2527,6 +2550,19 @@ function drawButtonWall() {
     ctx.fillRect(b.x, isUp ? by + bh - 5 : by, b.w, 5);
     ctx.fillStyle = '#ffd23f';
     ctx.beginPath(); ctx.arc(b.x + b.w / 2, b.y + b.h - bh - 3, 3, 0, 7); ctx.fill();
+  }
+
+  // 3-5 追踪导弹
+  for (var mj = 0; mj < game.missiles.length; mj++) {
+    var m2 = game.missiles[mj];
+    ctx.save(); ctx.translate(m2.x, m2.y);
+    var mang = Math.atan2((game.p.y + 14) - m2.y, (game.p.x + 13) - m2.x);
+    ctx.rotate(mang);
+    ctx.fillStyle = '#e0432f';
+    ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-10, 7); ctx.lineTo(-10, -7); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillRect(-16, -3, 8, 6);
+    ctx.restore();
   }
 
   // 3-5 博弈按钮：站上地板后才出现
