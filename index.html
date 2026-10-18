@@ -2787,8 +2787,13 @@ function update(dt) {
     var swp = null;
     for (var si2 = 0; si2 < game.plats.length; si2++) if (game.plats[si2].slideWall) swp = game.plats[si2];
     if (swp && save.keys[2]) {
-      // 钥匙已经拿过：墙放回原位（保持挡路），不再缩进
-      swp.x = 0; swp.noCollide = false;
+      if (game.keyThisLife && game.keyGetT < 1.2) {
+        // 刚拿到钥匙：墙先保持缩进，给玩家时间跑开（否则会把人挤死）
+        swp.x = -40; swp.noCollide = true;
+      } else {
+        // 已经拿过钥匙且离开该区域：墙放回原位（保持挡路）
+        swp.x = 0; swp.noCollide = false;
+      }
     } else if (swp && p.y > 400 && p.x + p.w / 2 < 190) {
       swp.x = Math.max(-40, swp.x - dt * 220);          // 往左缩进
       if (swp.x <= -39) { swp.noCollide = true; }
@@ -3902,11 +3907,14 @@ function drawComplete() {
   text(game.totalDeaths <= 15 ? '这身手，有点东西。' :
        game.totalDeaths <= 40 ? '坑是踩出来的，路是走出来的。' :
        '……你和这个游戏，都挺倔的。', VW / 2, VH / 2 + 56, 18, PAL.text, 'center');
-  // 成就播报（通关 4-1 时刚解锁的那一条）
+  // 成就播报：全通界面也要一条条播完（逃出生天 / 小蔡的巧思）
   if (game.tauntT > 0 && game.flash) {
     ctx.save(); ctx.globalAlpha = Math.min(1, game.tauntT / 0.4);
     text(game.flash, VW / 2, VH / 2 - 140, 24, PAL.player, 'center', true);
     ctx.restore();
+  }
+  if (game.achQueue && game.achQueue.length && game.tauntT <= 0) {
+    flashMsg(game.achQueue.shift());
   }
   var a = 0.5 + 0.5 * Math.sin(t * 3);
   ctx.globalAlpha = a;
