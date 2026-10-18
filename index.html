@@ -1216,6 +1216,19 @@ canvas.addEventListener('mousedown', function (e) {
     }
   } else if (game.state === 'levels') {
     if (pt.x >= VW-134 && pt.x <= VW-40 && pt.y >= 26 && pt.y <= 64) { game.state = 'world'; return; }
+    // 第四大关：点两扇地狱门
+    if (game.levelsWorld === 3) {
+      var upY2 = 120, dnY2 = 320;          // 和 drawDemonSelect 里的位置对应
+      if (pt.x > VW / 2 - 70 && pt.x < VW / 2 + 70 && pt.y > upY2 - 30 && pt.y < upY2 + 90) {
+        game.cursorL = 0; enterLevel(3, 0); return;
+      }
+      if (pt.x > VW / 2 - 60 && pt.x < VW / 2 + 60 && pt.y > dnY2 - 50 && pt.y < dnY2 + 60) {
+        game.cursorL = 1;
+        if (!save.demonInner) { Sound.sfxTrap && Sound.sfxTrap(); return; }
+        enterLevel(3, 1); return;
+      }
+      return;
+    }
     for (var j = 0; j < LEVELS_PER_WORLD; j++) {
       var n = LEVEL_POS[j];
       if (Math.hypot(pt.x - n.x, pt.y - n.y) < 36) {
@@ -3524,11 +3537,6 @@ function drawDemonSelect(W) {
   var inner = save.demonInner;
   drawHellGate(VW / 2, upY, 96, 68, true);
   text('表魔王', VW / 2, upY + 86, 16, PAL.text, 'center', true);
-  if (isCleared(3, 0)) {
-    ctx.strokeStyle = PAL.player; ctx.lineWidth = 3; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(VW / 2 - 14, upY + 34); ctx.lineTo(VW / 2 - 4, upY + 44); ctx.lineTo(VW / 2 + 16, upY + 20);
-    ctx.stroke();
-  }
 
   // 向下的线：未解锁=红线渐淡，解锁=黑线
   var ly = upY + 100, ly2 = upY + 200;
