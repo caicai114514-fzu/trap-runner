@@ -824,6 +824,22 @@ function markCleared(w, i) {
   save.cleared[w + '-' + i] = 1;
   writeSave();
 }
+var ACHIEVEMENTS = [
+  { w: 0, name: '脚下很稳' },
+  { w: 1, name: '火眼金睛' },
+  { w: 2, name: '披荆斩棘' },
+  { w: 3, name: '逃出生天' }
+];
+function unlockAchievement(w) {
+  if (!save.achievements) save.achievements = {};
+  if (save.achievements[w]) return false;   // 只有第一次通关才播报
+  save.achievements[w] = 1;
+  writeSave();
+  var a = null;
+  for (var ai = 0; ai < ACHIEVEMENTS.length; ai++) if (ACHIEVEMENTS[ai].w === w) a = ACHIEVEMENTS[ai];
+  if (a) { flashMsg('🏆 成就解锁 · ' + a.name); Sound.sfxAllClear(); }
+  return true;
+}
 function giveKey(w) {
   save.keys[w] = 1;
   writeSave();
@@ -1143,6 +1159,9 @@ function winLevel() {
   if (game.state !== 'play') return;
   Sound.sfxWin();
   markCleared(CUR.w, CUR.i);       // 记进存档
+  // 大关最后一关通关 → 解锁成就（每个大关的最后一小关）
+  var lastSlot = (CUR.w === 3) ? 1 : (LEVELS_PER_WORLD - 1);   // 第四大关只有表/里魔王两关
+  if (CUR.i === lastSlot) unlockAchievement(CUR.w);
   // 表魔王：没经过检查点 = 走了捷径 → 弹死人话 + 解锁里魔王
   var SC = LEVELS[game.li].shortcutCheck;
   if (SC && !game.passedShortcut) {
