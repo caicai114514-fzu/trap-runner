@@ -1378,7 +1378,11 @@ canvas.addEventListener('mousedown', function (e) {
 
   // ===== 左下角齿轮：开关设置弹窗（只在菜单界面有效）=====
   // 齿轮在所有界面都能点（包括游戏内）
-  if (pt.x < 64 && pt.y > VH - 64) { game.settingsOpen = !game.settingsOpen; game.settingsT = 0; return; }
+  if (pt.x < 64 && pt.y > VH - 64) {
+    game.settingsOpen = !game.settingsOpen;
+    if (game.settingsOpen) game.settingsT = 0;   // 打开才归零，关闭走退场
+    return;
+  }
 
   // ===== 重置确认弹窗：点叉叉关闭 =====
   if (game.resetOpen) {
@@ -1395,7 +1399,7 @@ canvas.addEventListener('mousedown', function (e) {
     var SW2 = 320, SH2 = 372, SX = (VW - SW2) / 2, SY = (VH - SH2) / 2 + (1 - (game.settingsT || 0)) * 280;
     // 右上角小叉
     if (pt.x > SX + SW2 - 40 && pt.x < SX + SW2 - 12 && pt.y > SY + 12 && pt.y < SY + 40) {
-      game.settingsOpen = false; game.settingsT = 0; return;
+      game.settingsOpen = false; return;   // 只置 false，让 settingsT 自然退场
     }
     // 两个按钮（各 110x110，同一水平线）
     var BW2 = 110, GAP2 = 26;
@@ -1403,12 +1407,12 @@ canvas.addEventListener('mousedown', function (e) {
     var by2 = SY + 92;   // 和绘制里的 by 保持一致
     var inG = (game.state === 'play' || game.state === 'dead' || game.state === 'win');
     if (pt.x > bx1 && pt.x < bx1 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
-      if (inG) { game.settingsOpen = false; game.settingsT = 0; loadSlot(CUR.w, CUR.i); }   // 重来
+      if (inG) { game.settingsOpen = false; loadSlot(CUR.w, CUR.i); }   // 重来（弹窗自然退场）
       else Sound.toggle();                                                                  // 静音 / 非静音
       return;
     }
     if (pt.x > bx2 && pt.x < bx2 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
-      if (inG) { game.settingsOpen = false; game.settingsT = 0; game.state = 'levels'; game.levelsWorld = CUR.w; game.cursorL = CUR.i; }  // 退出
+      if (inG) { game.settingsOpen = false; game.state = 'levels'; game.levelsWorld = CUR.w; game.cursorL = CUR.i; }  // 退出
       else game.achOpen = !game.achOpen;                                                    // 成就
       return;
     }
