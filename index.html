@@ -2435,7 +2435,7 @@ function update(dt) {
       if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22 && co.fake) {
         Sound.sfxBoom(); die(); return;
       }
-      if (co.chaseFrom - co.x > 150) { co.gone = true; co.hidden = true; }
+      if (co.chaseFrom - co.x > 380) { co.gone = true; co.hidden = true; }
       if (co.gone) continue;
     }
     if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22) {
