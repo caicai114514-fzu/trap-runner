@@ -688,9 +688,10 @@ function applyWorldPalette(w) {
 }
 
 var SAVE_KEY = 'trap-runner-save-v1';
-var save = { cleared:{}, keys:{}, deaths:0 };
+var save = { cleared:{}, keys:{}, deaths:0, demonInner:false };
 
 function loadSave() {
+  if (typeof location !== 'undefined' && location.search.indexOf('di=1') >= 0) save.demonInner = true;
   var o = null;
   try {
     var raw = localStorage.getItem(SAVE_KEY);
@@ -3440,6 +3441,88 @@ function drawWorldSelect() {
 }
 
 /* ---------------- 第二级：选小关 ---------------- */
+
+/* ---- 第四大关：地狱门二级目录 ---- */
+function drawHellGate(cx, cy, w, h, active) {
+  // 拱门
+  ctx.fillStyle = '#1c0705';
+  roundRect(cx - w / 2, cy, w, h, 10); ctx.fill();
+  ctx.strokeStyle = active ? '#a03322' : '#4a1a14'; ctx.lineWidth = 3; ctx.stroke();
+  // 拱形门洞
+  ctx.fillStyle = active ? '#3e0c07' : '#24100d';
+  ctx.beginPath();
+  ctx.moveTo(cx - w / 2 + 12, cy + h);
+  ctx.lineTo(cx - w / 2 + 12, cy + 14);
+  ctx.arc(cx, cy + 14, w / 2 - 12, Math.PI, 0);
+  ctx.lineTo(cx + w / 2 - 12, cy + h);
+  ctx.closePath(); ctx.fill();
+  // 门里透出的光 / 黑暗
+  if (active) {
+    var gg = ctx.createLinearGradient(0, cy, 0, cy + h);
+    gg.addColorStop(0, '#8c2418'); gg.addColorStop(1, '#160404');
+    ctx.fillStyle = gg;
+  } else {
+    ctx.fillStyle = '#0a0303';
+  }
+  ctx.beginPath();
+  ctx.moveTo(cx - w / 2 + 18, cy + h);
+  ctx.lineTo(cx - w / 2 + 18, cy + 14);
+  ctx.arc(cx, cy + 14, w / 2 - 18, Math.PI, 0);
+  ctx.lineTo(cx + w / 2 - 18, cy + h);
+  ctx.closePath(); ctx.fill();
+  // 门楣尖刺
+  ctx.fillStyle = active ? '#a03322' : '#3a120e';
+  for (var hk = 0; hk < 5; hk++) {
+    var hx = cx - w / 2 + 10 + hk * (w - 20) / 4;
+    ctx.beginPath();
+    ctx.moveTo(hx - 9, cy); ctx.lineTo(hx, cy - 18); ctx.lineTo(hx + 9, cy);
+    ctx.closePath(); ctx.fill();
+  }
+  // 门内一只眼睛
+  watchingEye(cx, cy + h * 0.42, active ? 16 : 11);
+}
+
+function drawDemonSelect(W) {
+  menuHeader(W, true);
+  drawMenuHelp('← →  选择      空格 / 点击  进入      R 返回');
+
+  // 表魔王地狱门（上方）
+  var upY = 150;
+  var inner = save.demonInner;
+  drawHellGate(VW / 2, upY, 180, 130, true);
+  text('表魔王', VW / 2, upY + 158, 18, PAL.text, 'center', true);
+  if (isCleared(3, 0)) {
+    ctx.strokeStyle = PAL.player; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(VW / 2 - 16, upY + 65); ctx.lineTo(VW / 2 - 5, upY + 76); ctx.lineTo(VW / 2 + 18, upY + 46);
+    ctx.stroke();
+  }
+
+  // 向下的线：未解锁=红线渐淡，解锁=黑线
+  var ly = upY + 180, ly2 = upY + 360;
+  var lg = ctx.createLinearGradient(0, ly, 0, ly2);
+  if (inner) {
+    lg.addColorStop(0, '#0a0305'); lg.addColorStop(1, 'rgba(10,3,5,0)');
+  } else {
+    lg.addColorStop(0, '#cc3322'); lg.addColorStop(1, 'rgba(204,51,34,0)');
+  }
+  ctx.strokeStyle = lg; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.setLineDash([1, 0]);
+  ctx.beginPath(); ctx.moveTo(VW / 2, ly); ctx.lineTo(VW / 2, ly2); ctx.stroke();
+
+  // 里魔王地狱门（下方）
+  var dnY = ly2;
+  drawHellGate(VW / 2, dnY, 150, 105, inner);
+  text(inner ? '里魔王' : '里魔王 · 未解锁', VW / 2, dnY + 132, 16, inner ? '#dd4433' : PAL.faint, 'center', true);
+  if (!inner) {
+    lockIcon(VW / 2, dnY + 52, 0.9, PAL.faint);
+  }
+
+  // 光标
+  var cur = game.cursorL === 0 ? 0 : 1;
+  cursorMark(VW / 2, (cur === 0 ? upY : dnY) - 30);
+}
+
+
 function drawLevelSelect() {
   var W = WORLDS[game.levelsWorld];
   applyWorldPalette(game.levelsWorld);   // 界面里的平台色也跟着这个主题
@@ -3455,6 +3538,9 @@ function drawLevelSelect() {
   else if (game.levelsWorld === 1) decorIllusion(W);
   else if (game.levelsWorld === 2) decorMachine(W);
   else decorDemon(W);
+
+  // 第四大关：地狱门二级目录（表魔王 + 里魔王）
+  if (game.levelsWorld === 3) { drawDemonSelect(W); return; }
 
   // 关卡之间的虚线小路
   ctx.strokeStyle = W.terrEdge; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.setLineDash([2, 13]);
