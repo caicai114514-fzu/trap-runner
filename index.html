@@ -1951,10 +1951,8 @@ function update(dt) {
               Sound.sfxTrap(); game.shake = 16;
             } else if (wr === 1) {
               // 惊喜二：从天而降的追踪导弹
-              game.missiles.push({ x: p.x + p.w / 2, y: -60, speed: 430, t: 0 });
-              game.missiles.push({ x: p.x + p.w / 2 + 180, y: -160, speed: 470, t: 0 });
-              game.missiles.push({ x: p.x + p.w / 2 - 180, y: -120, speed: 450, t: 0 });
-              Sound.sfxTrap(); game.shake = 10;
+              game.missiles.push({ x: p.x + p.w / 2, y: -90, speed: 210, t: 0 });   // 一枚，慢慢逼过来
+              Sound.sfxTrap(); game.shake = 12;
             } else {
               Sound.sfxTrap(); game.shake = 18; die();
             }
@@ -2558,10 +2556,18 @@ function drawButtonWall() {
     ctx.save(); ctx.translate(m2.x, m2.y);
     var mang = Math.atan2((game.p.y + 14) - m2.y, (game.p.x + 13) - m2.x);
     ctx.rotate(mang);
+    // 尾焰
+    for (var fl = 1; fl <= 3; fl++) {
+      ctx.globalAlpha = 0.5 / fl;
+      ctx.fillStyle = '#ffd23f';
+      ctx.beginPath(); ctx.arc(-14 - fl * 7, 0, 6 - fl, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // 弹体（放大）
     ctx.fillStyle = '#e0432f';
-    ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-10, 7); ctx.lineTo(-10, -7); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ffd23f';
-    ctx.fillRect(-16, -3, 8, 6);
+    ctx.beginPath(); ctx.moveTo(26, 0); ctx.lineTo(-18, 13); ctx.lineTo(-18, -13); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#8c2f22';
+    ctx.beginPath(); ctx.moveTo(26, 0); ctx.lineTo(8, 7); ctx.lineTo(8, -7); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
 
