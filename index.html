@@ -1298,7 +1298,7 @@ window.addEventListener('keydown', function (e) {
     var maxSlot = (game.levelsWorld === 3) ? 2 : 5;      // 第四大关只有 2 个入口
     if (a === 'left' || a === 'up')    { game.cursorL = (game.cursorL + maxSlot - 1) % maxSlot; return; }
     if (a === 'right' || a === 'down') { game.cursorL = (game.cursorL + 1) % maxSlot; return; }
-    if (a === 'restart') { game.state = 'world'; return; }          // R 回第一级
+    if (a === 'restart') { startTransition(function () { game.state = 'world'; }); return; }   // R 回第一级（带门动画）
     if (a === 'jump' || a === 'enter') {
       if (game.levelsWorld === 3 && game.cursorL === 1 && !save.demonInner) { Sound.sfxTrap && Sound.sfxTrap(); return; }   // 里魔王没解锁
       enterLevel(game.levelsWorld, game.cursorL); return;
@@ -1387,7 +1387,7 @@ canvas.addEventListener('mousedown', function (e) {
       }
     }
   } else if (game.state === 'levels') {
-    if (pt.x >= VW-134 && pt.x <= VW-40 && pt.y >= 26 && pt.y <= 64) { game.state = 'world'; return; }
+    if (pt.x >= VW-134 && pt.x <= VW-40 && pt.y >= 26 && pt.y <= 64) { startTransition(function () { game.state = 'world'; }); return; }
     // 第四大关：点两扇地狱门
     if (game.levelsWorld === 3) {
       var upY2 = 120, dnY2 = 320;          // 和 drawDemonSelect 里的位置对应
