@@ -581,8 +581,13 @@ var LEVELS = [
     goal: { x: 777, y: 200, w: 46, h: 70 },
     platforms: [
       { x: 0, y: 270, w: 960, h: 270, kind: 'solid' },   // 贯通大地板（上边缘在屏幕正中）
-      // ===== 天花板：一整块实心（0~960, 顶到屏幕外, 底 200），纯色 =====
-      { x: 0, y: -40, w: 960, h: 240, kind: 'solid', noTop: true }
+      // ===== 天花板：横梁 + 阶梯形状，中间空隙全部填实（底部阶梯状 140/170/200）=====
+      { x: 0,   y: -40, w: 960, h: 140, kind: 'solid', noTop: true },  // 横梁
+      { x: 0,   y: 100, w: 90,  h: 40,  kind: 'solid', noTop: true },  // 左1（底140）
+      { x: 90,  y: 100, w: 90,  h: 70,  kind: 'solid', noTop: true },  // 左2（底170）
+      { x: 180, y: 100, w: 600, h: 100, kind: 'solid', noTop: true },  // 中段（底200）
+      { x: 780, y: 100, w: 90,  h: 70,  kind: 'solid', noTop: true },  // 右2（底170）
+      { x: 870, y: 100, w: 90,  h: 40,  kind: 'solid', noTop: true }   // 右1（底140）
 
     ],
     spikes: [], arrows: []
