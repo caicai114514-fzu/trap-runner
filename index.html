@@ -969,7 +969,7 @@ function die(kind) {
   }
   game.tauntT = 1.4;
   game.shake = 14;
-  Sound.sfxDeath();                      // 统一用原版死亡音效
+  if (kind !== 'missile') Sound.sfxDeath();   // 导弹炸死就只留爆炸声，不再叠死亡音效
   // 掉坑：不爆尸体，就是人没了（约定：除了掉坑，其它死法都爆尸体）
   if (kind === 'fall') return;
 
@@ -1907,9 +1907,9 @@ function update(dt) {
     }
     if (Math.abs(ms.x - (p.x + p.w / 2)) < 20 && Math.abs(ms.y - (p.y + p.h / 2)) < 22) {
       game.missiles.length = 0;
-      Sound.sfxBoom ? Sound.sfxBoom() : Sound.sfxDeath();
+      Sound.sfxBoom();
       game.shake = 22;
-      die(); return;
+      die('missile'); return;
     }
   }
 
