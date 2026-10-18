@@ -1481,7 +1481,8 @@ canvas.addEventListener('mousedown', function (e) {
       return;
     }
     var _ab = game._achBtn || { x: bx2, y: by2, w: BW2, h: BW2 };
-    if (pt.x > _ab.x && pt.x < _ab.x + _ab.w && pt.y > _ab.y && pt.y < _ab.y + _ab.h) {
+    var _PAD = 24;   // 热区容差
+    if (pt.x > _ab.x - _PAD && pt.x < _ab.x + _ab.w + _PAD && pt.y > _ab.y - _PAD && pt.y < _ab.y + _ab.h + _PAD) {
       if (inG) { game.settingsOpen = false; game.state = 'levels'; game.levelsWorld = CUR.w; game.cursorL = CUR.i; }  // 退出
       else { game.achOpen = !game.achOpen; if (game.achOpen) game.achT = 0; game.achSel = null; }   // 成就
       return;
