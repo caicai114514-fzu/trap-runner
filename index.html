@@ -907,7 +907,8 @@ function winLevel() {
   markCleared(CUR.w, CUR.i);       // 记进存档
   // 记下过关门动画的起点：门中心 + 玩家当前位置
   var g = LEVELS[game.li].goal;
-  game.winDoor = { k: 1, cx: g.x + g.w / 2, cy: g.y + g.h / 2 };
+  var gx = (game.goalX !== undefined) ? game.goalX : g.x;   // 会走的门：用当前真实位置
+  game.winDoor = { k: 1, cx: gx + g.w / 2, cy: g.y + g.h / 2 };
   game.winFrom = { x: game.p.x, y: game.p.y };
   if (CUR.w === 3 && CUR.i === LEVELS_PER_WORLD - 1) {
     game.state = 'complete';
