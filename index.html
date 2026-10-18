@@ -1464,6 +1464,9 @@ canvas.addEventListener('mousedown', function (e) {
 
   // ===== 设置弹窗内的点击 =====
   if (game.settingsOpen) {
+    if (typeof location !== 'undefined' && location.search.indexOf('dbg=1') >= 0) {
+      flashMsg('点(' + Math.round(pt.x) + ',' + Math.round(pt.y) + ')');
+    }
     var _sT = (game.settingsT || 0), _sE = _sT * _sT * (3 - 2 * _sT);
     var SW2 = 320, SH2 = 372, SX = (VW - SW2) / 2, SY = (VH - SH2) / 2 + (1 - _sE) * 280;
     // 右上角小叉
