@@ -837,7 +837,7 @@ function unlockAchievement(w) {
   writeSave();
   var a = null;
   for (var ai = 0; ai < ACHIEVEMENTS.length; ai++) if (ACHIEVEMENTS[ai].w === w) a = ACHIEVEMENTS[ai];
-  if (a) { flashMsg('🏆 成就解锁 · ' + a.name); Sound.sfxAllClear(); }
+  if (a) { flashMsg('⭐ 获得成就：' + a.name); Sound.sfxAllClear(); }
   return true;
 }
 function giveKey(w) {
