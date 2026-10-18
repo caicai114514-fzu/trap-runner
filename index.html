@@ -102,6 +102,19 @@ var Sound = {
     this.noise(t, 0.3, 0.18);
   },
 
+  sfxSpring: function () {         // 跳板弹起：弹簧"嘣"的一声，带上升扫频
+    if (!this.ac) return;
+    var t = this.ac.currentTime, ac = this.ac;
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(220, t);
+    o.frequency.exponentialRampToValueAtTime(1100, t + 0.16);   // 往上窜
+    g.gain.setValueAtTime(0.34, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.24);
+    this.noise(t, 0.05, 0.18);                                   // 一点"噗"的摩擦感
+  },
+
   sfxBounce: function () {          // 球落地：低沉的"咚"
     if (!this.ac) return;
     var t = this.ac.currentTime, o = this.ac.createOscillator(), g = this.ac.createGain();
@@ -1789,7 +1802,7 @@ function update(dt) {
         game.jumpLock = 0.18;                // 锁一会儿，否则会被土狼时间里的普通跳跃覆盖掉
         game.popFired = true;                // 通知：人已经被弹起来了
         game.coyote = 0; game.jumpBuf = 0;
-        Sound.sfxBounce();
+        Sound.sfxSpring();
       }
     }
   }
