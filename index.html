@@ -1984,6 +1984,7 @@ function update(dt) {
           game.gBtnLock = true;
           game.gWrong = game.gRound;
           game.gRetract = true;                 // 两个按钮一起收回去
+          game.gBtns = false;                   // 按错之后按钮永久不再出现
           game.gWrongPending = game.gRound;     // 记住错在第几轮
           Sound.sfxCoin();                      // 和按对一样的音效
         }
