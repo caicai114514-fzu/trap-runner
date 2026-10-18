@@ -1886,7 +1886,7 @@ function update(dt) {
     for (var gbi = 0; gbi < gb.length; gbi++) {
       var bb = gb[gbi];
       if (p.x < bb.x + bb.w && p.x + p.w > bb.x && p.y < bb.y + bb.h && p.y + p.h > bb.y) {
-        var correct = GM.answers[game.gRound] === gbi;
+        var correct = true;   // ★ 临时测试：按什么都对（之后改回 GM.answers[game.gRound] === gbi）
         if (correct) {
           game.gRound++;
           Sound.sfxCoin();
