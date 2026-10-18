@@ -1412,9 +1412,9 @@ canvas.addEventListener('mousedown', function (e) {
       else game.achOpen = !game.achOpen;                                                    // 成就
       return;
     }
-    // ③ 重置按钮
+    // ③ 重置按钮（只在菜单界面）
     var rw2 = BW2 * 2 + GAP2, rx2 = SX + (SW2 - rw2) / 2, ry2 = by2 + BW2 + 22;
-    if (pt.x > rx2 && pt.x < rx2 + rw2 && pt.y > ry2 && pt.y < ry2 + 42) {
+    if (!inG && pt.x > rx2 && pt.x < rx2 + rw2 && pt.y > ry2 && pt.y < ry2 + 42) {
       game.resetOpen = true;
       game.resetT = 0;
       game.resetCode = String(1000 + Math.floor(Math.random() * 9000));   // 随机四位
@@ -3160,12 +3160,14 @@ function drawSettings(dt) {
   }
   ctx.closePath(); ctx.fill();
   }
-  // ③ 重置按钮（宽度 = 两个按钮 + 中间缝隙）
-  var rw = BW * 2 + GAP, rx = SX + (SW - rw) / 2, ry = by + BW + 22;
-  ctx.fillStyle = game.resetOpen ? '#5a1410' : '#2a1410';
-  ctx.fillRect(rx, ry, rw, 42);
-  ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(rx, ry, rw, 42);
-  text('重置', SX + SW / 2, ry + 21, 19, '#e8b98a', 'center', true);
+  // ③ 重置按钮（只在菜单界面；游戏内不显示）
+  if (!inGame) {
+    var rw = BW * 2 + GAP, rx = SX + (SW - rw) / 2, ry = by + BW + 22;
+    ctx.fillStyle = game.resetOpen ? '#5a1410' : '#2a1410';
+    ctx.fillRect(rx, ry, rw, 42);
+    ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(rx, ry, rw, 42);
+    text('重置', SX + SW / 2, ry + 21, 19, '#e8b98a', 'center', true);
+  }
   ctx.restore();
 
   // ===== 重置确认弹窗（盖在设置弹窗上）=====
