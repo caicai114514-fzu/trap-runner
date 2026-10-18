@@ -1308,8 +1308,7 @@ function update(dt) {
       var rwb = { x: b.x, y: b.y - rwH, w: b.w, h: rwH };
       if (aabb(p, rwb)) {
         if (p.vy > 0 && prevBottom <= rwb.y + 8) { p.y = rwb.y - p.h; p.onGround = true; p.ground = b; p.vy = 0; }
-        else if (p.vy < 0) { p.y = rwb.y + rwb.h; p.vy = 0; }
-        // 侧面撞上不掉血也不瞬移：让它自然被弹开（去掉"传送"）
+        else { die(); return; }   // 侧面/下方撞上升起的墙：直接死（不穿墙、不传送）
       }
       continue;
     }
