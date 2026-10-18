@@ -2259,7 +2259,7 @@ function update(dt) {
   }
 
   // ===== 按钮：碰一下触发整条连锁 =====
-  if (L6.button && !game.buttonPressed) {
+  if (L6.button && !game.buttonPressed && (game.buttonVisible || !L6.button.hidden)) {
     var bt = L6.button;
     if (p.x < bt.x + bt.w && p.x + p.w > bt.x && p.y < bt.y + bt.h && p.y + p.h > bt.y) {
       game.buttonPressed = true;
