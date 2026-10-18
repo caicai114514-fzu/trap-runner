@@ -851,6 +851,7 @@ function loadLevel(i) {
   game.keyReveal = false;  // 3-3：左墙缩进后，隐藏的钥匙才显现
   game.tp = null;          // 3-4 传送动画状态
   game.ring = null;        // 3-4 七球绕人一圈 → 加速旋转 → 贯穿
+  game.goalFly = null;     // 3-4 门传送的绘制动画
   game.buttonVisible = !(L.button && L.button.hidden);  // 默认显示；hidden 的按钮(2-5)等平台出现才显示
   game.wallSweep = 0;
   if (typeof location !== 'undefined' && location.search.indexOf('wa=') >= 0) {
@@ -1833,7 +1834,10 @@ function update(dt) {
       game.buttonVisible = true;
       game.airJumpUnlocked = true;      // ★ 获得浮空跳
       game.airJumped = false;
-      game.goalX = p.x + p.w / 2 - LEVELS[game.li].goal.w / 2;   // ★ 门传送到玩家脚下
+      var oldGX = game.goalX;
+      game.goalX = p.x + p.w / 2 - LEVELS[game.li].goal.w / 2;     // ★ 代码上瞬间挪过去
+      game.goalFly = { t: 0, fromX: oldGX, toX: game.goalX };      // ★ 美术上让它飞过去
+      Sound.sfxTeleport();
       Sound.sfxTrap(); game.shake = 8;
     }
   }
@@ -2467,19 +2471,35 @@ function drawBalls() {
 
 function drawGoal() {
   var L = LEVELS[game.li];
+  // 门的传送飞行动画：画一条残影 + 插值位置
+  var gxDraw = game.goalX;
+  if (game.goalFly) {
+    game.goalFly.t += 1 / 60;
+    var fk = Math.min(1, game.goalFly.t / 0.42);
+    var fk2 = fk * fk * (3 - 2 * fk);
+    gxDraw = game.goalFly.fromX + (game.goalFly.toX - game.goalFly.fromX) * fk2;
+    // 残影
+    for (var gh = 1; gh <= 3; gh++) {
+      var gxp = game.goalFly.fromX + (game.goalFly.toX - game.goalFly.fromX) * Math.max(0, fk2 - gh * 0.06);
+      ctx.save(); ctx.globalAlpha = 0.18 / gh;
+      drawOneDoor({ x: gxp, y: L.goal.y, w: L.goal.w, h: L.goal.h }, 1, 1);
+      ctx.restore();
+    }
+    if (fk >= 1) game.goalFly = null;
+  }
   // 假终点关：先画那扇假的（长得和真门一样），真门按进度淡入
   if (L.fakeGoal) {
     if (game.fakeGoalShown) drawOneDoor(L.fakeGoal, 1);   // 假门走近才出现
     if (game.state === 'win' && game.winDoor) {
-      drawOneDoor({ x: game.goalX, y: L.goal.y, w: L.goal.w, h: L.goal.h }, 1, game.winDoor.k);   // 通关：真门关门动画
+      drawOneDoor({ x: gxDraw, y: L.goal.y, w: L.goal.w, h: L.goal.h }, 1, game.winDoor.k);   // 通关：真门关门动画
     } else {
-      drawOneDoor({ x: game.goalX, y: L.goal.y, w: L.goal.w, h: L.goal.h }, game.goalReveal, 1);
+      drawOneDoor({ x: gxDraw, y: L.goal.y, w: L.goal.w, h: L.goal.h }, game.goalReveal, 1);
     }
     return;
   }
   if (!game.goalDead || game.sinkY > 0) {
-    if (game.state === 'win' && game.winDoor) drawOneDoor({ x: game.goalX, y: L.goal.y, w: L.goal.w, h: L.goal.h }, 1, game.winDoor.k);
-    else drawOneDoor({ x: game.goalX, y: L.goal.y, w: L.goal.w, h: L.goal.h }, L.goalHidden ? game.goalReveal : 1, 1);   // 用 game.goalX（会走的门）
+    if (game.state === 'win' && game.winDoor) drawOneDoor({ x: gxDraw, y: L.goal.y, w: L.goal.w, h: L.goal.h }, 1, game.winDoor.k);
+    else drawOneDoor({ x: gxDraw, y: L.goal.y, w: L.goal.w, h: L.goal.h }, L.goalHidden ? game.goalReveal : 1, 1);   // 用 gxDraw（含飞行动画）
   }
 }
 
