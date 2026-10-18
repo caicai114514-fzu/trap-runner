@@ -1080,6 +1080,10 @@ function loadLevel(i) {
   game.keyThisLife = false;          // 这一命有没有捡到钥匙
   game.keyGetT = 999;                // 拿到钥匙之后过了多久（决定是不是"献祭"）
   game.keys = (L.keys || []).map(function (k) {
+    // 钥匙只能拿一次：本大关的钥匙已经到手，就再也不出现
+    if (save.keys[Math.floor(game.li / LEVELS_PER_WORLD)]) {
+      return { x: k.x, y: k.y, got: true, t: 0, show: 0, hidden: true, gone: true };
+    }
     return {
       x: k.x, y: k.y, got: false, t: 0,
       show: k.show || 0,                   // 出场动画进度 0~1
