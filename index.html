@@ -1237,6 +1237,13 @@ function update(dt) {
     }
   }
 
+  // 门的传送动画（3-4）：飞行途中门还不存在，落位之后才生效
+  if (game.goalFly) {
+    game.goalFly.t += dt;
+    game.goalDead2 = true;                       // ★ 飞一半不能被碰到
+    if (game.goalFly.t >= 0.55) { game.goalFly = null; game.goalDead2 = false; }
+  }
+
   // 传送+绕环期间：人死死钉在屏幕正中，不受重力也不受按键
   if (game.ring || game.tp) {
     game.p.x = VW / 2 - game.p.w / 2;
@@ -2088,7 +2095,7 @@ function update(dt) {
   var g0 = LEVELS[game.li].goal;
   var LV2 = LEVELS[game.li];
   // 假门关（fakeGoal）：真门必须完全显现(goalReveal>=1)才能通关，否则就是"看不见的门"不算数
-  var canWin = !game.goalDead && game.goalReveal > 0.02;   // 门一出现判定就生效（普通关 goalReveal 恒 1）
+  var canWin = !game.goalDead && !game.goalDead2 && game.goalReveal > 0.02;   // 门一出现判定就生效（普通关 goalReveal 恒 1）
   if (canWin) {
     var g = { x: game.goalX, y: g0.y + (game.sinkY || 0), w: g0.w, h: g0.h };
     if (aabb(p, g)) { winLevel(); return; }
@@ -2489,7 +2496,6 @@ function drawGoal() {
   var gxDraw = game.goalX, gDrawable = true;
   if (game.goalFly) {
     var GF = game.goalFly;
-    GF.t += 1 / 60;
     var fk = Math.min(1, GF.t / 0.55);
     var fk2 = fk * fk * (3 - 2 * fk);
     gDrawable = false;                       // 门本体先隐藏
@@ -2502,7 +2508,7 @@ function drawGoal() {
       ctx.fillStyle = PAL.door;
       ctx.beginPath(); ctx.arc(gpp.x, gpp.y, 4, 0, 7); ctx.fill();
     }
-    if (fk >= 1) { game.goalFly = null; gDrawable = true; }
+    if (fk >= 1) gDrawable = true;
   }
   if (!gDrawable) return;
 
