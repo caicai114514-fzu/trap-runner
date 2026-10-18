@@ -579,7 +579,7 @@ var LEVELS = [
     name: '4-1 · 表魔王', hint: '先铺好地，再放东西。',
     width: 960, spawn: [147, 220],
     goal: { x: 804, y: 200, w: 46, h: 70 },   // 门卡在右边第二级阶梯下，下边缘贴地板(270)
-    hiddenPathY: 240,                        // 人走天花板隐藏通道时隐身
+    hiddenPathY: 250,                        // 人走天花板隐藏通道时隐身
     goalTeleportOnTouch: true,               // 第三层陷阱：第一次碰门 → 门自己传送到最左边
     missileAfterGoalTp: true,                // 门传送完，身后飞来一枚导弹追你
     platforms: [
@@ -594,7 +594,7 @@ var LEVELS = [
       { x: 780, y: 100, w: 90,  h: 70,  kind: 'solid', noTop: true },  // 右2（底170）
       { x: 870, y: 100, w: 90,  h: 40,  kind: 'solid', noTop: true },  // 右1（底140）
       // ===== 隐藏保送通道：天花板下面那条看不见的平台（790 之后开口，人掉下去正好进门）=====
-      { x: 0,   y: 200, w: 790, h: 20, kind: 'solid', oneWay: true, hiddenPath: true },
+      { x: 0,   y: 236, w: 790, h: 20, kind: 'solid', oneWay: true, hiddenPath: true },
       // ===== 最左边台阶下的隐藏跳板（吃了金币就自动失效）=====
       { x: 60,  y: 270, w: 66, h: 10, kind: 'bounce', power: 1150, popTime: 0.10, secretPad: true }
     ],
