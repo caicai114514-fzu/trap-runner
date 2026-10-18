@@ -1286,6 +1286,16 @@ function update(dt) {
     var a = game.plats[m];
     if (a.state !== 'active' || a.oneWay || a.noCollide) continue;
     if (a.kind === 'flip' && game.flipT >= 0) continue;      // 翻板过程中不挡路
+    if (a.kind === 'riseWall') {
+      var rwH4 = a.h * a.riseY;
+      if (rwH4 <= 1) continue;
+      var rwb4 = { x: a.x, y: a.y - rwH4, w: a.w, h: rwH4 };
+      if (aabb(p, rwb4)) {
+        if (p.vx > 0) p.x = rwb4.x - p.w;      // 像硬墙一样：从左边推回
+        else if (p.vx < 0) p.x = rwb4.x + rwb4.w;
+      }
+      continue;
+    }
     if (aabb(p, a)) {
       if (p.vx > 0) p.x = a.x - p.w;
       else if (p.vx < 0) p.x = a.x + a.w;
@@ -1308,12 +1318,7 @@ function update(dt) {
       var rwb = { x: b.x, y: b.y - rwH, w: b.w, h: rwH };
       if (aabb(p, rwb)) {
         if (p.vy > 0 && prevBottom <= rwb.y + 8) { p.y = rwb.y - p.h; p.onGround = true; p.ground = b; p.vy = 0; }
-        else {
-          // 侧面撞墙：挡住（贴墙停住），不死、不穿墙
-          if (p.x + p.w / 2 < rwb.x + rwb.w / 2) p.x = rwb.x - p.w;
-          else p.x = rwb.x + rwb.w;
-          p.vx = 0;
-        }
+        else if (p.vy < 0) { p.y = rwb.y + rwb.h; p.vy = 0; }   // 顶头
       }
       continue;
     }
