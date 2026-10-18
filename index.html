@@ -828,15 +828,22 @@ var ACHIEVEMENTS = [
   { w: 0, name: '脚下很稳' },
   { w: 1, name: '火眼金睛' },
   { w: 2, name: '披荆斩棘' },
-  { w: 3, name: '逃出生天' }
+  { w: 3, name: '逃出生天' },
+  // 隐藏成就
+  { id: 'save',      name: '自我救赎',   hidden: true },
+  { id: 'sacrifice', name: '献祭大师',   hidden: true },
+  { id: 'pointless', name: '多此一举',   hidden: true },
+  { id: 'clever',    name: '小蔡的巧思', hidden: true }
 ];
-function unlockAchievement(w) {
+function unlockAchievement(key) {
   if (!save.achievements) save.achievements = {};
-  if (save.achievements[w]) return false;   // 只有第一次通关才播报
-  save.achievements[w] = 1;
+  if (save.achievements[key]) return false;   // 只播报第一次
+  save.achievements[key] = 1;
   writeSave();
   var a = null;
-  for (var ai = 0; ai < ACHIEVEMENTS.length; ai++) if (ACHIEVEMENTS[ai].w === w) a = ACHIEVEMENTS[ai];
+  for (var ai = 0; ai < ACHIEVEMENTS.length; ai++) {
+    if (ACHIEVEMENTS[ai].id === key || ACHIEVEMENTS[ai].w === key) a = ACHIEVEMENTS[ai];
+  }
   if (a) { flashMsg('🏆 获得成就：' + a.name); Sound.sfxAllClear(); }
   return true;
 }
@@ -844,6 +851,10 @@ function giveKey(w) {
   save.keys[w] = 1;
   writeSave();
   Sound.sfxWin();
+  unlockAchievement('save');
+  var kn = 0;
+  for (var kx = 0; kx < 3; kx++) if (save.keys[kx]) kn++;
+  if (kn >= 3) unlockAchievement('sacrifice');
 }
 
 var CUR = { w: 0, i: 0 };        // 当前正在玩的是哪个大关的哪个小关
@@ -1113,6 +1124,8 @@ function loadLevel(i) {
 
 /* kind: 'boom'（默认，爆尸体）| 'fall'（掉坑，不爆） */
 function die(kind) {
+  // 隐藏成就：在 3-4 摁下按钮后死亡
+  if (game.buttonPressed && CUR.w === 2 && CUR.i === 3) unlockAchievement('pointless');
   if (game.state !== 'play') return;
   game.state = 'dead';
   game.timer = 0;
@@ -1168,6 +1181,8 @@ function winLevel() {
   if (game.state !== 'play') return;
   Sound.sfxWin();
   markCleared(CUR.w, CUR.i);       // 记进存档
+  // 隐藏成就：走保送路线通关 4-1
+  if (CUR.w === 3 && CUR.i === 0 && game.fromHiddenPath) unlockAchievement('clever');
   // 大关最后一关通关 → 解锁成就（每个大关的最后一小关）
   var lastSlot = (CUR.w === 3) ? 0 : (LEVELS_PER_WORLD - 1);   // 第四大关只剩表魔王一关
   if (CUR.i === lastSlot) unlockAchievement(CUR.w);
@@ -2685,6 +2700,11 @@ function update(dt) {
       save.keys[CUR.w] = 1;
       writeSave();
       Sound.sfxWin();
+      // 隐藏成就：第一次拿钥匙 / 三把拿满
+      unlockAchievement('save');
+      var keyN = 0;
+      for (var kw = 0; kw < 3; kw++) if (save.keys[kw]) keyN++;
+      if (keyN >= 3) unlockAchievement('sacrifice');
       game.flash = '拿到钥匙了';
       game.tauntT = 1.6;
     }
