@@ -805,6 +805,7 @@ function loadLevel(i) {
       x0: p.x,
       w0: p.w,                  // 消失板收缩动画用的原始宽度
       retractT: p.retractT || 0.20,   // 收缩用时（越小消失越快）
+      power: p.power || 1420,          // bounce 跳板：弹力（之前没复制，一直用默认值）
       pop: 0,                          // bounce 跳板：皮鼓起来的进度 0~1
       popped: false,
       sinkT2: p.sinkTime || 0.26,     // pitFloor 往下缩用时
