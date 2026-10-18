@@ -489,14 +489,14 @@ var LEVELS = [
     ],
     balls: [
       // 四个从天上往下掉
-      { x: 120, bounces: 2, speed: 320 },
-      { x: 300, bounces: 2, speed: 330 },
-      { x: 560, bounces: 2, speed: 345 },
-      { x: 820, bounces: 3, speed: 365 },
+      { x: 120, bounces: 2, speed: 320, noHoming: true },
+      { x: 300, bounces: 2, speed: 330, noHoming: true },
+      { x: 560, bounces: 2, speed: 345, noHoming: true },
+      { x: 820, bounces: 3, speed: 365, noHoming: true },
       // 三个从地下往上顶
-      { x: 200, bounces: 2, speed: 350, fromBottom: true },
-      { x: 460, bounces: 2, speed: 360, fromBottom: true },
-      { x: 700, bounces: 3, speed: 385, fromBottom: true }
+      { x: 200, bounces: 2, speed: 350, fromBottom: true, noHoming: true },
+      { x: 460, bounces: 2, speed: 360, fromBottom: true, noHoming: true },
+      { x: 700, bounces: 3, speed: 385, fromBottom: true, noHoming: true }
     ],
     spikes: [], arrows: []
   },
@@ -823,6 +823,7 @@ function loadLevel(i) {
   game.balls = (L.balls || []).map(function (b) {
     return {
       x: b.x, y: (b.y === undefined ? -50 : b.y), r: b.r || 18,
+      noHoming: !!b.noHoming,               // 永不追踪（只做普通弹跳）
       vy: (b.vy !== undefined) ? b.vy : (b.fromBottom ? -700 : 0),   // fromBottom：从下往上飞
       vx: 0, bounce: 0, maxBounce: b.bounces || 3,
       speed: b.speed || 300, homing: false, spin: 0,
@@ -1660,7 +1661,7 @@ function update(dt) {
         bl.vy = -bl.vy * 0.95;
         bl.bounce++;
         if (bl.bounce === 1) Sound.sfxTrap();
-        if (bl.bounce >= bl.maxBounce && !bl.armed) { bl.armed = true; bl.delay = (bl.delay === undefined ? 1.4 : bl.delay); }
+        if (!bl.noHoming && bl.bounce >= bl.maxBounce && !bl.armed) { bl.armed = true; bl.delay = (bl.delay === undefined ? 1.4 : bl.delay); }
       }
       if (bl.armed && !bl.homing) {
         bl.delay -= dt;
