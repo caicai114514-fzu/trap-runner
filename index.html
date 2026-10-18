@@ -3542,14 +3542,15 @@ function drawDemonSelect(W) {
   ctx.setLineDash([1, 0]);
   ctx.beginPath(); ctx.moveTo(VW / 2, ly); ctx.lineTo(VW / 2, ly2); ctx.stroke();
 
-  // 红线底端：一只悬浮的眼睛（未解锁=2 只眼；解锁后+里魔王门=3 只眼）
-  watchingEye(VW / 2, dnY, inner ? 13 : 11);
-
-  // 里魔王地狱门（下方）：未解锁时不画门，只留一根渐淡红线
   var dnY = ly2;
+
+  // 红线底端：一只悬浮的眼睛，居中在中轴线上（未解锁=2 只眼；解锁后+里魔王门=3 只眼）
+  watchingEye(VW / 2, dnY + 10, inner ? 13 : 11);
+
+  // 里魔王地狱门（下方）：未解锁时不画门，只留一根渐淡红线；门下移，不挡眼睛
   if (inner) {
-    drawHellGate(VW / 2, dnY + 44, 82, 58, inner);
-    text('里魔王', VW / 2, dnY + 120, 14, '#dd4433', 'center', true);
+    drawHellGate(VW / 2, dnY + 64, 82, 58, inner);
+    text('里魔王', VW / 2, dnY + 144, 14, '#dd4433', 'center', true);
   }
 
   // 光标
