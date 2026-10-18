@@ -1292,6 +1292,7 @@ window.addEventListener('keydown', function (e) {
     if (a === 'left' || a === 'up')    { game.cursorW = (game.cursorW + 3) % 4; return; }
     if (a === 'right' || a === 'down') { game.cursorW = (game.cursorW + 1) % 4; return; }
     if (a === 'jump' || a === 'enter') { enterWorld(game.cursorW); return; }
+    if (a === 'restart') { startTransition(function () { game.state = 'title'; }); return; }
     return;
   }
   if (game.state === 'levels') {
