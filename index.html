@@ -578,7 +578,7 @@ var LEVELS = [
   {
     name: '4-1 · 表魔王', hint: '墙里有一条路。',
     width: 960, spawn: [120, 400],
-    goal: { x: 884, y: 180, w: 46, h: 70 },
+    goal: { x: 890, y: 180, w: 46, h: 70 },
     hiddenPathY: 300,
     shortcutCheck: { x: 300, y: 430, w: 60, h: 40 },
     platforms: [
@@ -587,11 +587,11 @@ var LEVELS = [
       { x: 0,   y: 320, w: 150, h: 220, kind: 'solid' },
       { x: 0,   y: 390, w: 210, h: 150, kind: 'solid' },
       // ===== 中间长通道 =====
-      { x: 210, y: 470, w: 570, h: 70,  kind: 'solid' },
+      { x: 210, y: 470, w: 540, h: 70,  kind: 'solid' },
       // ===== 右边阶梯（3 级，往上走到门）=====
-      { x: 780, y: 390, w: 120, h: 150, kind: 'solid' },
-      { x: 840, y: 320, w: 120, h: 220, kind: 'solid' },
-      { x: 900, y: 250, w: 60,  h: 290, kind: 'solid' },
+      { x: 750, y: 390, w: 210, h: 150, kind: 'solid' },
+      { x: 810, y: 320, w: 150, h: 220, kind: 'solid' },
+      { x: 870, y: 250, w: 90,  h: 290, kind: 'solid' },
       // ===== 墙里的隐藏路线（贴图不画，实际能走）=====
       { x: 60,  y: 100, w: 780, h: 40,  kind: 'solid', hiddenPath: true },   // 顶部横带
       { x: 840, y: 100, w: 40,  h: 300, kind: 'solid', hiddenPath: true },   // 右侧竖带（通到门上方）
