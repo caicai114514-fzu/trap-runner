@@ -3908,13 +3908,13 @@ function drawComplete() {
        game.totalDeaths <= 40 ? '坑是踩出来的，路是走出来的。' :
        '……你和这个游戏，都挺倔的。', VW / 2, VH / 2 + 56, 18, PAL.text, 'center');
   // 成就播报：全通界面也要一条条播完（逃出生天 / 小蔡的巧思）
-  if (game.tauntT > 0 && game.flash) {
-    ctx.save(); ctx.globalAlpha = Math.min(1, game.tauntT / 0.4);
+  if (game.achQueue && game.achQueue.length && (game.flashT || 0) <= 0) {
+    flashMsg(game.achQueue.shift());
+  }
+  if ((game.flashT || 0) > 0 && game.flash) {
+    ctx.save(); ctx.globalAlpha = Math.min(1, game.flashT / 0.4);
     text(game.flash, VW / 2, VH / 2 - 140, 24, PAL.player, 'center', true);
     ctx.restore();
-  }
-  if (game.achQueue && game.achQueue.length && game.tauntT <= 0) {
-    flashMsg(game.achQueue.shift());
   }
   var a = 0.5 + 0.5 * Math.sin(t * 3);
   ctx.globalAlpha = a;
