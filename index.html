@@ -991,6 +991,10 @@ function loadLevel(i) {
   game.passedShortcut = false;  // 表魔王：是否经过了正常路线的检查点
   game.gFinalDelay = undefined;  // 第四轮的反应时间
   game.missiles = [];      // 3-5 四个黑球绕人（半径周期变化）
+  // 4-1：门的传送触发过 → 重生后导弹继续追（要在清空之后补，否则被覆盖）
+  if (L.goalTeleportOnTouch && game.goalTpedOnce) {
+    game.missiles = [{ x: (L.spawn[0] || 100) + 300, y: (L.spawn[1] || 300) + 14, speed: 280, t: 1 }];
+  }
   if (game.ring3) {
     var R3d = game.ring3;
     var baseR = 110 + Math.sin(R3d.t * 3.2) * 46;      // 半径来回伸缩
