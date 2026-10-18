@@ -563,29 +563,37 @@ var LEVELS = [
 
   /* ================= 大关四 · 险路尽头（全部叠起来）================= */
   {
-    name: '4-1 · 开局即终局', hint: '第一块板就是假的。',
+    name: '4-1 · 表魔王', hint: '有近路，也有代价。',
     width: 960, spawn: [70, 380], jump: 900,
     goal: { x: 880, y: 400, w: 46, h: 70 },
+    shortcutCheck: { x: 480, y: 430, w: 70, h: 40 },      // 老实打要经过这里（中间地面）
     platforms: [
-      { x: 0, y: 470, w: 300, h: 70, kind: 'solid' },
-      { x: 300, y: 470, w: 140, h: 70, kind: 'fake' },
-      { x: 440, y: 470, w: 520, h: 70, kind: 'solid' }
+      { x: 0,   y: 470, w: 320, h: 70, kind: 'solid' },
+      { x: 320, y: 470, w: 160, h: 70, kind: 'fake' },      // 中间的坑
+      { x: 480, y: 470, w: 480, h: 70, kind: 'solid' },
+      { x: 150, y: 350, w: 130, h: 22, kind: 'solid' },     // 捷径高台（左）
+      { x: 400, y: 350, w: 130, h: 22, kind: 'solid' }      // 捷径高台（右）
     ],
-    spikes: [{ x: 500, y: 414, w: 110, h: 56, hidden: true, triggerX: 450 }],
+    spikes: [{ x: 330, y: 414, w: 140, h: 56 }],
     arrows: []
   },
   {
-    name: '4-2 · 抬头', hint: '这次上面也有东西。',
+    name: '4-2 · 里魔王', hint: '没有近路了。',
     width: 960, spawn: [70, 380], jump: 900,
     goal: { x: 880, y: 400, w: 46, h: 70 },
-    timeLimit: 7,
     platforms: [
-      { x: 0, y: 470, w: 340, h: 70, kind: 'solid' },
-      { x: 340, y: 470, w: 130, h: 70, kind: 'fake' },
-      { x: 470, y: 470, w: 490, h: 70, kind: 'solid' }
+      { x: 0,   y: 470, w: 280, h: 70, kind: 'solid' },
+      { x: 280, y: 470, w: 180, h: 70, kind: 'fake' },
+      { x: 460, y: 470, w: 180, h: 70, kind: 'solid' },
+      { x: 640, y: 470, w: 180, h: 70, kind: 'fake' },
+      { x: 820, y: 470, w: 140, h: 70, kind: 'solid' }
     ],
-    balls: [{ x: 200, bounces: 2 }, { x: 640, bounces: 3 }],
-    spikes: [], arrows: []
+    spikes: [
+      { x: 290, y: 414, w: 160, h: 56 },
+      { x: 650, y: 414, w: 160, h: 56 }
+    ],
+    saws: [{ x: 500, y: 442, r: 24, tx: 800, ty: 442, speed: 230 }],
+    arrows: []
   },
   {
     name: '4-3 · 反向', hint: '你的手会骗你。',
@@ -3509,40 +3517,40 @@ function drawDemonSelect(W) {
   menuHeader(W, true);
   drawMenuHelp('← →  选择      空格 / 点击  进入      R 返回');
 
-  // 表魔王地狱门（上方）
-  var upY = 150;
+  // 表魔王地狱门（上方，缩小）
+  var upY = 120;
   var inner = save.demonInner;
-  drawHellGate(VW / 2, upY, 180, 130, true);
-  text('表魔王', VW / 2, upY + 158, 18, PAL.text, 'center', true);
+  drawHellGate(VW / 2, upY, 96, 68, true);
+  text('表魔王', VW / 2, upY + 86, 16, PAL.text, 'center', true);
   if (isCleared(3, 0)) {
     ctx.strokeStyle = PAL.player; ctx.lineWidth = 3; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(VW / 2 - 16, upY + 65); ctx.lineTo(VW / 2 - 5, upY + 76); ctx.lineTo(VW / 2 + 18, upY + 46);
+    ctx.beginPath(); ctx.moveTo(VW / 2 - 14, upY + 34); ctx.lineTo(VW / 2 - 4, upY + 44); ctx.lineTo(VW / 2 + 16, upY + 20);
     ctx.stroke();
   }
 
   // 向下的线：未解锁=红线渐淡，解锁=黑线
-  var ly = upY + 180, ly2 = upY + 360;
+  var ly = upY + 100, ly2 = upY + 190;
   var lg = ctx.createLinearGradient(0, ly, 0, ly2);
   if (inner) {
     lg.addColorStop(0, '#0a0305'); lg.addColorStop(1, 'rgba(10,3,5,0)');
   } else {
     lg.addColorStop(0, '#cc3322'); lg.addColorStop(1, 'rgba(204,51,34,0)');
   }
-  ctx.strokeStyle = lg; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.strokeStyle = lg; ctx.lineWidth = 6; ctx.lineCap = 'round';
   ctx.setLineDash([1, 0]);
   ctx.beginPath(); ctx.moveTo(VW / 2, ly); ctx.lineTo(VW / 2, ly2); ctx.stroke();
 
-  // 里魔王地狱门（下方）
+  // 里魔王地狱门（下方，缩小）
   var dnY = ly2;
-  drawHellGate(VW / 2, dnY, 150, 105, inner);
-  text(inner ? '里魔王' : '里魔王 · 未解锁', VW / 2, dnY + 132, 16, inner ? '#dd4433' : PAL.faint, 'center', true);
+  drawHellGate(VW / 2, dnY, 82, 58, inner);
+  text(inner ? '里魔王' : '里魔王 · 未解锁', VW / 2, dnY + 76, 14, inner ? '#dd4433' : PAL.faint, 'center', true);
   if (!inner) {
-    lockIcon(VW / 2, dnY + 52, 0.9, PAL.faint);
+    lockIcon(VW / 2, dnY + 29, 0.75, PAL.faint);
   }
 
   // 光标
   var cur = game.cursorL === 0 ? 0 : 1;
-  cursorMark(VW / 2, (cur === 0 ? upY : dnY) - 30);
+  cursorMark(VW / 2, (cur === 0 ? upY : dnY) - 26);
 }
 
 
