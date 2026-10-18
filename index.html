@@ -1215,8 +1215,11 @@ function keyAction(e) {
 function startGame() {
   game.deaths = 0; game.totalDeaths = 0;
   Sound.startBgm();
-  game.state = 'world';
-  game.cursorW = 0;
+  // 开始 → 一级目录：门合上 → 换场景 → 开门
+  startTransition(function () {
+    game.state = 'world';
+    game.cursorW = 0;
+  });
 }
 
 /* 从第二级选关界面进入某一关 */
@@ -1318,7 +1321,13 @@ function enterWorld(w) {
   game.cursorL = 0;
   var slotN = (w === 3 ? 2 : LEVELS_PER_WORLD);   // 第四大关只有 2 个入口
   for (var i = 0; i < slotN; i++) if (!isCleared(w, i)) { game.cursorL = i; break; }
-  game.state = 'levels';
+  // 一级 → 二级目录：门合上 → 换场景 → 开门
+  var targetW = game.levelsWorld, targetL = game.cursorL;
+  startTransition(function () {
+    game.levelsWorld = targetW;
+    game.cursorL = targetL;
+    game.state = 'levels';
+  });
   Sound.sfxWin();
 }
 function enterLevel(w, i) {
