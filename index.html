@@ -1315,8 +1315,8 @@ canvas.addEventListener('mousedown', function (e) {
   var pt = canvasPoint(e);
 
   // ===== 左下角齿轮：开关设置弹窗（只在菜单界面有效）=====
-  var inMenu2 = (game.state === 'title' || game.state === 'world' || game.state === 'levels' || game.state === 'complete');
-  if (inMenu2 && pt.x < 64 && pt.y > VH - 64) { game.settingsOpen = !game.settingsOpen; game.settingsT = 0; return; }
+  // 齿轮在所有界面都能点（包括游戏内）
+  if (pt.x < 64 && pt.y > VH - 64) { game.settingsOpen = !game.settingsOpen; game.settingsT = 0; return; }
 
   // ===== 设置弹窗内的点击 =====
   if (game.settingsOpen) {
