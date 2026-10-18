@@ -2438,7 +2438,7 @@ function update(dt) {
       if (co.gone) continue;
     }
     if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22) {
-      if (co.fake) { Sound.sfxBoom(); die(); return; }
+      if (co.fake) { continue; }   // 4-1：假金币只做视觉/追击，碰到不炸死
       co.got = true; Sound.sfxCoin();
       if (co.flip) { game.flipT = 0; Sound.sfxTrap(); }     // 吃到"翻板金币"→整块地板开始翻
       // 4-1：吃掉第一枚 → 隐藏跳板失效（后门被堵）
