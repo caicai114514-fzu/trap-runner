@@ -1533,6 +1533,7 @@ function update(dt) {
     var a = game.plats[m];
     if (a.state !== 'active' || a.oneWay || a.noCollide) continue;
     if (a.kind === 'flip' && game.flipT >= 0) continue;      // 翻板过程中不挡路
+    if (a.riser) continue;                                    // 升降地板是地面，不能做水平推出
     if (a.kind === 'riseWall') {
       var rwH4 = a.h * a.riseY;
       if (rwH4 <= 1) continue;
