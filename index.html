@@ -948,7 +948,15 @@ function loadLevel(i) {
   game.flipOnLand = !!L.flipOnLand;          // 每次落地再反一次
   game.wasOnGround = false;
   game.goalReveal = (L.fakeGoal || L.goalHidden) ? 0 : 1;   // 真门的显现进度
-  game.goalX = L.goal.x;                                    // 会走的门：当前 x
+  if (L.goalTeleportOnTouch && game.goalTpedOnce) {
+    // 4-1：门的传送已经触发过 —— 重生后门还在最左边，导弹也还在追
+    game.goalX = 16;
+    game.goalHide = false;
+    game.missileSpawned = true;
+    game.missiles = [{ x: L.spawn[0] + 300, y: (L.spawn[1] || 300) + 14, speed: 280, t: 1 }];
+  } else {
+    game.goalX = L.goal.x;                                  // 会走的门：当前 x
+  }
   game.goalDone = false; game.goalMoving = false;
   game.buttonPressed = false;                // 按钮是否按下
   game.wallAngle = 90;                       // 墙初始【竖直】(90°)；按按钮后匀速转起来
