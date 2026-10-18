@@ -458,23 +458,23 @@ var LEVELS = [
   },
   {
     name: '3-3 · 回溯', hint: '门不会等你。',
-    width: 960, spawn: [300, 40],                // 4 楼（最上层）
+    width: 960, spawn: [760, 40],                // 4 楼【右边】出生
     goal: { x: 120, y: 400, w: 46, h: 70 },      // 门在最底层左边
-    goalMoveVX: 50,                              // ★ 玩家到底层才触发，门缓缓往右（往刺的方向）走
-    goalMoveTriggerY: 250,                       // 玩家下到 2 楼(y>250) 门就开始跑
-    goalStopX: 700,                              // 走到刺前面停住
-    // 之字形四层塔：交替开口，一层一层往下掉
+    goalMoveVX: 50,                              // 门缓缓往右（往刺的方向）走
+    goalStopX: 700,
+    goalMoveTriggerX: 600,                       // ★ 玩家往左走到 x<600 时，门才开始移动
+    // 之字形塔（平台从右往左延伸 → 缺口在左；交替开口）
     platforms: [
-      { x: 0,   y: 110, w: 820, h: 22, kind: 'solid' },     // 4 楼（左边封死，只能从右边缺口掉）
-      { x: 320, y: 230, w: 640, h: 22, kind: 'solid' },     // 3 楼（左侧缺口）
-      { x: 180, y: 350, w: 640, h: 22, kind: 'solid' },     // 2 楼（右侧缺口）
-      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid' },     // 1 楼（地面）
-      { x: 0,   y: 400, w: 56, h: 70, kind: 'solid', vanishWall: true }   // 左墙：到底层后收进去，露出钥匙
+      { x: 180, y: 110, w: 780, h: 22, kind: 'solid' },     // 4 楼：右边延伸，缺口在左
+      { x: 0,   y: 230, w: 780, h: 22, kind: 'solid' },     // 3 楼：左边延伸，缺口在右
+      { x: 180, y: 350, w: 780, h: 22, kind: 'solid' },     // 2 楼：右边延伸，缺口在左
+      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid' },     // 1 楼
+      { x: 0,   y: 400, w: 56, h: 70, kind: 'solid', vanishWall: true }   // 左墙：到底层收进露出钥匙
     ],
     spikes: [
       { x: 740, y: 444, w: 220, h: 26 }                    // 1 楼右边一长串刺
     ],
-    keys: [{ x: 30, y: 420 }],                              // 钥匙藏在左墙后面
+    keys: [{ x: 30, y: 420 }],
     arrows: []
   },
   {
@@ -1842,7 +1842,12 @@ function update(dt) {
 
   // 会走的门（3-3）：玩家下到底层(位置触发)后，门才开始往右走
   if (LEVELS[game.li].goalMoveVX && !game.goalDone && !game.goalMoving) {
-    if (p.y > (LEVELS[game.li].goalMoveTriggerY || 400)) game.goalMoving = true;
+    var _L = LEVELS[game.li];
+    if (_L.goalMoveTriggerX !== undefined) {
+      if (p.x + p.w / 2 < _L.goalMoveTriggerX) game.goalMoving = true;   // 横向位置触发
+    } else if (p.y > (_L.goalMoveTriggerY || 400)) {
+      game.goalMoving = true;
+    }
   }
   if (LEVELS[game.li].goalMoveVX && game.goalMoving && !game.goalDone) {
     game.goalX += LEVELS[game.li].goalMoveVX * dt;
