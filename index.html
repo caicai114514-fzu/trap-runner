@@ -880,7 +880,7 @@ function loadLevel(i) {
       fake: !!s.fake,           // 假刺：长得一模一样，但不致命
       keepSafe: !!s.keepSafe,   // 反转后仍安全（2-5 的第二个刺）
       holdTime: (s.holdTime === undefined ? 0 : s.holdTime),   // 伸出后持续这么久再收回（0=不收回）
-      holdT: 0, retracted: false
+      holdT: 0, retracted: false,
       onPop: !!s.onPop,         // 等跳板把人弹起来之后才长出来
       moveTo: s.moveTo || null, // 触发后瞬移到这里（判定立刻过去，视觉上快速平移）
       atX: (s.atX === undefined ? null : s.atX),     // 横坐标触发
