@@ -578,7 +578,7 @@ var LEVELS = [
   {
     name: '4-1 · 表魔王', hint: '墙里有一条路。',
     width: 960, spawn: [110, 140],
-    goal: { x: 884, y: 110, w: 46, h: 70 },
+    goal: { x: 890, y: 200, w: 46, h: 70 },
     hiddenPathY: 250,
     shortcutCheck: { x: 300, y: 210, w: 60, h: 40 },
     platforms: [
@@ -587,7 +587,8 @@ var LEVELS = [
       { x: 0,   y: 220, w: 150, h: 50, kind: 'solid' },   // 第 2 级
       { x: 0,   y: 250, w: 210, h: 20, kind: 'solid' },   // 第 3 级
       // ===== 中间通道（和阶梯底齐平，浮空，下面全是背景）=====
-      { x: 210, y: 250, w: 540, h: 20, kind: 'solid' },
+      { x: 210, y: 220, w: 540, h: 50, kind: 'solid' },   // 通道加高（能站）
+      { x: 210, y: 0,   w: 540, h: 180, kind: 'solid' },  // 头顶墙（跳不起来）
       // ===== 右边阶梯（镜像：从 270 升到 180）=====
       { x: 750, y: 250, w: 210, h: 20, kind: 'solid' },
       { x: 810, y: 220, w: 150, h: 50, kind: 'solid' },
