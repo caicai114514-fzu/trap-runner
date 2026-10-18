@@ -2259,8 +2259,7 @@ function update(dt) {
     if (rf) {
       game.floorT += dt;
       if (game.floorT < 0.15) { rf.x = 90 - (game.floorT / 0.15) * 90; }       // 0.15s 快速收进去
-      else if (game.floorT > 2.0) { rf.x = 90 - (1 - (game.floorT - 2.0) / 0.3) * 90; }  // 停 1.85s 后 0.3s 伸回来
-      if (game.floorT > 2.3) { rf.x = 90; game.floorRetract = false; game.floorT = 0; }
+      if (game.floorT >= 0.15) { rf.x = 0; }                                   // 收到底就保持，不再伸回
     }
   }
 
