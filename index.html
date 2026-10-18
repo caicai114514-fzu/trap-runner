@@ -2584,19 +2584,21 @@ function drawButtonWall() {
       for (var gbi2 = 0; gbi2 < L.gambleButtons.length; gbi2++) {
         var gb2 = L.gambleButtons[gbi2];
         var grow = Math.max(0, Math.min(1, game.btnAnim));
-        if (grow <= 0.02) continue;                 // 收回去了就别画
-        var gh2 = gb2.h * grow;
-        var byy = risY - gh2 - 2;                   // 从地板表面往上长
+        if (grow <= 0.02) continue;
+        // 整体下沉：按钮不变形，只是慢慢陷进地板，被地板沿口裁掉
+        var drop = (1 - grow) * (gb2.h + 4);
+        var btnTop = risY - gb2.h - 2 + drop;
+        ctx.save();
+        ctx.beginPath(); ctx.rect(gb2.x - 2, 0, gb2.w + 4, risY); ctx.clip();
         ctx.fillStyle = '#e0432f';
-        ctx.fillRect(gb2.x, byy, gb2.w, gh2);
-        if (grow > 0.6) {
-          ctx.fillStyle = '#ff6b52';
-          ctx.fillRect(gb2.x, byy, gb2.w, 5);
-        }
-        if (grow > 0.5) {                           // 黄点只在按钮基本成型时才画
+        ctx.fillRect(gb2.x, btnTop, gb2.w, gb2.h);
+        ctx.fillStyle = '#ff6b52';
+        ctx.fillRect(gb2.x, btnTop, gb2.w, 5);
+        if (grow > 0.5) {
           ctx.fillStyle = '#ffd23f';
-          ctx.beginPath(); ctx.arc(gb2.x + gb2.w / 2, byy + gh2 + 5, 3, 0, 7); ctx.fill();
+          ctx.beginPath(); ctx.arc(gb2.x + gb2.w / 2, btnTop - 5, 3, 0, 7); ctx.fill();
         }
+        ctx.restore();
       }
     }
   }
