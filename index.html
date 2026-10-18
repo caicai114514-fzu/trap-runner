@@ -795,7 +795,8 @@ function loadLevel(i) {
       isWall: !!p.isWall,
       deadly: !!p.deadly,
       riseT: 0, risePhase: 'idle', riseY: 0,  // riseWall：升起的墙
-      slideWall: !!p.slideWall            // 3-3：会往左缩进的下半堵墙
+      slideWall: !!p.slideWall,           // 3-3：会往左缩进的下半堵墙
+      riser: !!p.riser                   // 3-5：博弈对就上升的地板
     };
   });
   game.spikes = L.spikes.map(function (s) {
