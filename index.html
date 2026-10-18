@@ -1278,7 +1278,7 @@ window.addEventListener('keydown', function (e) {
      会被 `if (!a) return` 直接拦掉（A 之所以好使，是因为它映射成了 left）。 */
   // 重置弹窗的输入（优先于一切）
   if (game.resetOpen) {
-    if (e.code === 'Escape') { game.resetOpen = false; game.resetInput = ''; game.resetMsg = ''; return; }
+    if (e.code === 'Escape') { game.resetOpen = false; game.resetInput = ''; game.resetMsg = ''; return; }   // 走退场动画
     if (e.code === 'Enter' || e.code === 'NumpadEnter') {
       e.preventDefault();
       if (game.resetInput === game.resetCode) {
@@ -1384,7 +1384,7 @@ canvas.addEventListener('mousedown', function (e) {
   if (game.resetOpen) {
     var RW2 = 420, RH2 = 230, RX2 = (VW - RW2) / 2, RY2 = (VH - RH2) / 2;
     if (pt.x > RX2 + RW2 - 44 && pt.x < RX2 + RW2 - 8 && pt.y > RY2 + 8 && pt.y < RY2 + 44) {
-      game.resetOpen = false; game.resetT = 0; game.resetInput = ''; game.resetMsg = '';
+      game.resetOpen = false; game.resetInput = ''; game.resetMsg = '';
       return;
     }
     return;   // 弹窗打开时其它点击不穿透
@@ -3066,7 +3066,7 @@ function drawSettings(dt) {
 
   if (!game.settingsOpen && (game.settingsT || 0) <= 0) return;
   game.settingsT = Math.min(1, (game.settingsT || 0) + dt * 5);
-  if (!game.settingsOpen) game.settingsT = Math.max(0, game.settingsT - dt * 6);
+  if (!game.settingsOpen) game.settingsT = Math.max(0, game.settingsT - dt * 6);   // 和重置弹窗同速退场
 
   var t = game.settingsT;
   var e = t * t * (3 - 2 * t);
@@ -3171,10 +3171,11 @@ function drawSettings(dt) {
   ctx.restore();
 
   // ===== 重置确认弹窗（盖在设置弹窗上）=====
-  if (game.resetOpen || (game.resetT || 0) > 0) {
-    game.resetT = Math.min(1, (game.resetT || 0) + (1 / 60) * 5);   // 0.2 秒滑上来
+  if (game.resetOpen) game.resetT = Math.min(1, (game.resetT || 0) + (1 / 60) * 5);
+  else game.resetT = Math.max(0, (game.resetT || 0) - (1 / 60) * 6);
+  if ((game.resetT || 0) > 0) {
     var rt = game.resetT, re = rt * rt * (3 - 2 * rt);
-    var RW = 420, RH = 230, RX = (VW - RW) / 2, RY = (VH - RH) / 2 + (1 - re) * 300;
+    var RW = 420, RH = 230, RX = (VW - RW) / 2, RY = (VH - RH) / 2 + (1 - re) * 280;
     ctx.save();
     ctx.globalAlpha = re;
     ctx.fillStyle = 'rgba(0,0,0,0.72)';
