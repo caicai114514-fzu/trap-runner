@@ -1670,7 +1670,7 @@ function update(dt) {
     var bl = game.balls[bi];
     bl.spin += dt * 6;
     // 玩家站到（下沉后的）球顶上 → 球重新开始弹
-    if (bl.asPlatform && bl.sunkDone && Math.abs((p.x + p.w / 2) - bl.x) < bl.r) {
+    if (bl.asPlatform && Math.abs((p.x + p.w / 2) - bl.x) < bl.r) {
       if (bl.frozen) { bl.frozen = false; bl.vy = -520; }   // 人走到球上方（只看 x 轴）→ 重新弹
     }
     if (bl.homing) {
@@ -1710,7 +1710,7 @@ function update(dt) {
   // 人走到（已下沉的）球上方 → 球重新开始弹（放在球逻辑之后，确保不会被覆盖）
   for (var rb = 0; rb < game.balls.length; rb++) {
     var rball = game.balls[rb];
-    if (rball.asPlatform && rball.sunkDone && Math.abs((p.x + p.w / 2) - rball.x) < rball.r) {
+    if (rball.asPlatform && Math.abs((p.x + p.w / 2) - rball.x) < rball.r) {
       if (rball.frozen) { rball.frozen = false; rball.vy = -520; }
     }
   }
