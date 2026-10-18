@@ -967,6 +967,7 @@ function loadLevel(i) {
   game.goalFly = null;     // 3-4 门的粒子传送（美术层）
   game.missileSpawned = false;   // 4-1 门传送后那枚导弹只放一次
   game.goalTpedOnce = false;     // 4-1 门传送标记（重开要清）
+  game.fromHiddenPath = false;   // 4-1 走隐藏通道标记（重开要清，否则门传送/导弹永远不触发）
   game.goalHide = false;
   game.gotCoins = 0;       // 4-1 金币计数（重开要清零）
   game.floorRetract = false;  // 4-1 左2地板是否在收
