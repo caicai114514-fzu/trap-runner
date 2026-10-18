@@ -1261,15 +1261,15 @@ function update(dt) {
       for (var pj = 0; pj < game.particles.length; pj++) {
         var qp = game.particles[pj];
         if (!qp.debris || !qp.pulled) continue;
-        qp.vx += (tcx - qp.x) * 26 * dt - qp.vx * 6 * dt;
-        qp.vy += (tcy - qp.y) * 26 * dt - qp.vy * 6 * dt;
+        qp.vx += (tcx - qp.x) * 90 * dt - qp.vx * 9 * dt;
+        qp.vy += (tcy - qp.y) * 90 * dt - qp.vy * 9 * dt;
       }
     }
     for (var pj2 = 0; pj2 < game.particles.length; pj2++) {
       if (game.particles[pj2].debris) game.particles[pj2].pulled = true;
     }
     // 0.62 秒后重组成人，出现在正中
-    if (game.tp.t > 0.62) {
+    if (game.tp.t > 0.75) {
       p.x = game.tp.tx; p.y = game.tp.ty; p.vx = 0; p.vy = 0;
       for (var pk = game.particles.length - 1; pk >= 0; pk--) if (game.particles[pk].debris) game.particles.splice(pk, 1);
       Sound.sfxWin && Sound.sfxWin();
