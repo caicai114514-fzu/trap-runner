@@ -27,6 +27,7 @@ function fitCanvas() {
   canvas.style.height = (540 * s) + 'px';
 }
 window.addEventListener('resize', fitCanvas);
+window.addEventListener('orientationchange', function () { setTimeout(fitCanvas, 120); });
 fitCanvas();
 var ctx = canvas.getContext('2d');
 var VW = canvas.width, VH = canvas.height;
