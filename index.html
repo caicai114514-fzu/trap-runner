@@ -978,6 +978,10 @@ function loadLevel(i) {
   game.goalX = L.goal.x;                                  // 会走的门：当前 x（重生 = 门回原位）
   game.goalDone = false; game.goalMoving = false;
   game.settingsOpen = false;                 // 设置弹窗是否打开
+  game.resetOpen = false;                    // 重置确认弹窗
+  game.resetCode = '';
+  game.resetInput = '';
+  game.resetMsg = '';
   game.settingsT = 0;                        // 设置弹窗滑入动画进度
   game.achOpen = false;
   game.buttonPressed = false;                // 按钮是否按下
@@ -1271,6 +1275,31 @@ window.addEventListener('keydown', function (e) {
   /* ---- 调试键必须先判 ----
      B / C 在 keyAction 里没有对应的动作名，如果放在下面，
      会被 `if (!a) return` 直接拦掉（A 之所以好使，是因为它映射成了 left）。 */
+  // 重置弹窗的输入（优先于一切）
+  if (game.resetOpen) {
+    if (e.code === 'Escape') { game.resetOpen = false; game.resetInput = ''; game.resetMsg = ''; return; }
+    if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+      e.preventDefault();
+      if (game.resetInput === game.resetCode) {
+        // 重置：清空存档
+        save = { cleared: {}, keys: {}, deaths: 0, demonInner: false, achievements: {} };
+        writeSave();
+        game.resetOpen = false; game.settingsOpen = false; game.settingsT = 0;
+        game.resetInput = ''; game.resetMsg = '';
+        game.state = 'title';
+        flashMsg('🗑 游戏进度已重置'); Sound.sfxTrap && Sound.sfxTrap();
+      } else {
+        game.resetMsg = '重置码不对，请重新输入';
+        game.resetInput = '';
+      }
+      return;
+    }
+    var dg = e.key && e.key.length === 1 && e.key >= '0' && e.key <= '9';
+    if (dg && game.resetInput.length < 4) { game.resetInput += e.key; e.preventDefault(); return; }
+    if (e.code === 'Backspace') { game.resetInput = game.resetInput.slice(0, -1); e.preventDefault(); return; }
+    return;   // 弹窗打开时吃掉所有按键
+  }
+
   if (e.code === 'KeyN' && game.state === 'play') {
     e.preventDefault(); debugClearCurrent(); return;
   }
@@ -1370,6 +1399,15 @@ canvas.addEventListener('mousedown', function (e) {
     if (pt.x > bx2 && pt.x < bx2 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
       if (inG) { game.settingsOpen = false; game.settingsT = 0; game.state = 'levels'; game.levelsWorld = CUR.w; game.cursorL = CUR.i; }  // 退出
       else game.achOpen = !game.achOpen;                                                    // 成就
+      return;
+    }
+    // ③ 重置按钮
+    var rw2 = BW2 * 2 + GAP2, rx2 = SX + (SW2 - rw2) / 2, ry2 = by2 + BW2 + 22;
+    if (pt.x > rx2 && pt.x < rx2 + rw2 && pt.y > ry2 && pt.y < ry2 + 42) {
+      game.resetOpen = true;
+      game.resetCode = String(1000 + Math.floor(Math.random() * 9000));   // 随机四位
+      game.resetInput = ''; game.resetMsg = '';
+      Sound.sfxTrap && Sound.sfxTrap();
       return;
     }
     return;   // 弹窗打开时，点别处不穿透
@@ -3020,7 +3058,7 @@ function drawSettings(dt) {
 
   var t = game.settingsT;
   var e = t * t * (3 - 2 * t);
-  var SW = 320, SX = (VW - SW) / 2, SY = (VH - SW) / 2 + (1 - e) * 240;
+  var SW = 320, SH = 372, SX = (VW - SW) / 2, SY = (VH - SH) / 2 + (1 - e) * 280;
 
   ctx.save();
   ctx.globalAlpha = e;
@@ -3028,10 +3066,10 @@ function drawSettings(dt) {
   ctx.fillRect(0, 0, VW, VH);
   // 弹窗本体
   ctx.fillStyle = '#1a0a06';
-  ctx.fillRect(SX, SY, SW, SW);
+  ctx.fillRect(SX, SY, SW, SH);
   ctx.strokeStyle = '#c9884a';
   ctx.lineWidth = 3;
-  ctx.strokeRect(SX, SY, SW, SW);
+  ctx.strokeRect(SX, SY, SW, SH);
 
   // 右上角小叉
   var xx = SX + SW - 26, xy = SY + 26;
@@ -3045,7 +3083,7 @@ function drawSettings(dt) {
   // 两个按钮
   var BW = 110, GAP = 26;
   var bx1 = SX + SW / 2 - BW - GAP / 2, bx2 = SX + SW / 2 + GAP / 2;
-  var by = SY + SW / 2 - BW / 2 + 14;
+  var by = SY + 92;
 
   var inGame = (game.state === 'play' || game.state === 'dead' || game.state === 'win');
 
@@ -3110,7 +3148,36 @@ function drawSettings(dt) {
   }
   ctx.closePath(); ctx.fill();
   }
+  // ③ 重置按钮（宽度 = 两个按钮 + 中间缝隙）
+  var rw = BW * 2 + GAP, rx = SX + (SW - rw) / 2, ry = by + BW + 22;
+  ctx.fillStyle = game.resetOpen ? '#5a1410' : '#2a1410';
+  ctx.fillRect(rx, ry, rw, 42);
+  ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(rx, ry, rw, 42);
+  text('重置', SX + SW / 2, ry + 21, 19, '#e8b98a', 'center', true);
   ctx.restore();
+
+  // ===== 重置确认弹窗（盖在设置弹窗上）=====
+  if (game.resetOpen) {
+    var RW = 420, RH = 230, RX = (VW - RW) / 2, RY = (VH - RH) / 2;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.fillRect(0, 0, VW, VH);
+    ctx.fillStyle = '#1a0a06';
+    ctx.fillRect(RX, RY, RW, RH);
+    ctx.strokeStyle = '#c9884a'; ctx.lineWidth = 3; ctx.strokeRect(RX, RY, RW, RH);
+    text('如果想重置游戏进程', VW / 2, RY + 42, 20, '#e8b98a', 'center', true);
+    text('请输入四位重置码：' + game.resetCode, VW / 2, RY + 78, 22, '#ffd23f', 'center', true);
+    // 输入框
+    var IX = RX + 60, IY = RY + 110, IW = RW - 120, IH = 46;
+    ctx.fillStyle = '#0d0409';
+    ctx.fillRect(IX, IY, IW, IH);
+    ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(IX, IY, IW, IH);
+    var shown = game.resetInput + '_'.repeat(Math.max(0, 4 - game.resetInput.length));
+    text(shown, VW / 2, IY + IH / 2, 26, '#ffffff', 'center', true);
+    text(game.resetMsg || '输入后按回车确认', VW / 2, RY + RH - 26, 15,
+         game.resetMsg ? '#ff6b52' : '#a08070', 'center');
+    ctx.restore();
+  }
 }
 
 function drawButtonWall() {
