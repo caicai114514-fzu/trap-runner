@@ -475,7 +475,7 @@ var LEVELS = [
     ],
     spikes: [
       { x: 690, y: 444, w: 270, h: 26 },                                      // 1楼右侧刺（门要跑的）
-      { x: 400, y: 84, w: 90, h: 26, hidden: true, triggerX: 520 }            // ★ 4楼(最上层)的弹出刺：走到 x<520 触发，挡在你往左的路上
+      { x: 400, y: 84, w: 90, h: 26, hidden: true, atXlt: 520 }            // ★ 4楼(最上层)的弹出刺：走到 x<520 触发，挡在你往左的路上
     ],
     keys: [{ x: 18, y: 420, hidden: true, revealOnly: true }],   // 钥匙初始隐藏（左墙缩进后才浮现）
     arrows: []
@@ -1236,6 +1236,7 @@ function update(dt) {
     if (!sp.shown) {
       var reveal = false;
       if (sp.onPlatY !== null) reveal = !!(p.ground && Math.abs(p.ground.y - sp.onPlatY) < 6);  // 站在二楼平台上才露头
+      else if (sp.atXlt !== null) reveal = (p.x + p.w / 2 < sp.atXlt);   // 玩家往左走到某点才露头
       else if (sp.atYlt !== null) reveal = (p.y < sp.atYlt);      // 只有上到高处才露头
       else reveal = (p.x + p.w > sp.triggerX);
       if (reveal) { sp.shown = true; Sound.sfxTrap(); game.shake = 5; }
