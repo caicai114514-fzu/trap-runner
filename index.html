@@ -979,6 +979,7 @@ function loadLevel(i) {
   game.goalDone = false; game.goalMoving = false;
   game.settingsOpen = false;                 // 设置弹窗是否打开
   game.resetOpen = false;                    // 重置确认弹窗
+  game.resetT = 0;                           // 重置弹窗滑入动画
   game.resetCode = '';
   game.resetInput = '';
   game.resetMsg = '';
@@ -1379,6 +1380,16 @@ canvas.addEventListener('mousedown', function (e) {
   // 齿轮在所有界面都能点（包括游戏内）
   if (pt.x < 64 && pt.y > VH - 64) { game.settingsOpen = !game.settingsOpen; game.settingsT = 0; return; }
 
+  // ===== 重置确认弹窗：点叉叉关闭 =====
+  if (game.resetOpen) {
+    var RW2 = 420, RH2 = 230, RX2 = (VW - RW2) / 2, RY2 = (VH - RH2) / 2;
+    if (pt.x > RX2 + RW2 - 44 && pt.x < RX2 + RW2 - 8 && pt.y > RY2 + 8 && pt.y < RY2 + 44) {
+      game.resetOpen = false; game.resetT = 0; game.resetInput = ''; game.resetMsg = '';
+      return;
+    }
+    return;   // 弹窗打开时其它点击不穿透
+  }
+
   // ===== 设置弹窗内的点击 =====
   if (game.settingsOpen) {
     var SW2 = 320, SH2 = 372, SX = (VW - SW2) / 2, SY = (VH - SH2) / 2 + (1 - (game.settingsT || 0)) * 280;
@@ -1405,6 +1416,7 @@ canvas.addEventListener('mousedown', function (e) {
     var rw2 = BW2 * 2 + GAP2, rx2 = SX + (SW2 - rw2) / 2, ry2 = by2 + BW2 + 22;
     if (pt.x > rx2 && pt.x < rx2 + rw2 && pt.y > ry2 && pt.y < ry2 + 42) {
       game.resetOpen = true;
+      game.resetT = 0;
       game.resetCode = String(1000 + Math.floor(Math.random() * 9000));   // 随机四位
       game.resetInput = ''; game.resetMsg = '';
       Sound.sfxTrap && Sound.sfxTrap();
@@ -3157,9 +3169,12 @@ function drawSettings(dt) {
   ctx.restore();
 
   // ===== 重置确认弹窗（盖在设置弹窗上）=====
-  if (game.resetOpen) {
-    var RW = 420, RH = 230, RX = (VW - RW) / 2, RY = (VH - RH) / 2;
+  if (game.resetOpen || (game.resetT || 0) > 0) {
+    game.resetT = Math.min(1, (game.resetT || 0) + (1 / 60) * 5);   // 0.2 秒滑上来
+    var rt = game.resetT, re = rt * rt * (3 - 2 * rt);
+    var RW = 420, RH = 230, RX = (VW - RW) / 2, RY = (VH - RH) / 2 + (1 - re) * 300;
     ctx.save();
+    ctx.globalAlpha = re;
     ctx.fillStyle = 'rgba(0,0,0,0.72)';
     ctx.fillRect(0, 0, VW, VH);
     ctx.fillStyle = '#1a0a06';
@@ -3176,6 +3191,13 @@ function drawSettings(dt) {
     text(shown, VW / 2, IY + IH / 2, 26, '#ffffff', 'center', true);
     text(game.resetMsg || '输入后按回车确认', VW / 2, RY + RH - 26, 15,
          game.resetMsg ? '#ff6b52' : '#a08070', 'center');
+    // 右上角叉
+    var rxx = RX + RW - 26, rxy = RY + 26;
+    ctx.strokeStyle = '#e8b98a'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(rxx - 8, rxy - 8); ctx.lineTo(rxx + 8, rxy + 8);
+    ctx.moveTo(rxx + 8, rxy - 8); ctx.lineTo(rxx - 8, rxy + 8);
+    ctx.stroke();
     ctx.restore();
   }
 }
