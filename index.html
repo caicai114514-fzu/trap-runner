@@ -3923,7 +3923,7 @@ function drawComplete() {
   }
   for (var _aj = 0; _aj < _achList.length && _aj < 4; _aj++) {
     ctx.save();
-    ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 300 + _aj);
+    ctx.globalAlpha = 1;
     text(_achList[_aj], VW / 2, VH / 2 - 148 + _aj * 34, 22, PAL.player, 'center', true);
     ctx.restore();
   }
