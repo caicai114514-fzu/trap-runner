@@ -866,17 +866,27 @@ function unlockAchievement(key) {
   for (var ai = 0; ai < ACHIEVEMENTS.length; ai++) {
     if (ACHIEVEMENTS[ai].id === key || ACHIEVEMENTS[ai].w === key) a = ACHIEVEMENTS[ai];
   }
-  if (a) { if (!game.achQueue) game.achQueue = []; game.achQueue.push('🏆 获得成就：' + a.name); Sound.sfxAllClear(); }
+  if (a) {
+    if (arguments[1]) {
+      // 立即播报（拿钥匙会马上死，等不到队列）
+      flashMsg('🏆 获得成就：' + a.name);
+      if (game.achQueue && game.achQueue.length) game.achQueue.shift();
+    } else {
+      if (!game.achQueue) game.achQueue = [];
+      game.achQueue.push('🏆 获得成就：' + a.name);
+    }
+    Sound.sfxAllClear();
+  }
   return true;
 }
 function giveKey(w) {
   save.keys[w] = 1;
   writeSave();
   Sound.sfxWin();
-  unlockAchievement('save');
+  unlockAchievement('save', true);
   var kn = 0;
   for (var kx = 0; kx < 3; kx++) if (save.keys[kx]) kn++;
-  if (kn >= 3) unlockAchievement('sacrifice');
+  if (kn >= 3) unlockAchievement('sacrifice', true);
 }
 
 var CUR = { w: 0, i: 0 };        // 当前正在玩的是哪个大关的哪个小关
@@ -2758,11 +2768,11 @@ function update(dt) {
       save.keys[CUR.w] = 1;
       writeSave();
       Sound.sfxWin();
-      // 隐藏成就：第一次拿钥匙 / 三把拿满
-      unlockAchievement('save');
+      // 隐藏成就：第一次拿钥匙 / 三把拿满（立即播报，因为拿完马上就死了）
+      unlockAchievement('save', true);
       var keyN = 0;
       for (var kw = 0; kw < 3; kw++) if (save.keys[kw]) keyN++;
-      if (keyN >= 3) unlockAchievement('sacrifice');
+      if (keyN >= 3) unlockAchievement('sacrifice', true);
       game.flash = '拿到钥匙了';
       game.tauntT = 1.6;
     }
