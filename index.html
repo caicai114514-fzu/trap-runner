@@ -161,29 +161,61 @@ var Sound = {
     this.note(95, t + 0.07, 0.18, 'square', 0.18, this.sfxGain);
   },
 
-  sfxBoom: function () {          // 大爆炸：低频冲击 + 三层噪声 + 金属碎片
+  sfxBoom: function () {          // 假金币爆炸：低频冲击 + 两层噪声，要够吓人
     if (!this.ac) return;
-    var t = this.ac.currentTime, ac = this.ac;
-    // 低频炮击：sawtooth 从 220 一路砸到 18
-    var o = ac.createOscillator(), g = ac.createGain();
+    var t = this.ac.currentTime, o = this.ac.createOscillator(), g = this.ac.createGain();
     o.type = 'sawtooth';
     o.frequency.setValueAtTime(220, t);
     o.frequency.exponentialRampToValueAtTime(18, t + 0.75);
-    g.gain.setValueAtTime(1.0, t);
+    g.gain.setValueAtTime(1.0, t);                                   // 0.5 → 1.0
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.85);
     o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.9);
-    // 亚低频冲击（震胸口那一下）
-    var o2 = ac.createOscillator(), g2 = ac.createGain();
+    // 亚低频冲击：震胸口那一下
+    var o2 = this.ac.createOscillator(), g2 = this.ac.createGain();
     o2.type = 'sine';
     o2.frequency.setValueAtTime(70, t);
     o2.frequency.exponentialRampToValueAtTime(28, t + 0.35);
     g2.gain.setValueAtTime(0.9, t);
     g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
     o2.connect(g2); g2.connect(this.sfxGain); o2.start(t); o2.stop(t + 0.5);
-    // 三层噪声：爆开 + 余震 + 碎片
-    this.noise(t, 0.55, 0.75);
+    this.noise(t, 0.55, 0.75);                                       // 0.45/0.40 → 0.55/0.75
     this.noise(t + 0.04, 0.40, 0.55);
     this.noise(t + 0.12, 0.30, 0.30);
+  },
+
+  sfxWin: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime, seq = [72, 76, 79, 84], self = this;
+    seq.forEach(function (m, i) { self.note(m, t + i * 0.09, 0.3, 'triangle', 0.3, self.sfxGain); });
+  },
+
+  sfxTeleport: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime, ac = this.ac;
+    // 1) 炸开：短促噪声
+    this.noise(t, 0.10, 0.26);
+    // 2) 下沉：低频 square 快速滑落
+    var o1 = ac.createOscillator(), g1 = ac.createGain();
+    o1.type = 'square';
+    o1.frequency.setValueAtTime(320, t);
+    o1.frequency.exponentialRampToValueAtTime(55, t + 0.22);
+    g1.gain.setValueAtTime(0.001, t);
+    g1.gain.exponentialRampToValueAtTime(0.20, t + 0.015);
+    g1.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+    o1.connect(g1); g1.connect(this.sfxGain);
+    o1.start(t); o1.stop(t + 0.26);
+    // 3) 聚拢：上行扫频（像被吸回去）
+    var o2 = ac.createOscillator(), g2 = ac.createGain();
+    o2.type = 'sawtooth';
+    o2.frequency.setValueAtTime(180, t + 0.20);
+    o2.frequency.exponentialRampToValueAtTime(1400, t + 0.58);
+    g2.gain.setValueAtTime(0.001, t + 0.20);
+    g2.gain.exponentialRampToValueAtTime(0.18, t + 0.30);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.62);
+    o2.connect(g2); g2.connect(this.sfxGain);
+    o2.start(t + 0.20); o2.stop(t + 0.64);
+    // 4) 重组：一记清脆高音
+    this.note(84, t + 0.60, 0.18, 'triangle', 0.20, this.sfxGain);
   },
 
   sfxTrap: function () {
