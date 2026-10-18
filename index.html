@@ -825,12 +825,12 @@ function loadLevel(i) {
   game.revealStarted = false;
   game.balls = (L.balls || []).map(function (b) {
     return {
-      x: b.x, y: (b.y === undefined ? (b.fromBottom ? 470 : -50) : b.y), r: b.r || 34,
+      x: b.x, y: (b.y === undefined ? (b.fromBottom ? 436 : 100) : b.y), r: b.r || 34,   // 最高点统一 100
       bounceH: (b.bounceH === undefined ? 110 : b.bounceH),
       noHoming: !!b.noHoming,               // 永不追踪（只做普通弹跳）
       toPlatform: !!b.toPlatform,           // 触发后变成可站立的半圆平台
       asPlatform: false,
-      vy: (b.vy !== undefined) ? b.vy : (b.fromBottom ? -700 : 0),   // fromBottom：从下往上飞
+      vy: (b.vy !== undefined) ? b.vy : (b.fromBottom ? -Math.sqrt(2 * GRAVITY * 0.32 * 336) : 0),   // 从下往上：同样的弹起能量
       vx: 0, bounce: 0, maxBounce: b.bounces || 3,
       speed: b.speed || 300, homing: false, spin: 0,
       delay: b.chaseDelay === undefined ? 1.4 : b.chaseDelay    // 弹够之后还要等这么久才追
@@ -1676,7 +1676,7 @@ function update(dt) {
       // 落地反弹
       if (bl.y + bl.r > 470) {
         bl.y = 470 - bl.r;
-        bl.vy = -bl.vy;                 // 不衰减，配合低重力：弹得高但慢
+        bl.vy = -Math.sqrt(2 * GRAVITY * 0.32 * 336);   // 固定弹起能量：所有球最高点一致(球心 y≈100)
         bl.bounce++;
         if (bl.bounce === 1) Sound.sfxTrap();
         if (!bl.noHoming && bl.bounce >= bl.maxBounce && !bl.armed) { bl.armed = true; bl.delay = (bl.delay === undefined ? 1.4 : bl.delay); }
