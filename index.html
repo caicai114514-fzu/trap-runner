@@ -1727,7 +1727,7 @@ function update(dt) {
     if (lb3 && !lb3.sunkDone) {
       lb3.asPlatform = true;
       lb3.frozen = true;                                  // 沉下去时先不弹
-      var sinkTo = 470 + lb3.r + 6;
+      var sinkTo = 464 + lb3.r;
       lb3.y = Math.min(sinkTo, lb3.y + dt * 620);         // 沉到球顶略低于地板
       if (lb3.y >= sinkTo - 0.5) lb3.sunkDone = true;     // 沉完了就不再管它
     }
