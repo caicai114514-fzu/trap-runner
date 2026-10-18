@@ -850,6 +850,7 @@ function loadLevel(i) {
   game.reversed = false;   // 2-5：按下按钮后世界规则反转（刺危险/地板安全）
   game.keyReveal = false;  // 3-3：左墙缩进后，隐藏的钥匙才显现
   game.tp = null;          // 3-4 传送动画状态
+  game.ring = null;        // 3-4 七球绕人一圈 → 加速旋转 → 贯穿
   game.buttonVisible = !(L.button && L.button.hidden);  // 默认显示；hidden 的按钮(2-5)等平台出现才显示
   game.wallSweep = 0;
   if (typeof location !== 'undefined' && location.search.indexOf('wa=') >= 0) {
@@ -928,6 +929,15 @@ function die(kind) {
   // 判定：拿到钥匙之后 2.6 秒内就死了 —— 也就是"拿完就没命了"。
   // 拿完钥匙跑很远才死的不算，那是自己作死，不是献祭。
   var sacrificed = game.keyThisLife && game.keyGetT < 2.6;
+  if (game.crushed) {
+    game.crushed = false;
+    game.taunt = '谁让你按了哈哈哈哈';
+    game.tauntColor = '#c0392b';
+    game.shake = 24;
+    game.tauntT = 1.6;
+    Sound.sfxDeath();
+    return;
+  }
   if (sacrificed) {
     game.taunt = (LEVELS[game.li].sacrificeTaunt || '你献祭了自己，这是你应得的');
     game.tauntColor = '#c0392b';
@@ -1181,6 +1191,50 @@ function update(dt) {
     q.life -= dt;
     if (q.life <= 0) game.particles.splice(i, 1);
   }
+  // ===== 3-4 七球绕环：飞到中心周围 → 加速旋转 2s → 一起贯穿 =====
+  if (game.ring) {
+    var RG = game.ring;
+    RG.t += dt;
+    var CX = VW / 2, CY = VH / 2, RR = 150;
+    if (RG.phase === 'gather') {
+      var gk = Math.min(1, RG.t / 0.45); gk = gk * gk * (3 - 2 * gk);
+      for (var gi = 0; gi < game.balls.length; gi++) {
+        var gb = game.balls[gi], gf = RG.from[gi] || gb;
+        var ga = (gi / game.balls.length) * Math.PI * 2 - Math.PI / 2;
+        gb.x = gf.x + (CX + Math.cos(ga) * RR - gf.x) * gk;
+        gb.y = gf.y + (CY + Math.sin(ga) * RR - gf.y) * gk;
+        gb.frozen = true;
+      }
+      if (RG.t >= 0.45) { RG.phase = 'spin'; RG.t = 0; RG.spin = 0; Sound.sfxTrap(); game.shake = 6; }
+    } else if (RG.phase === 'spin') {
+      RG.spin += 0.9 * RG.t * dt;                 // 从 0 开始加速
+      RG.ang += RG.spin * dt * 7;
+      for (var si3 = 0; si3 < game.balls.length; si3++) {
+        var sb = game.balls[si3];
+        var sa = (si3 / game.balls.length) * Math.PI * 2 - Math.PI / 2 + RG.ang;
+        sb.x = CX + Math.cos(sa) * RR;
+        sb.y = CY + Math.sin(sa) * RR;
+        sb.frozen = true;
+      }
+      if (RG.t >= 2.0) { RG.phase = 'crush'; RG.t = 0; Sound.sfxTrap(); game.shake = 12; }
+    } else if (RG.phase === 'crush') {
+      var ck = Math.min(1, RG.t / 0.18);
+      for (var ci3 = 0; ci3 < game.balls.length; ci3++) {
+        var cb = game.balls[ci3];
+        var ca = (ci3 / game.balls.length) * Math.PI * 2 - Math.PI / 2 + RG.ang;
+        var cr = RR * (1 - ck);
+        cb.x = CX + Math.cos(ca) * cr;
+        cb.y = CY + Math.sin(ca) * cr;
+      }
+      if (RG.t >= 0.18) {
+        game.ring = null; game.tp = null;
+        game.crushed = true;
+        die();
+        return;
+      }
+    }
+  }
+
   // ===== 3-4 传送动画：人炸成碎片 → 碎片飞到屏幕正中 → 重组成人 =====
   if (game.tp) {
     game.tp.t += dt;
@@ -1785,6 +1839,7 @@ function update(dt) {
       game.reversed = true;               // ★ 2-5：世界规则反转
       if (L6.teleportOnButton && !game.tp) {
         game.tp = { t: 0, tx: VW / 2 - p.w / 2, ty: VH / 2 - p.h / 2 };
+        game.ring = { t: 0, phase: 'gather', from: game.balls.map(function (b) { return { x: b.x, y: b.y }; }), spin: 0, ang: 0 };
         // 用和死亡完全一样的尸块粒子
         var DEBRIS2 = ['#9c7a1e', '#b8901f', '#c9a02b', '#d8b02f', '#e8bb35', '#ffd23f', '#fff0a8'];
         for (var tpj = 0; tpj < 32; tpj++) {
