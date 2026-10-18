@@ -1308,7 +1308,12 @@ function update(dt) {
       var rwb = { x: b.x, y: b.y - rwH, w: b.w, h: rwH };
       if (aabb(p, rwb)) {
         if (p.vy > 0 && prevBottom <= rwb.y + 8) { p.y = rwb.y - p.h; p.onGround = true; p.ground = b; p.vy = 0; }
-        else { die(); return; }   // 侧面/下方撞上升起的墙：直接死（不穿墙、不传送）
+        else {
+          // 侧面撞墙：挡住（贴墙停住），不死、不穿墙
+          if (p.x + p.w / 2 < rwb.x + rwb.w / 2) p.x = rwb.x - p.w;
+          else p.x = rwb.x + rwb.w;
+          p.vx = 0;
+        }
       }
       continue;
     }
