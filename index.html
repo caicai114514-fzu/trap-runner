@@ -600,15 +600,15 @@ var LEVELS = [
     spikes: [
       // ② 玩家走到通道内 350 时，刺从通道口(190)开始一排排往右冒，像在追你
       { x: 190, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 3.0, waveDelay: 0.00, waveLeader: true },
-      { x: 215, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 3.0, waveDelay: 0.00 },
-      { x: 270, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 3.0, waveDelay: 0.30 },
-      { x: 295, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 3.0, waveDelay: 0.30 },
-      { x: 350, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 3.0, waveDelay: 0.60 },
-      { x: 375, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 3.0, waveDelay: 0.60 },
-      { x: 430, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 3.0, waveDelay: 0.90 },
-      { x: 455, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 3.0, waveDelay: 0.90 },
-      { x: 510, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 3.0, waveDelay: 1.20 },
-      { x: 535, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 3.0, waveDelay: 1.20 }
+      { x: 215, y: 240, w: 20, h: 30, hidden: true, triggerX: 999999, needFloorDone: true, holdTime: 3.0, waveDelay: 0.00 },
+      { x: 270, y: 240, w: 20, h: 30, hidden: true, triggerX: 999999, needFloorDone: true, holdTime: 3.0, waveDelay: 0.30 },
+      { x: 295, y: 240, w: 20, h: 30, hidden: true, triggerX: 999999, needFloorDone: true, holdTime: 3.0, waveDelay: 0.30 },
+      { x: 350, y: 240, w: 20, h: 30, hidden: true, triggerX: 999999, needFloorDone: true, holdTime: 3.0, waveDelay: 0.60 },
+      { x: 375, y: 240, w: 20, h: 30, hidden: true, triggerX: 999999, needFloorDone: true, holdTime: 3.0, waveDelay: 0.60 },
+      { x: 430, y: 240, w: 20, h: 30, hidden: true, triggerX: 999999, needFloorDone: true, holdTime: 3.0, waveDelay: 0.90 },
+      { x: 455, y: 240, w: 20, h: 30, hidden: true, triggerX: 999999, needFloorDone: true, holdTime: 3.0, waveDelay: 0.90 },
+      { x: 510, y: 240, w: 20, h: 30, hidden: true, triggerX: 999999, needFloorDone: true, holdTime: 3.0, waveDelay: 1.20 },
+      { x: 535, y: 240, w: 20, h: 30, hidden: true, triggerX: 999999, needFloorDone: true, holdTime: 3.0, waveDelay: 1.20 }
     ],
     // ② 距离触发的按钮：离门一定距离就伸出，按了传回出生点
     button: { x: 700, y: 250, w: 40, h: 20, hidden: true, revealDist: 120, tpOnPress: true },
