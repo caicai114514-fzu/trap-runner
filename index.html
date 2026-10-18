@@ -595,7 +595,7 @@ var LEVELS = [
     coins: [
       { x: 350, y: 240 },
       { x: 550, y: 240 },
-      { x: 720, y: 240, fake: true, hidden: true }   // 第三枚假金币：平时不显示，吃满两枚才出现追人，追完消失
+      { x: 720, y: 240, fake: true }                 // 第三枚假金币：开局就在，吃满两枚才开始追，追完消失
     ],
     spikes: [
       // ② 密集刺墙：从通道口(180)每隔50px一排、每排2根，0.12s一波铺到门口
@@ -2435,7 +2435,10 @@ function update(dt) {
       if (co.gone) continue;
     }
     if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22) {
-      if (co.fake) { Sound.sfxBoom(); die(); return; }
+      if (co.fake) {
+        if (co.chasing) { Sound.sfxBoom(); die(); return; }   // 追你时才炸
+        continue;                                              // 站着的时候只是挡路，不炸死
+      }
       co.got = true; Sound.sfxCoin();
       if (co.flip) { game.flipT = 0; Sound.sfxTrap(); }     // 吃到"翻板金币"→整块地板开始翻
       // 4-1：吃掉第一枚 → 隐藏跳板失效（后门被堵）
