@@ -481,14 +481,18 @@ var LEVELS = [
     arrows: []
   },
   {
-    name: '3-4 · 追命', hint: '一根接一根。中间不许停。',
-    width: 960, spawn: [70, 380], jump: 900,
+    name: '3-4 · 弹雨', hint: '它们会追人。',
+    width: 960, spawn: [70, 380],
     goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 400, h: 70, kind: 'solid' },
-      { x: 520, y: 470, w: 440, h: 70, kind: 'solid' },
-      { x: 120, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 200, moveV: 540, moveTo: 400 },
-      { x: 620, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 560, moveV: -580, moveTo: 520 }
+      { x: 0,   y: 470, w: 400, h: 70, kind: 'solid' },     // 左地面
+      { x: 520, y: 470, w: 440, h: 70, kind: 'solid' },     // 右地面（中间 400~520 是坑）
+      { x: 620, y: 372, w: 130, h: 18, kind: 'bounce', power: 1480, popTime: 0.10 }   // 跳板：能把你弹更高
+    ],
+    balls: [
+      { x: 200, bounces: 2, speed: 320 },     // 弹两下就追
+      { x: 460, bounces: 2, speed: 345 },     // 弹两下，更快
+      { x: 800, bounces: 3, speed: 385 }      // 弹三下，最快
     ],
     spikes: [], arrows: []
   },
