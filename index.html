@@ -457,18 +457,24 @@ var LEVELS = [
     spikes: [], arrows: []
   },
   {
-    name: '3-3 · 落球', hint: '球落地后，会追着你跑。',
-    width: 960, spawn: [70, 380],
-    goal: { x: 880, y: 400, w: 46, h: 70 },
-    keys: [{ x: 500, y: 425 }],                  // 钥匙在中间：拿它要冒着被球追的风险
+    name: '3-3 · 回溯', hint: '门不会等你。',
+    width: 960, spawn: [300, 40],                // 4 楼（最上层）
+    goal: { x: 120, y: 400, w: 46, h: 70 },      // 门在最底层左边
+    goalMoveVX: 42,                              // ★ 门自己缓缓往右（往刺的方向）走
+    goalStopX: 700,                              // 走到刺前面停住
+    // 之字形四层塔：交替开口，一层一层往下掉
     platforms: [
-      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' }
+      { x: 180, y: 110, w: 640, h: 22, kind: 'solid' },     // 4 楼（出生，右侧缺口）
+      { x: 320, y: 230, w: 640, h: 22, kind: 'solid' },     // 3 楼（左侧缺口）
+      { x: 180, y: 350, w: 640, h: 22, kind: 'solid' },     // 2 楼（右侧缺口）
+      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid' },     // 1 楼（地面）
+      { x: 0,   y: 400, w: 56, h: 70, kind: 'solid', vanishWall: true }   // 左墙：到底层后收进去，露出钥匙
     ],
-    balls: [
-      { x: 320, bounces: 2, speed: 330 },        // 弹两下就追你
-      { x: 640, bounces: 3, speed: 370 }         // 弹三下才追，但追得更快
+    spikes: [
+      { x: 740, y: 444, w: 220, h: 26 }                    // 1 楼右边一长串刺
     ],
-    spikes: [], arrows: []
+    keys: [{ x: 30, y: 420 }],                              // 钥匙藏在左墙后面
+    arrows: []
   },
   {
     name: '3-4 · 追命', hint: '一根接一根。中间不许停。',
@@ -784,7 +790,9 @@ function loadLevel(i) {
   game.reverse = L.reverse ? -1 : 1;         // 反向关：一开始就是反的
   game.flipOnLand = !!L.flipOnLand;          // 每次落地再反一次
   game.wasOnGround = false;
-  game.goalReveal = (L.fakeGoal || L.goalHidden) ? 0 : 1;   // 真门的显现进度（goalHidden = 一开始连门都没有）
+  game.goalReveal = (L.fakeGoal || L.goalHidden) ? 0 : 1;   // 真门的显现进度
+  game.goalX = L.goal.x;                                    // 会走的门：当前 x
+  game.goalDone = false;
   game.buttonPressed = false;                // 按钮是否按下
   game.wallAngle = 90;                       // 墙初始【竖直】(90°)；按按钮后匀速转起来
   game.wallOn = false;                       // 墙是否开始旋转
@@ -1821,13 +1829,31 @@ function update(dt) {
     }
   }
 
+  // 左墙收进（3-3）：人下到底层后，左边那堵墙缓缓缩进去，露出藏在后面的钥匙
+  if (LEVELS[game.li].platforms.some(function (q) { return q.vanishWall; })) {
+    var vw = null;
+    for (var vi = 0; vi < game.plats.length; vi++) if (game.plats[vi].vanishWall) vw = game.plats[vi];
+    if (vw && p.y > 380 && vw.w > 0) {
+      vw.w = Math.max(0, vw.w - dt * 130);
+      if (vw.w <= 0) { vw.noCollide = true; }
+    }
+  }
+
+  // 会走的门：自己缓缓往右移动（3-3）
+  if (LEVELS[game.li].goalMoveVX && !game.goalDone) {
+    game.goalX += LEVELS[game.li].goalMoveVX * dt;
+    if (LEVELS[game.li].goalStopX !== undefined && game.goalX >= LEVELS[game.li].goalStopX) {
+      game.goalX = LEVELS[game.li].goalStopX; game.goalDone = true;
+    }
+  }
+
   // 到达终点
   var g0 = LEVELS[game.li].goal;
   var LV2 = LEVELS[game.li];
   // 假门关（fakeGoal）：真门必须完全显现(goalReveal>=1)才能通关，否则就是"看不见的门"不算数
   var canWin = !game.goalDead && game.goalReveal > 0.02;   // 门一出现判定就生效（普通关 goalReveal 恒 1）
   if (canWin) {
-    var g = { x: g0.x, y: g0.y + (game.sinkY || 0), w: g0.w, h: g0.h };
+    var g = { x: game.goalX, y: g0.y + (game.sinkY || 0), w: g0.w, h: g0.h };
     if (aabb(p, g)) { winLevel(); return; }
   }
 
@@ -2234,9 +2260,9 @@ function drawGoal() {
   if (L.fakeGoal) {
     if (game.fakeGoalShown) drawOneDoor(L.fakeGoal, 1);   // 假门走近才出现
     if (game.state === 'win' && game.winDoor) {
-      drawOneDoor(L.goal, 1, game.winDoor.k);            // 通关：真门关门动画
+      drawOneDoor({ x: game.goalX, y: L.goal.y, w: L.goal.w, h: L.goal.h }, 1, game.winDoor.k);   // 通关：真门关门动画
     } else {
-      drawOneDoor(L.goal, game.goalReveal, 1);           // 平时：缓缓浮现
+      drawOneDoor({ x: game.goalX, y: L.goal.y, w: L.goal.w, h: L.goal.h }, game.goalReveal, 1);
     }
     return;
   }
