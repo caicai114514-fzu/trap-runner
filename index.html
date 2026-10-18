@@ -1480,7 +1480,8 @@ canvas.addEventListener('mousedown', function (e) {
       else Sound.toggle();                                                                  // 静音 / 非静音
       return;
     }
-    if (pt.x > bx2 && pt.x < bx2 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
+    var _ab = game._achBtn || { x: bx2, y: by2, w: BW2, h: BW2 };
+    if (pt.x > _ab.x && pt.x < _ab.x + _ab.w && pt.y > _ab.y && pt.y < _ab.y + _ab.h) {
       if (inG) { game.settingsOpen = false; game.state = 'levels'; game.levelsWorld = CUR.w; game.cursorL = CUR.i; }  // 退出
       else { game.achOpen = !game.achOpen; if (game.achOpen) game.achT = 0; game.achSel = null; }   // 成就
       return;
@@ -3232,6 +3233,7 @@ function drawSettings(dt) {
   }
 
   // ② 成就按钮（正方形 + 五角星）
+  game._achBtn = { x: bx2, y: by, w: BW, h: BW };   // 缓存命中区（点击直接用）
   ctx.fillStyle = '#2a1410';
   ctx.fillRect(bx2, by, BW, BW);
   ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(bx2, by, BW, BW);
