@@ -1914,8 +1914,8 @@ function update(dt) {
       }
       // 按钮收回动画
       if (game.gRetract) {
-        game.btnAnim = Math.max(0, game.btnAnim - dt * 5);
-        if (game.btnAnim <= 0) { game.gRetract = false; game.gDelay = 0.5; }
+        game.btnAnim = Math.max(0, game.btnAnim - dt * 3.5);
+        if (game.btnAnim <= 0) { game.gRetract = false; game.gDelay = 0.5; }   // 收回后停 0.5 秒
       }
       // 收回后等 0.5 秒，地板才开始升
       if (game.gDelay > 0) {
