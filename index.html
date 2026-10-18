@@ -1311,9 +1311,9 @@ function update(dt) {
   if (game.jumpLock <= 0 && game.jumpBuf > 0 && game.coyote > 0) {
     p.vy = -jumpV; p.onGround = false; game.coyote = 0; game.jumpBuf = 0; p.sq = 0.72;
     Sound.sfxJump();
-  } else if (game.airJumpUnlocked && game.jumpLock <= 0 && game.jumpBuf > 0 && !p.onGround && !game.airJumped) {
-    // 浮空跳（二段跳）：按钮出现后解锁，空中还能再跳一次
-    p.vy = -jumpV * 0.95; game.jumpBuf = 0; game.airJumped = true; p.sq = 0.8;
+  } else if (game.airJumpUnlocked && game.jumpLock <= 0 && game.jumpBuf > 0 && !p.onGround) {
+    // 无限浮空跳：按钮出现后解锁，空中可以一直跳
+    p.vy = -jumpV * 0.95; game.jumpBuf = 0; p.sq = 0.8;
     Sound.sfxJump();
   }
   jumpPressed = false;
