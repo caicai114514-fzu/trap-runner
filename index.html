@@ -1329,12 +1329,15 @@ canvas.addEventListener('mousedown', function (e) {
     var BW2 = 110, GAP2 = 26;
     var bx1 = SX + SW2 / 2 - BW2 - GAP2 / 2, bx2 = SX + SW2 / 2 + GAP2 / 2;
     var by2 = SY + SW2 / 2 - BW2 / 2 + 14;
+    var inG = (game.state === 'play' || game.state === 'dead' || game.state === 'win');
     if (pt.x > bx1 && pt.x < bx1 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
-      Sound.toggle();                       // 静音 / 非静音
+      if (inG) { game.settingsOpen = false; game.settingsT = 0; loadSlot(CUR.w, CUR.i); }   // 重来
+      else Sound.toggle();                                                                  // 静音 / 非静音
       return;
     }
     if (pt.x > bx2 && pt.x < bx2 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
-      game.achOpen = !game.achOpen;         // 成就
+      if (inG) { game.settingsOpen = false; game.settingsT = 0; game.state = 'levels'; game.levelsWorld = CUR.w; game.cursorL = CUR.i; }  // 退出
+      else game.achOpen = !game.achOpen;                                                    // 成就
       return;
     }
     return;   // 弹窗打开时，点别处不穿透
@@ -2982,8 +2985,7 @@ function drawGear(cx, cy, r) {
 }
 function drawSettings(dt) {
   // 齿轮只在菜单类界面出现（一级目录 / 二级选关 / 标题 / 通关），关卡里不显示
-  var inMenu = (game.state === 'title' || game.state === 'world' || game.state === 'levels' || game.state === 'complete');
-  if (inMenu) drawGear(34, VH - 34, 20);
+  drawGear(34, VH - 34, 20);   // 所有界面都有齿轮
 
   if (!game.settingsOpen && (game.settingsT || 0) <= 0) return;
   game.settingsT = Math.min(1, (game.settingsT || 0) + dt * 5);
@@ -3018,6 +3020,40 @@ function drawSettings(dt) {
   var bx1 = SX + SW / 2 - BW - GAP / 2, bx2 = SX + SW / 2 + GAP / 2;
   var by = SY + SW / 2 - BW / 2 + 14;
 
+  var inGame = (game.state === 'play' || game.state === 'dead' || game.state === 'win');
+
+  if (inGame) {
+    // ===== 游戏内：重来 + 退出 =====
+    // ① 重来（回转箭头）
+    ctx.fillStyle = '#2a1410';
+    ctx.fillRect(bx1, by, BW, BW);
+    ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(bx1, by, BW, BW);
+    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    var rccx = bx1 + BW / 2, rccy = by + BW / 2, rcr = BW * 0.26;
+    ctx.beginPath(); ctx.arc(rccx, rccy, rcr, Math.PI * 0.35, Math.PI * 1.95); ctx.stroke();
+    // 箭头
+    var rax = rccx + Math.cos(Math.PI * 0.35) * rcr, ray = rccy + Math.sin(Math.PI * 0.35) * rcr;
+    ctx.beginPath();
+    ctx.moveTo(rax - 10, ray - 4); ctx.lineTo(rax + 4, ray + 2); ctx.lineTo(rax - 2, ray + 14);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // ② 退出（方框缺一边 + 箭头向外）
+    ctx.fillStyle = '#2a1410';
+    ctx.fillRect(bx2, by, BW, BW);
+    ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(bx2, by, BW, BW);
+    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 5;
+    var exx = bx2 + BW / 2 - 12, exy = by + BW / 2 - 12, esz = 26;
+    ctx.beginPath();
+    ctx.moveTo(exx + esz, exy);
+    ctx.lineTo(exx, exy); ctx.lineTo(exx, exy + esz); ctx.lineTo(exx + esz, exy + esz);
+    ctx.moveTo(exx + esz, exy + esz * 0.5);
+    ctx.lineTo(exx + esz + 14, exy + esz * 0.5);   // 往外指的箭头杆
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(exx + esz + 6, exy + esz * 0.5 - 8); ctx.lineTo(exx + esz + 16, exy + esz * 0.5); ctx.lineTo(exx + esz + 6, exy + esz * 0.5 + 8);
+    ctx.stroke();
+  } else {
   // ① 静音按钮（图片）
   ctx.fillStyle = '#2a1410';
   ctx.fillRect(bx1, by, BW, BW);
@@ -3046,6 +3082,7 @@ function drawSettings(dt) {
     if (si === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
   }
   ctx.closePath(); ctx.fill();
+  }
   ctx.restore();
 }
 
