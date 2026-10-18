@@ -475,7 +475,7 @@ var LEVELS = [
     ],
     spikes: [
       { x: 690, y: 444, w: 270, h: 26 },                                      // 1楼右侧刺
-      { x: 700, y: 324, w: 112, h: 26, hidden: true, triggerX: 640 }         // 2楼弹出的刺（走到640触发，宽112极限）
+      { x: 700, y: 324, w: 80, h: 26, hidden: true, onPlatY: 350 }         // 2楼弹出的刺（站上2楼平台才出现，宽80可跳）
     ],
     keys: [{ x: 18, y: 420, hidden: true, revealOnly: true }],   // 钥匙初始隐藏（左墙缩进后才浮现）
     arrows: []
