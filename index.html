@@ -1833,6 +1833,7 @@ function update(dt) {
       game.buttonVisible = true;
       game.airJumpUnlocked = true;      // ★ 获得浮空跳
       game.airJumped = false;
+      game.goalX = p.x + p.w / 2 - LEVELS[game.li].goal.w / 2;   // ★ 门传送到玩家脚下
       Sound.sfxTrap(); game.shake = 8;
     }
   }
