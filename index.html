@@ -2600,6 +2600,8 @@ function update(dt) {
   if (canWin) {
     var g = { x: game.goalX, y: g0.y + (game.sinkY || 0), w: g0.w, h: g0.h };
     if (aabb(p, g)) {
+      // 4-1：从隐藏通道顶上掉下来的（下落状态）→ 直接进门，不触发传送陷阱
+      if (p.vy > 80) { winLevel(); return; }
       // 4-1 第三层陷阱：第一次碰到门 → 门炸成粒子飞走，传送到最左边
       if (LEVELS[game.li].goalTeleportOnTouch && !game.goalTpedOnce) {
         game.goalTpedOnce = true;
