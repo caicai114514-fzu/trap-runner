@@ -1584,7 +1584,6 @@ function update(dt) {
       if (reveal) {
         sp.shown = true; Sound.sfxTrap(); game.shake = 5;
         if (sp.waveLeader && game.spikeWaveT === undefined) game.spikeWaveT = 0;
-        if (game.spikeWaveT !== undefined && game.spikeWaveT >= 0) game.spikeWaveT += dt;
       }
       // 4-1：伸出后持续 holdTime 秒，然后整体收进去
       if (sp.shown && sp.holdTime > 0 && !sp.retracted) {
@@ -1622,6 +1621,7 @@ function update(dt) {
       sp.y = sp.fromY + (sp.targetY - sp.fromY) * ee;
     }
   }
+  if (game.spikeWaveT !== undefined) game.spikeWaveT += dt;   // 4-1 波浪计时每帧推进
 
   // 水平输入（反向关：整体乘以 game.reverse，+1 正常 / -1 反向）
   var left = keys['left'];
