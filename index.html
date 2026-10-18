@@ -1718,11 +1718,12 @@ function update(dt) {
   if (game.buttonVisible && L6.balls && L6.balls.length) {
     var lb3 = null;
     for (var lb4 = 0; lb4 < game.balls.length; lb4++) if (game.balls[lb4].toPlatform) lb3 = game.balls[lb4];
-    if (lb3) {
+    if (lb3 && !lb3.sunkDone) {
       lb3.asPlatform = true;
-      lb3.frozen = true;                                  // 不再弹跳
+      lb3.frozen = true;                                  // 沉下去时先不弹
       var sinkTo = 470 + lb3.r + 6;
-      if (lb3.y < sinkTo) lb3.y = Math.min(sinkTo, lb3.y + dt * 620);   // 沉到球顶略低于地板
+      lb3.y = Math.min(sinkTo, lb3.y + dt * 620);         // 沉到球顶略低于地板
+      if (lb3.y >= sinkTo - 0.5) lb3.sunkDone = true;     // 沉完了就不再管它
     }
   }
 
