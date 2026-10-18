@@ -484,6 +484,7 @@ var LEVELS = [
     name: '3-4 · 弹雨', hint: '它们会追人。',
     width: 960, spawn: [70, 380],
     noGlow: true,                              // 门不要那层光
+    teleportOnButton: true,                    // 按下按钮后人炸成碎片、飞到屏幕正中重组
     goal: { x: 910, y: 400, w: 46, h: 70 },    // 门再往右
     goalHidden: false,
     platforms: [
@@ -819,6 +820,7 @@ function loadLevel(i) {
   game.newWallDone = false; game.newWallT = 0; game.newWallRect = null;
   game.reversed = false;   // 2-5：按下按钮后世界规则反转（刺危险/地板安全）
   game.keyReveal = false;  // 3-3：左墙缩进后，隐藏的钥匙才显现
+  game.tp = null;          // 3-4 传送动画状态
   game.buttonVisible = !(L.button && L.button.hidden);  // 默认显示；hidden 的按钮(2-5)等平台出现才显示
   game.wallSweep = 0;
   if (typeof location !== 'undefined' && location.search.indexOf('wa=') >= 0) {
@@ -1141,6 +1143,17 @@ function update(dt) {
   if (TRANS.on) { updateTransition(dt); return; }
 
   var p = game.p;
+
+  // ===== 3-4 传送动画：人炸成碎片 → 碎片飞到屏幕正中 → 重组成人 =====
+  if (game.tp) {
+    game.tp.t += dt;
+    if (game.tp.t > 0.55) {
+      p.x = game.tp.tx; p.y = game.tp.ty; p.vx = 0; p.vy = 0;
+      if (!game.tp.done) { game.tp.done = true; Sound.sfxWin && Sound.sfxWin(); }
+      if (game.tp.t > 0.85) game.tp = null;
+    }
+    return;    // 动画期间玩家完全不能动
+  }
 
   // 粒子
   for (var i = game.particles.length - 1; i >= 0; i--) {
@@ -1726,6 +1739,21 @@ function update(dt) {
       game.wallOn = true;                 // 墙开始旋转（有墙的关才用）
       game.fakeGoalDead = true;           // 假门失效（碰了没反应）
       game.reversed = true;               // ★ 2-5：世界规则反转
+      if (L6.teleportOnButton && !game.tp) {
+        game.tp = { t: 0, fx: p.x, fy: p.y, tx: VW / 2 - p.w / 2, ty: VH / 2 - p.h / 2 };
+        // 炸成一堆碎片
+        for (var tpj = 0; tpj < 18; tpj++) {
+          var ta = Math.random() * Math.PI * 2, tsv = 120 + Math.random() * 200;
+          game.particles.push({
+            x: p.x + p.w / 2, y: p.y + p.h / 2,
+            vx: Math.cos(ta) * tsv, vy: Math.sin(ta) * tsv - 80,
+            life: 0.55 + Math.random() * 0.2, max: 0.7, size: 3 + Math.random() * 4,
+            col: PAL.player
+          });
+        }
+        Sound.sfxDeath && Sound.sfxDeath();
+        game.shake = 10;
+      }
       game.shake = 8;
       Sound.sfxTrap();
     }
