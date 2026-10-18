@@ -287,13 +287,20 @@ var Sound = {
     }
   },
 
+  muted: false,
   toggle: function () {
-    if (!this.bgmGain) return;
-    var on = this.bgmGain.gain.value > 0.01;
-    this.bgmGain.gain.setTargetAtTime(on ? 0 : 0.28, this.ac.currentTime, 0.05);
-    return !on;
+    this.muted = !this.muted;
+    if (!this.bgmGain) return this.muted;
+    this.bgmGain.gain.setTargetAtTime(this.muted ? 0 : 0.28, this.ac.currentTime, 0.05);
+    return this.muted;
   }
 };
+
+// 设置弹窗用的两个图标（同目录下的 png）
+if (typeof Image !== 'undefined') {
+  Sound.imgOn = new Image(); Sound.imgOn.src = 'sound-on.png';
+  Sound.imgOff = new Image(); Sound.imgOff.src = 'sound-off.png';
+}
 
 /* ==================================================================
    关卡数据 —— 一屏一关（固定视角）
@@ -954,6 +961,9 @@ function loadLevel(i) {
   game.goalReveal = (L.fakeGoal || L.goalHidden) ? 0 : 1;   // 真门的显现进度
   game.goalX = L.goal.x;                                  // 会走的门：当前 x（重生 = 门回原位）
   game.goalDone = false; game.goalMoving = false;
+  game.settingsOpen = false;                 // 设置弹窗是否打开
+  game.settingsT = 0;                        // 设置弹窗滑入动画进度
+  game.achOpen = false;
   game.buttonPressed = false;                // 按钮是否按下
   game.buttonRiseT = 1;                      // 按钮伸出进度（0=埋在地里，1=完全伸出）
   game.wallAngle = 90;                       // 墙初始【竖直】(90°)；按按钮后匀速转起来
@@ -1303,6 +1313,31 @@ canvas.addEventListener('mousedown', function (e) {
   Sound.init();
   if (Sound.ac && Sound.ac.state === 'suspended') Sound.ac.resume();
   var pt = canvasPoint(e);
+
+  // ===== 左下角齿轮：开关设置弹窗 =====
+  if (pt.x < 64 && pt.y > VH - 64) { game.settingsOpen = !game.settingsOpen; game.settingsT = 0; return; }
+
+  // ===== 设置弹窗内的点击 =====
+  if (game.settingsOpen) {
+    var SW2 = 320, SX = (VW - SW2) / 2, SY = (VH - SW2) / 2 + (1 - (game.settingsT || 0)) * 240;
+    // 右上角小叉
+    if (pt.x > SX + SW2 - 40 && pt.x < SX + SW2 - 12 && pt.y > SY + 12 && pt.y < SY + 40) {
+      game.settingsOpen = false; game.settingsT = 0; return;
+    }
+    // 两个按钮（各 110x110，同一水平线）
+    var BW2 = 110, GAP2 = 26;
+    var bx1 = SX + SW2 / 2 - BW2 - GAP2 / 2, bx2 = SX + SW2 / 2 + GAP2 / 2;
+    var by2 = SY + SW2 / 2 - BW2 / 2 + 14;
+    if (pt.x > bx1 && pt.x < bx1 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
+      Sound.toggle();                       // 静音 / 非静音
+      return;
+    }
+    if (pt.x > bx2 && pt.x < bx2 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
+      game.achOpen = !game.achOpen;         // 成就
+      return;
+    }
+    return;   // 弹窗打开时，点别处不穿透
+  }
 
   if (game.state === 'title') {
     // 只有点到那个播放按钮才开始 —— 点屏幕别处不算
@@ -2925,6 +2960,85 @@ function wallBlocks() {
   return out;
 }
 
+/* ---- 设置：左下角齿轮 + 滑入弹窗 ---- */
+var gearSpin = 0;
+function drawGear(cx, cy, r) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  gearSpin += 0.02;
+  ctx.rotate(gearSpin * 0.35);
+  ctx.fillStyle = 'rgba(255,210,63,0.75)';
+  for (var g = 0; g < 8; g++) {
+    ctx.save();
+    ctx.rotate((g / 8) * Math.PI * 2);
+    ctx.fillRect(-r * 0.22, -r - 6, r * 0.44, 10);   // 8 个齿
+    ctx.restore();
+  }
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(20,6,4,0.9)';
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.45, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawSettings(dt) {
+  drawGear(34, VH - 34, 20);
+
+  if (!game.settingsOpen && (game.settingsT || 0) <= 0) return;
+  game.settingsT = Math.min(1, (game.settingsT || 0) + dt * 5);
+  if (!game.settingsOpen) game.settingsT = Math.max(0, game.settingsT - dt * 6);
+
+  var t = game.settingsT;
+  var e = t * t * (3 - 2 * t);
+  var SW = 320, SX = (VW - SW) / 2, SY = (VH - SW) / 2 + (1 - e) * 240;
+
+  ctx.save();
+  ctx.globalAlpha = e;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, VW, VH);
+  // 弹窗本体
+  ctx.fillStyle = '#1a0a06';
+  ctx.fillRect(SX, SY, SW, SW);
+  ctx.strokeStyle = '#c9884a';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(SX, SY, SW, SW);
+
+  // 右上角小叉
+  var xx = SX + SW - 26, xy = SY + 26;
+  ctx.strokeStyle = '#e8b98a';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(xx - 8, xy - 8); ctx.lineTo(xx + 8, xy + 8);
+  ctx.moveTo(xx + 8, xy - 8); ctx.lineTo(xx - 8, xy + 8);
+  ctx.stroke();
+
+  // 两个按钮
+  var BW = 110, GAP = 26;
+  var bx1 = SX + SW / 2 - BW - GAP / 2, bx2 = SX + SW / 2 + GAP / 2;
+  var by = SY + SW / 2 - BW / 2 + 14;
+
+  // ① 静音按钮（图片）
+  ctx.fillStyle = '#2a1410';
+  ctx.fillRect(bx1, by, BW, BW);
+  ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(bx1, by, BW, BW);
+  var img = Sound.muted ? Sound.imgOff : Sound.imgOn;
+  if (img && img.complete) ctx.drawImage(img, bx1 + 18, by + 18, BW - 36, BW - 36);
+
+  // ② 成就按钮（正方形 + 五角星）
+  ctx.fillStyle = '#2a1410';
+  ctx.fillRect(bx2, by, BW, BW);
+  ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(bx2, by, BW, BW);
+  ctx.fillStyle = '#ffd23f';
+  var scx = bx2 + BW / 2, scy = by + BW / 2, sr = 30;
+  ctx.beginPath();
+  for (var si = 0; si < 10; si++) {
+    var ang = -Math.PI / 2 + si * Math.PI / 5;
+    var rr = (si % 2 === 0) ? sr : sr * 0.42;
+    var px2 = scx + Math.cos(ang) * rr, py2 = scy + Math.sin(ang) * rr;
+    if (si === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
 function drawButtonWall() {
   var L = LEVELS[game.li];
 
@@ -4208,6 +4322,7 @@ function drawScene() {
   drawParticles();
   ctx.restore();
   drawHUD();
+  drawSettings(game.dtLast || 1 / 60);   // 设置齿轮 + 弹窗（最上层，所有界面都有）
 }
 
 /* ---------------- 主循环 ---------------- */
@@ -4216,6 +4331,7 @@ function loop(ts) {
   if (!last) last = ts;
   var dt = Math.min(0.033, (ts - last) / 1000);
   last = ts;
+  game.dtLast = dt;
   update(dt);
   render();
   requestAnimationFrame(loop);
