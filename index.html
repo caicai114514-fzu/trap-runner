@@ -877,6 +877,7 @@ function loadLevel(i) {
   game.jumpLocked = false; // 地板在动的期间禁止跳跃（也不响音效）
   game.gShrink = false;    // 3-5 按错：地板从两边往中间收
   game.gWrongPending = null; // 3-5 按错了，等按钮收完+0.5s 再执行惩罚
+  game.gFinal = false;     // 3-5 第四轮：按钮收完就撤地板，玩家必须立刻跳
   game.missiles = [];      // 3-5 四个黑球绕人（半径周期变化）
   if (game.ring3) {
     var R3d = game.ring3;
@@ -2033,6 +2034,11 @@ function update(dt) {
             } else {
               Sound.sfxTrap(); game.shake = 18; die();
             }
+          } else if (game.gFinal) {
+            game.gFinal = false;
+            game.jumpLocked = false;                       // ★ 跳跃恢复
+            game.gShrink = true; game.gShrinkX = ris0.x; game.gShrinkW = ris0.w;   // 地板像第一轮那样消失
+            Sound.sfxTrap(); game.shake = 14;
           } else if (game.gRiseTo !== null) {
             game.gRiseFrom = ris0.y; game.gRiseT = 0;
           }
@@ -2065,7 +2071,7 @@ function update(dt) {
       var touching = (p.ground && p.ground.riser && cx0 > bb.x - 8 && cx0 < bb.x + bb.w + 8);
       if (touching) touchingAny = true;
       if (touching && !game.gBtnLock) {
-        var correct = GM.answers[game.gRound] === gbi;
+        var correct = (game.gRound >= 3) ? true : (GM.answers[game.gRound] === gbi);   // 第四轮按什么都算对
         if (correct) {
           game.gBtnLock = true;
           game.gRound++;
@@ -2075,7 +2081,11 @@ function update(dt) {
           for (var rri = 0; rri < game.plats.length; rri++) if (game.plats[rri].riser) riser = game.plats[rri];
           if (riser) {
             game.gRetract = true;                                  // 两个按钮收回去
-            game.gRiseTo = Math.max(250, riser.y - GM.riseStep);   // 记下要升到哪
+            if (game.gRound >= 4) {
+              game.gFinal = true;                                  // 第四轮：收完就撤地板
+            } else {
+              game.gRiseTo = Math.max(250, riser.y - GM.riseStep);
+            }
           }
         } else {
           // ===== 按错：先和按对一样收按钮+停 0.5s，再执行惩罚 =====
