@@ -1585,6 +1585,7 @@ function update(dt) {
   for (var k = 0; k < game.spikes.length; k++) {
     var sp = game.spikes[k];
     if (sp.onPop) continue;                    // onPop 的刺由 popFired 单独管，别在这里抢
+    if (sp.retracted) continue;   // 已经收回过的刺：不再重新冒出
     if (!sp.shown) {
       var reveal = false;
       if (sp.onPlatY !== null) reveal = !!(p.ground && Math.abs(p.ground.y - sp.onPlatY) < 6);  // 站在二楼平台上才露头
