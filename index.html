@@ -488,7 +488,7 @@ var LEVELS = [
     goalHidden: false,
     platforms: [
       { x: 0,   y: 470, w: 960, h: 70, kind: 'solid' },      // 平地板
-      { x: 880, y: 250, w: 80, h: 22, kind: 'solid' }        // 门上方二楼平台
+      { x: 880, y: 250, w: 80, h: 22, kind: 'solid', oneWay: true }   // 门上方二楼平台：能从下面穿过去
     ],
     // 按钮在二楼平台上，初始不显示：穿过最后一个球后才出现
     button: { x: 900, y: 230, w: 40, h: 20, hidden: true, revealAfterBall: true },
@@ -1304,12 +1304,16 @@ function update(dt) {
   // 反过来调高还能做"跳太高反而撞上天花板尖刺"的坑。
   var jumpV = LEVELS[game.li].jump || JUMP_V;
   var wantJump = keys['jump'];
-  if (p.onGround) game.coyote = 0.1; else game.coyote = Math.max(0, game.coyote - dt);
+  if (p.onGround) { game.coyote = 0.1; game.airJumped = false; } else game.coyote = Math.max(0, game.coyote - dt);
   if (jumpPressed) game.jumpBuf = 0.12; else game.jumpBuf = Math.max(0, game.jumpBuf - dt);
   if (wantJump) game.jumpBuf = Math.max(game.jumpBuf, 0.08);
   if (game.jumpLock > 0) { game.jumpLock -= dt; game.jumpBuf = 0; game.coyote = 0; }
   if (game.jumpLock <= 0 && game.jumpBuf > 0 && game.coyote > 0) {
     p.vy = -jumpV; p.onGround = false; game.coyote = 0; game.jumpBuf = 0; p.sq = 0.72;
+    Sound.sfxJump();
+  } else if (game.airJumpUnlocked && game.jumpLock <= 0 && game.jumpBuf > 0 && !p.onGround && !game.airJumped) {
+    // 浮空跳（二段跳）：按钮出现后解锁，空中还能再跳一次
+    p.vy = -jumpV * 0.95; game.jumpBuf = 0; game.airJumped = true; p.sq = 0.8;
     Sound.sfxJump();
   }
   jumpPressed = false;
@@ -1370,19 +1374,6 @@ function update(dt) {
         // 实心平台的底面可以顶头（墙就是靠这个挡住你的）
         p.y = b.y + b.h; p.vy = 0;
       }
-    }
-  }
-
-  // 变平台的球：球顶当半圆平台站（3-4）
-  for (var bp2 = 0; bp2 < game.balls.length; bp2++) {
-    var blp = game.balls[bp2];
-    if (!blp.asPlatform) continue;
-    var capY = blp.y - blp.r;
-    if (p.x + p.w > blp.x - blp.r && p.x < blp.x + blp.r &&
-        p.vy >= 0 && prevBottom <= capY + 10 && p.y + p.h >= capY && p.y + p.h <= capY + 26) {
-      p.y = capY - p.h; p.vy = 0; p.onGround = true; p.ground = null;
-      blp.riding = true;
-      if (blp.frozen) { blp.frozen = false; blp.vy = -500; }   // 站上去：球重新开始弹
     }
   }
 
@@ -1698,7 +1689,7 @@ function update(dt) {
         if (bl.delay <= 0) bl.homing = true;
       }
     }
-    if (!bl.asPlatform && Math.abs((p.x + p.w / 2) - bl.x) < bl.r + 9 && Math.abs((p.y + p.h / 2) - bl.y) < bl.r + 11) {
+    if (Math.abs((p.x + p.w / 2) - bl.x) < bl.r + 9 && Math.abs((p.y + p.h / 2) - bl.y) < bl.r + 11) {
       die(); return;
     }
   }
@@ -1721,21 +1712,9 @@ function update(dt) {
     for (var lb = 0; lb < game.balls.length; lb++) if (game.balls[lb].toPlatform) lastBall = game.balls[lb];
     if (lastBall && p.x + p.w / 2 > lastBall.x) {
       game.buttonVisible = true;
-      lastBall.asPlatform = true;
+      game.airJumpUnlocked = true;      // ★ 获得浮空跳
+      game.airJumped = false;
       Sound.sfxTrap(); game.shake = 8;
-    }
-  }
-
-  // 按钮【出现】后：最后一个球脱离控制，自己往下沉到地板以下，变成能站的平台
-  if (game.buttonVisible && L6.balls && L6.balls.length) {
-    var lb3 = null;
-    for (var lb4 = 0; lb4 < game.balls.length; lb4++) if (game.balls[lb4].toPlatform) lb3 = game.balls[lb4];
-    if (lb3 && !lb3.sunkDone) {
-      lb3.asPlatform = true;
-      lb3.frozen = true;                                  // 沉下去时先不弹
-      var sinkTo = 464 + lb3.r;
-      lb3.y = Math.min(sinkTo, lb3.y + dt * 620);         // 沉到球顶略低于地板
-      if (lb3.y >= sinkTo - 0.5) { lb3.sunkDone = true; lb3.baseY = sinkTo; }   // 沉完了就不再管它
     }
   }
 
@@ -2338,16 +2317,6 @@ function drawBalls() {
   for (var i = 0; i < game.balls.length; i++) {
     var b = game.balls[i];
     // 玩家进入球的范围（x 轴）→ 球重新开始上下移动
-    if (b.asPlatform) {
-      if (Math.abs((game.p.x + game.p.w / 2) - b.x) < b.r) b.liveT = (b.liveT || 0) + 1 / 60;
-      if (b.liveT > 0) {
-        b.y = b.baseY - Math.abs(Math.sin(b.liveT * 2.2)) * 190;   // 上下浮动
-        var bp = game.p;
-        if (Math.abs((bp.x + bp.w / 2) - b.x) < b.r && bp.y + bp.h >= b.y - b.r - 6 && bp.y + bp.h <= b.y - b.r + 14 && bp.vy >= 0) {
-          bp.y = b.y - b.r - bp.h; bp.vy = 0;   // 站上去跟着球走
-        }
-      }
-    }
     ctx.save();
     ctx.translate(b.x, b.y);
     ctx.rotate(b.spin);
