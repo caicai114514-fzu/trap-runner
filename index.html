@@ -3531,7 +3531,7 @@ function drawDemonSelect(W) {
   }
 
   // 向下的线：未解锁=红线渐淡，解锁=黑线
-  var ly = upY + 100, ly2 = upY + 190;
+  var ly = upY + 100, ly2 = upY + 200;
   var lg = ctx.createLinearGradient(0, ly, 0, ly2);
   if (inner) {
     lg.addColorStop(0, '#0a0305'); lg.addColorStop(1, 'rgba(10,3,5,0)');
@@ -3549,8 +3549,8 @@ function drawDemonSelect(W) {
 
   // 里魔王地狱门（下方）：未解锁时不画门，只留一根渐淡红线；门下移，不挡眼睛
   if (inner) {
-    drawHellGate(VW / 2, dnY + 64, 82, 58, inner);
-    text('里魔王', VW / 2, dnY + 144, 14, '#dd4433', 'center', true);
+    drawHellGate(VW / 2, dnY + 92, 82, 58, inner);   // 再往下，绝不压住眼睛
+    text('里魔王', VW / 2, dnY + 172, 14, '#dd4433', 'center', true);
   }
 
   // 光标
