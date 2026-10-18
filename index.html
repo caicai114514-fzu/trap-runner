@@ -1891,8 +1891,8 @@ function update(dt) {
       if (!game.riserSank && p.ground === ris0) { game.riserSank = true; game.gBtns = true; Sound.sfxTrap(); game.shake = 6; }
       if (game.riserSank && ris0.y < 470) { ris0.y = Math.min(470, ris0.y + dt * 190); }
       // 人站在地板上：像坐电梯一样跟着地板走（不弹不甩）
-      if (p.ground === ris0 || (Math.abs((p.y + p.h) - ris0.y) < 4 && p.x + p.w > ris0.x && p.x < ris0.x + ris0.w)) {
-        p.y = ris0.y - p.h; p.vy = 0; p.onGround = true; p.ground = ris0;
+      if (p.x + p.w > ris0.x && p.x < ris0.x + ris0.w && Math.abs((p.y + p.h) - ris0.y) < 34) {
+        p.y = ris0.y - p.h; p.vy = 0; p.onGround = true; p.ground = ris0;   // 人贴在地板上，像电梯
       }
       // 沉到底之后，按钮才开始伸出来
       if (game.riserSank && ris0.y >= 470 - 0.5) {
