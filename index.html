@@ -537,17 +537,17 @@ var LEVELS = [
   },
   {
     name: '3-5 · 赌命', hint: '两个按钮，只有一个是真的。',
-    width: 960, spawn: [70, 280],
-    goal: { x: 880, y: 280, w: 46, h: 70 },
-    gamble: { answers: [0, 1, 1, 0], riseStep: 38 },   // 0=左按钮对，1=右按钮对；4 轮
+    width: 960, spawn: [110, 200],
+    goal: { x: 850, y: 180, w: 46, h: 70 },
+    gamble: { answers: [0, 1, 1, 0], riseStep: 55 },   // 四轮，每轮升 55px
     gambleButtons: [
-      { x: 55,  y: 285, w: 42, h: 20 },     // 左按钮
-      { x: 863, y: 285, w: 42, h: 20 }      // 右按钮
+      { x: 55,  y: 185, w: 42, h: 20 },     // 左高台上的按钮
+      { x: 862, y: 185, w: 42, h: 20 }      // 右高台上的按钮
     ],
     platforms: [
-      { x: 0,   y: 320, w: 200, h: 150, kind: 'solid' },     // 左高台（出生）
-      { x: 760, y: 320, w: 200, h: 150, kind: 'solid' },     // 右高台（门）
-      { x: 200, y: 470, w: 560, h: 70, kind: 'solid', riser: true }   // 中间地板（会上升）
+      { x: 0,   y: 250, w: 220, h: 220, kind: 'solid' },            // 左高台（出生）
+      { x: 740, y: 250, w: 220, h: 220, kind: 'solid' },            // 右高台（门）
+      { x: 220, y: 470, w: 520, h: 70, kind: 'solid', riser: true } // 中间地板（会上升）
     ],
     spikes: [], saws: [], arrows: []
   },
