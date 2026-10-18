@@ -3566,17 +3566,16 @@ function drawLevelSelect() {
   g.addColorStop(0, W.bg); g.addColorStop(1, W.bgDeep);
   ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
 
+  // 第四大关：完全独立的界面（不画底部配图，避免多出一只眼睛）
+  if (game.levelsWorld === 3) { drawDemonSelect(W); return; }
+
   menuHeader(W, true);
   drawMenuHelp('← →  选关      空格 / 点击  进入      R 返回');
 
   // 底部配图：每个大关讲自己那关的故事
   if (game.levelsWorld === 0) decorGround(W);
   else if (game.levelsWorld === 1) decorIllusion(W);
-  else if (game.levelsWorld === 2) decorMachine(W);
-  else decorDemon(W);
-
-  // 第四大关：地狱门二级目录（表魔王 + 里魔王）
-  if (game.levelsWorld === 3) { drawDemonSelect(W); return; }
+  else decorMachine(W);
 
   // 关卡之间的虚线小路
   ctx.strokeStyle = W.terrEdge; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.setLineDash([2, 13]);
