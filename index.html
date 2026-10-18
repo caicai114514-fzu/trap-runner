@@ -1735,7 +1735,7 @@ function update(dt) {
       lb3.frozen = true;                                  // 沉下去时先不弹
       var sinkTo = 464 + lb3.r;
       lb3.y = Math.min(sinkTo, lb3.y + dt * 620);         // 沉到球顶略低于地板
-      if (lb3.y >= sinkTo - 0.5) lb3.sunkDone = true;     // 沉完了就不再管它
+      if (lb3.y >= sinkTo - 0.5) { lb3.sunkDone = true; lb3.baseY = sinkTo; }   // 沉完了就不再管它
     }
   }
 
@@ -2337,6 +2337,17 @@ function drawKeys() {
 function drawBalls() {
   for (var i = 0; i < game.balls.length; i++) {
     var b = game.balls[i];
+    // 玩家进入球的范围（x 轴）→ 球重新开始上下移动
+    if (b.asPlatform) {
+      if (Math.abs((game.p.x + game.p.w / 2) - b.x) < b.r) b.liveT = (b.liveT || 0) + 1 / 60;
+      if (b.liveT > 0) {
+        b.y = b.baseY - Math.abs(Math.sin(b.liveT * 2.2)) * 190;   // 上下浮动
+        var bp = game.p;
+        if (Math.abs((bp.x + bp.w / 2) - b.x) < b.r && bp.y + bp.h >= b.y - b.r - 6 && bp.y + bp.h <= b.y - b.r + 14 && bp.vy >= 0) {
+          bp.y = b.y - b.r - bp.h; bp.vy = 0;   // 站上去跟着球走
+        }
+      }
+    }
     ctx.save();
     ctx.translate(b.x, b.y);
     ctx.rotate(b.spin);
