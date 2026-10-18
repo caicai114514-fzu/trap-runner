@@ -1270,7 +1270,7 @@ var ACT = {
   ArrowLeft: 'left', KeyA: 'left',
   ArrowRight: 'right', KeyD: 'right',
   ArrowDown: 'down', KeyS: 'down',
-  KeyR: 'restart', KeyM: 'music', KeyN: 'skip', Enter: 'enter'
+  KeyR: 'restart', KeyM: 'music', Enter: 'enter'
 };
 function keyAction(e) {
   if (e.code && ACT[e.code]) return ACT[e.code];
@@ -1370,14 +1370,6 @@ window.addEventListener('keydown', function (e) {
     return;   // 弹窗打开时吃掉所有按键
   }
 
-  if (e.code === 'KeyN' && game.state === 'play') {
-    e.preventDefault(); debugClearCurrent(); return;
-  }
-  if (game.state !== 'play') {
-    if (e.code === 'KeyA') { e.preventDefault(); giveKey(0); flashMsg('🔑 获得钥匙 · 脚下不稳'); return; }
-    if (e.code === 'KeyB') { e.preventDefault(); giveKey(1); flashMsg('🔑 获得钥匙 · 眼见为虚'); return; }
-    if (e.code === 'KeyC') { e.preventDefault(); giveKey(2); flashMsg('🔑 获得钥匙 · 机关重重'); return; }
-  }
 
   var a = keyAction(e);
   if (!a) return;
@@ -1409,7 +1401,6 @@ window.addEventListener('keydown', function (e) {
   if ((game.state === 'title' || game.state === 'complete') && (a === 'jump' || a === 'enter')) startGame();
   else if (a === 'music') Sound.toggle();
   else if (a === 'restart' && game.state === 'play') loadSlot(CUR.w, CUR.i);
-  else if (a === 'skip' && game.state === 'play' && game.deaths >= 8) skipLevel();
 });
 
 function enterWorld(w) {
@@ -3861,7 +3852,6 @@ function drawTitle() {
 
   drawStartButton(t);
 
-  text('调试：N 直接通关　　A / B / C 拿钥匙', VW / 2, VH - 26, 13, PAL.faint, 'center');
 }
 
 /* 播放按钮：正方形边框 + 里面一个三角形，鼠标悬停时变亮 */
@@ -4205,7 +4195,7 @@ function drawWorldSelect() {
   ctx.globalAlpha = 1;
 
   menuHeader(null, false);
-  drawMenuHelp('← →  选路      空格 / 点击  进入      按 N 直接通关当前关        A / B / C  拿钥匙（调试）');
+  drawMenuHelp('← →  选路      空格 / 点击  进入      R 返回');
 
   // 曲折路径
   var pts = DOOR_POS.map(function (d) { return { x: d.x, y: d.y + 34 }; });
