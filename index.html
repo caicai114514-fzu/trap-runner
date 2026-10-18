@@ -2795,6 +2795,12 @@ function drawSpikes() {
     if (!sp.shown) continue;
     if (sp.onPop && !game.popFired) continue;      // 保险：没弹起来就不画
     var box = spikeBox(sp);
+    // ★ 用 sp.anim 缩放高度：anim=1 全高，anim=0 缩回地面（收回动画）
+    var spA = (sp.anim === undefined || sp.anim === null) ? 1 : sp.anim;
+    if (spA <= 0.02) continue;
+    var baseY = box.y + box.h;                  // 刺的底部（地面）
+    var hh = box.h * spA;                       // 当前可见高度
+    box = { x: box.x, y: baseY - hh, w: box.w, h: hh };
     var n = Math.max(1, Math.round(box.w / 16));   // 15px 的窄刺就画 1 根，49px 画 3 根
     var step = box.w / n;
     // 纯色三角，一次画完，没有描边也没有高光
