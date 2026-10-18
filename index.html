@@ -4619,7 +4619,7 @@ function render() {
     ctx.save();
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(0,0,0,0.8)';
-    ctx.fillRect(VW / 2 - 230, VH / 2 - 78, 460, 168);
+    ctx.fillRect(VW / 2 - 230, VH / 2 - 78, 460, 200);
     ctx.font = '700 26px monospace'; ctx.fillStyle = '#00ff88';
     ctx.fillText('点: ' + (_p ? _p.x + ',' + _p.y : '未点击'), VW / 2, VH / 2 - 46);
     if (_b) {
@@ -4630,6 +4630,8 @@ function render() {
       ctx.font = '700 46px monospace';
       ctx.fillStyle = _hit ? '#00ff88' : '#ff5555';
       ctx.fillText(_hit ? 'HIT' : 'MISS', VW / 2, VH / 2 + 60);
+      ctx.font = '700 16px monospace'; ctx.fillStyle = '#ffffff';
+      ctx.fillText('state=' + game.state + ' achOpen=' + game.achOpen + ' achT=' + (game.achT || 0).toFixed(2), VW / 2, VH / 2 + 96);
     }
     ctx.restore();
   }
