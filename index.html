@@ -539,7 +539,7 @@ var LEVELS = [
     name: '3-5 · 赌命', hint: '两个按钮，只有一个是真的。',
     width: 960, spawn: [110, 200],
     goal: { x: 850, y: 180, w: 46, h: 70 },
-    gamble: { answers: [0, 1, 1, 0], riseStep: 55 },
+    gamble: { answers: [0, 0, 1, 0], riseStep: 55 },   // 前三轮：左 左 右
     gambleButtons: [
       { x: 258, y: 228, w: 42, h: 20 },     // 中间地板左端（往里一点）
       { x: 660, y: 228, w: 42, h: 20 }      // 中间地板右端（往里一点）
@@ -1944,7 +1944,7 @@ function update(dt) {
       var touching = (p.ground && p.ground.riser && cx0 > bb.x - 8 && cx0 < bb.x + bb.w + 8);
       if (touching) touchingAny = true;
       if (touching && !game.gBtnLock) {
-        var correct = true;   // ★ 临时测试：按什么都对（之后改回 GM.answers[game.gRound] === gbi）
+        var correct = GM.answers[game.gRound] === gbi;
         if (correct) {
           game.gBtnLock = true;
           game.gRound++;
