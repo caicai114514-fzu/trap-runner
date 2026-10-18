@@ -566,15 +566,17 @@ var LEVELS = [
     name: '4-1 · 表魔王', hint: '有条近路，也有代价。',
     width: 960, spawn: [60, 380], jump: 900,
     goal: { x: 880, y: 400, w: 46, h: 70 },
-    // 正常路线：地面跳过中间那个坑（会经过检查点）
-    // 后门：踩左下隐藏跳板弹上顶层，沿"藏在墙里"的横线一路滑到右边跳下来
+    // 正常路线：地面跳过中间的坑（经过检查点）
+    // 后门：走下角那块小跳板 → 弹进"天花板里"的隐藏通道 → 沿通道滑到右边掉下来
     shortcutCheck: { x: 340, y: 430, w: 90, h: 40 },
+    hiddenPathY: 200,                                  // 玩家 y 小于这个值 = 在隐藏通道里（不画人）
     platforms: [
       { x: 0,   y: 470, w: 300, h: 70, kind: 'solid' },
-      { x: 300, y: 470, w: 200, h: 70, kind: 'fake' },                // 中间的坑
+      { x: 300, y: 470, w: 200, h: 70, kind: 'fake' },
       { x: 500, y: 470, w: 460, h: 70, kind: 'solid' },
-      { x: 0,   y: 240, w: 790, h: 22, kind: 'solid', oneWay: true }, // 顶层"藏在墙里"的横线
-      { x: 15,  y: 470, w: 230, h: 10, kind: 'bounce', power: 1210, popTime: 0.10 }   // 左下隐藏跳板
+      { x: 0,   y: 0,   w: 960, h: 90,  kind: 'solid' },                                   // 天花板（贴图封死）
+      { x: 0,   y: 130, w: 790, h: 18,  kind: 'solid', oneWay: true, hiddenPath: true },   // 隐藏通道（代码存在、贴图不画）
+      { x: 8,   y: 470, w: 42,  h: 10,  kind: 'bounce', power: 1350, popTime: 0.10 }       // 角落小跳板（不盖出生点）
     ],
     spikes: [{ x: 310, y: 444, w: 180, h: 26 }],
     arrows: []
@@ -818,7 +820,8 @@ function loadLevel(i) {
       deadly: !!p.deadly,
       riseT: 0, risePhase: 'idle', riseY: 0,  // riseWall：升起的墙
       slideWall: !!p.slideWall,           // 3-3：会往左缩进的下半堵墙
-      riser: !!p.riser                   // 3-5：博弈对就上升的地板
+      riser: !!p.riser,                  // 3-5：博弈对就上升的地板
+      hiddenPath: !!p.hiddenPath         // 4-1：天花板里的隐藏通道（有碰撞不绘制）
     };
   });
   game.spikes = L.spikes.map(function (s) {
@@ -2485,6 +2488,7 @@ function drawPlatforms() {
     var p = game.plats[i];
     if (p.state === 'hidden') continue;
     if (p.state === 'gone') continue;
+    if (p.hiddenPath) continue;          // 隐藏通道：贴图上完全看不见
     var grow = p.appeared > 0 ? 1 - p.appeared / 0.18 : 1;
     ctx.save();
     if (p.appeared > 0) ctx.globalAlpha = 0.35 + 0.65 * grow;
@@ -2982,6 +2986,9 @@ function drawArrows() {
 function drawPlayer() {
   // 传送动画期间：只画粒子，人一帧都不能露（逐帧动画：首帧=粒子，末帧=人）
   if (game.tp) return;
+  // 4-1：走在天花板里的隐藏通道上时，人也要藏起来
+  var hpY = LEVELS[game.li] && LEVELS[game.li].hiddenPathY;
+  if (hpY !== undefined && game.p.y < hpY) return;
   if (game.state === 'dead') return;
   var p = game.p;
   var t = p.anim || 0;
