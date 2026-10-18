@@ -825,7 +825,7 @@ function loadLevel(i) {
   game.revealStarted = false;
   game.balls = (L.balls || []).map(function (b) {
     return {
-      x: b.x, y: (b.y === undefined ? (b.fromBottom ? 470 : -50) : b.y), r: b.r || 18,
+      x: b.x, y: (b.y === undefined ? (b.fromBottom ? 470 : -50) : b.y), r: b.r || 32,
       bounceH: (b.bounceH === undefined ? 110 : b.bounceH),
       noHoming: !!b.noHoming,               // 永不追踪（只做普通弹跳）
       toPlatform: !!b.toPlatform,           // 触发后变成可站立的半圆平台
@@ -1671,12 +1671,12 @@ function update(dt) {
       bl.x += bx / bd * bl.speed * dt;
       bl.y += by / bd * bl.speed * dt;
     } else {
-      bl.vy = Math.min(1200, bl.vy + GRAVITY * dt);
+      bl.vy = Math.min(900, bl.vy + GRAVITY * 0.32 * dt);   // 球的重力更小：掉得慢、弹得高
       bl.y += bl.vy * dt;
       // 落地反弹
       if (bl.y + bl.r > 470) {
         bl.y = 470 - bl.r;
-        bl.vy = -Math.sqrt(2 * GRAVITY * (bl.bounceH || 110));   // 固定弹起高度，慢而稳定
+        bl.vy = -bl.vy;                 // 不衰减，配合低重力：弹得高但慢
         bl.bounce++;
         if (bl.bounce === 1) Sound.sfxTrap();
         if (!bl.noHoming && bl.bounce >= bl.maxBounce && !bl.armed) { bl.armed = true; bl.delay = (bl.delay === undefined ? 1.4 : bl.delay); }
