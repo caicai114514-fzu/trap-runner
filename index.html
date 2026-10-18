@@ -1450,7 +1450,8 @@ function update(dt) {
   // ===== 3-4 传送动画：人炸成碎片 → 碎片飞到屏幕正中 → 重组成人 =====
   if (game.tp) {
     game.tp.t += dt;
-    var tcx = VW / 2, tcy = VH / 2;
+    var tcx = (game.tp.tx !== undefined ? game.tp.tx + p.w / 2 : VW / 2);
+    var tcy = (game.tp.ty !== undefined ? game.tp.ty + p.h / 2 : VH / 2);
     // 碎片刻散 0.12s 后，全部被吸向屏幕正中
     if (game.tp.t > 0.12) {
       for (var pj = 0; pj < game.particles.length; pj++) {
@@ -2435,7 +2436,7 @@ function update(dt) {
       if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22 && co.fake) {
         Sound.sfxBoom(); die(); return;
       }
-      if (co.chaseFrom - co.x > 380) { co.gone = true; co.hidden = true; }
+      if (co.chaseFrom - co.x > 540) { co.gone = true; co.hidden = true; }
       if (co.gone) continue;
     }
     if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22) {
