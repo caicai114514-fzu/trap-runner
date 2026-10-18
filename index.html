@@ -2017,8 +2017,9 @@ function update(dt) {
               Sound.sfxTrap(); game.shake = 16;
             } else if (wr === 2) {
               // 惊喜三：把人掳到右高台顶，四个黑球绕着他转 4 秒再贯穿
-              game.tp = { t: 0, tx: 840, ty: 160 };
-              game.ring3 = { t: 0, ang: 0, spin: 0, cx: 853, cy: 174 };   // 台子正上方，浮空
+              var mcx = ris0.x + ris0.w / 2, mcy = ris0.y - 110;   // 中间升降平台正上方，浮空
+              game.tp = { t: 0, tx: mcx - p.w / 2, ty: mcy - p.h / 2 };
+              game.ring3 = { t: 0, ang: 0, spin: 0, cx: mcx, cy: mcy };
               var DB = ['#9c7a1e', '#b8901f', '#c9a02b', '#d8b02f'];
               for (var dj = 0; dj < 18; dj++) {
                 var da = Math.random() * Math.PI * 2, dv = 60 + Math.random() * 180;
