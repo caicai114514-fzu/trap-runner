@@ -1381,6 +1381,8 @@ function update(dt) {
     if (p.x + p.w > blp.x - blp.r && p.x < blp.x + blp.r &&
         p.vy >= 0 && prevBottom <= capY + 10 && p.y + p.h >= capY && p.y + p.h <= capY + 26) {
       p.y = capY - p.h; p.vy = 0; p.onGround = true; p.ground = null;
+      blp.riding = true;
+      if (blp.frozen) { blp.frozen = false; blp.vy = -500; }   // 站上去：球重新开始弹
     }
   }
 
@@ -1675,6 +1677,10 @@ function update(dt) {
     } else if (!bl.frozen) {
       bl.vy = Math.min(900, bl.vy + GRAVITY * 0.32 * dt);   // 球的重力更小：掉得慢、弹得高
       bl.y += bl.vy * dt;
+      // 有人站在球顶：带着他一起动
+      if (bl.riding && p.x + p.w > bl.x - bl.r && p.x < bl.x + bl.r && Math.abs((p.y + p.h) - (bl.y - bl.r)) < 6) {
+        p.y = (bl.y - bl.r) - p.h; p.vy = 0;
+      }
       // 落地反弹
       if (bl.y + bl.r > 470) {
         bl.y = 470 - bl.r;
