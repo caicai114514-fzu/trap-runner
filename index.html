@@ -2258,9 +2258,9 @@ function update(dt) {
     for (var rfi = 0; rfi < game.plats.length; rfi++) if (game.plats[rfi].retractFloor) rf = game.plats[rfi];
     if (rf) {
       game.floorT += dt;
-      if (game.floorT < 0.5) { rf.x = 90 - (game.floorT / 0.5) * 90; }       // 0.5s 往左收进去
-      else if (game.floorT > 2.0) { rf.x = 90 - (1 - (game.floorT - 2.0) / 0.5) * 90; }  // 停 1.5s 后 0.5s 伸回来
-      if (game.floorT > 2.5) { rf.x = 90; game.floorRetract = false; game.floorT = 0; }
+      if (game.floorT < 0.15) { rf.x = 90 - (game.floorT / 0.15) * 90; }       // 0.15s 快速收进去
+      else if (game.floorT > 2.0) { rf.x = 90 - (1 - (game.floorT - 2.0) / 0.3) * 90; }  // 停 1.85s 后 0.3s 伸回来
+      if (game.floorT > 2.3) { rf.x = 90; game.floorRetract = false; game.floorT = 0; }
     }
   }
 
