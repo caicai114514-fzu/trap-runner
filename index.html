@@ -4523,7 +4523,7 @@ loadLevel(0);
 game.state = 'title';
 if (typeof location !== 'undefined' && location.search.indexOf('lv=') >= 0) { var _lv = parseInt(location.search.split('lv=')[1]) || 0; loadLevel(_lv); game.state = 'play'; applyWorldPalette(Math.floor(_lv / 5)); Sound.startBgm(); }
 if (typeof location !== 'undefined' && location.search.indexOf('settings=1') >= 0) { game.settingsOpen = true; game.settingsT = 1; }
-if (typeof location !== 'undefined' && location.search.indexOf('reset=1') >= 0) { game.settingsOpen = true; game.settingsT = 1; game.resetOpen = true; game.resetCode = '4271'; game.resetInput = '42'; }
+if (typeof location !== 'undefined' && location.search.indexOf('reset=1') >= 0) { game.settingsOpen = true; game.settingsT = 1; game.resetOpen = true; game.resetT = 1; game.resetCode = '4271'; game.resetInput = '42'; }
 
 /* 调试：?screen=world|levels|demon|play|win  可以直接跳到某个界面看效果
          ?w=0..3   指定大关（play / win 用）
