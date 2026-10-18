@@ -597,7 +597,13 @@ var LEVELS = [
       { x: 550, y: 240 },
       { x: 720, y: 240, fake: true }       // 第三枚假金币：吃完第二枚才开始追
     ],
-    spikes: [], arrows: []
+    spikes: [
+      // ② 窄通道天花板的刺：走一段距离(atX 300)后出现，追人，速度略快——停下来就被扎
+      { x: 400, y: 100, w: 34, h: 46, dir: 'down', hidden: true, atX: 300, follow: true, followDist: 44, moveSpeed: 5.6 }
+    ],
+    // ② 距离触发的按钮：离门一定距离就伸出，按了传回出生点
+    button: { x: 700, y: 250, w: 40, h: 20, hidden: true, revealDist: 120, tpOnPress: true },
+    arrows: []
   },
   {
     name: '4-2 · 里魔王', hint: '没有近路了。',
@@ -2206,6 +2212,11 @@ function update(dt) {
     if (!touchingAny) game.gBtnLock = false;   // 离开按钮范围才能再按
   }
 
+  // ② 距离触发的按钮：离门一定距离就从地板伸出来
+  if (L6.button && L6.button.revealDist !== undefined && !game.buttonVisible) {
+    if (p.x > L6.goal.x - L6.button.revealDist) { game.buttonVisible = true; Sound.sfxTrap(); }
+  }
+
   // ===== 按钮：碰一下触发整条连锁 =====
   if (L6.button && !game.buttonPressed) {
     var bt = L6.button;
@@ -2214,6 +2225,16 @@ function update(dt) {
       game.wallOn = true;                 // 墙开始旋转（有墙的关才用）
       game.fakeGoalDead = true;           // 假门失效（碰了没反应）
       game.reversed = true;               // ★ 2-5：世界规则反转
+      if (L6.button && L6.button.tpOnPress && !game.tp) {
+        var _sp = L6.spawn;
+        game.tp = { t: 0, tx: _sp[0], ty: _sp[1] };
+        var DB = ['#9c7a1e', '#b8901f', '#c9a02b', '#d8b02f', '#e8bb35', '#ffd23f', '#fff0a8'];
+        for (var _pj = 0; _pj < 30; _pj++) {
+          var _a = Math.random() * Math.PI * 2, _v = 60 + Math.random() * 220;
+          game.particles.push({ x: p.x + p.w / 2, y: p.y + p.h / 2, vx: Math.cos(_a) * _v, vy: Math.sin(_a) * _v - 110, life: 1.4, max: 1.4, c: DB[(Math.random() * 7) | 0], debris: true, pulled: false });
+        }
+        Sound.sfxTeleport();
+      }
       if (L6.teleportOnButton && !game.tp) {
         game.tp = { t: 0, tx: VW / 2 - p.w / 2, ty: VH / 2 - p.h / 2 };
         game.ring = { t: 0, phase: 'gather', from: game.balls.map(function (b) { return { x: b.x, y: b.y }; }), spin: 0, ang: 0 };
