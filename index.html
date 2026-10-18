@@ -1464,7 +1464,8 @@ canvas.addEventListener('mousedown', function (e) {
 
   // ===== 设置弹窗内的点击 =====
   if (game.settingsOpen) {
-    var SW2 = 320, SH2 = 372, SX = (VW - SW2) / 2, SY = (VH - SH2) / 2 + (1 - (game.settingsT || 0)) * 280;
+    var _sT = (game.settingsT || 0), _sE = _sT * _sT * (3 - 2 * _sT);
+    var SW2 = 320, SH2 = 372, SX = (VW - SW2) / 2, SY = (VH - SH2) / 2 + (1 - _sE) * 280;
     // 右上角小叉
     if (pt.x > SX + SW2 - 40 && pt.x < SX + SW2 - 12 && pt.y > SY + 12 && pt.y < SY + 40) {
       game.settingsOpen = false; return;   // 只置 false，让 settingsT 自然退场
