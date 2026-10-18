@@ -1908,7 +1908,7 @@ function update(dt) {
       }
       // 按错：地板从两边往中间快速收，最后完全消失
       if (game.gShrink) {
-        ris0.w = Math.max(0, ris0.w - dt * 900);       // 两边同时往中间收
+        ris0.w = Math.max(0, ris0.w - dt * 2200);      // 两边同时往中间收（快）
         ris0.x = game.gShrinkX + (game.gShrinkW - ris0.w) / 2;
         if (ris0.w <= 0.5) { ris0.state = 'gone'; ris0.noCollide = true; game.gShrink = false; }
       }
