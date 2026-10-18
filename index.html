@@ -3022,8 +3022,10 @@ function drawSettings(dt) {
   var img = Sound.muted ? Sound.imgOff : Sound.imgOn;
   if (img && img.complete) {
     ctx.save();
-    ctx.globalCompositeOperation = 'multiply';   // 白底 → 融进弹窗底色，只留黑色图标
+    ctx.filter = 'invert(1)';                    // 黑图标 → 白，白底 → 黑
+    ctx.globalCompositeOperation = 'screen';     // 黑（原白底）不显示，白（原图标）留下
     ctx.drawImage(img, bx1 + 20, by + 20, BW - 40, BW - 40);
+    ctx.filter = 'none';
     ctx.restore();
   }
 
