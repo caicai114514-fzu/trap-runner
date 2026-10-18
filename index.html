@@ -302,6 +302,28 @@ if (typeof Image !== 'undefined') {
   Sound.imgOff = new Image(); Sound.imgOff.src = 'sound-off.png';
 }
 
+/* ---- 成就展示 ---- */
+var ACH_META = [
+  { key: 0,         name: '脚下很稳',  on: '通关 1-5',           off: '通关 1-5' },
+  { key: 1,         name: '火眼金睛',  on: '通关 2-5',           off: '通关 2-5' },
+  { key: 2,         name: '披荆斩棘',  on: '通关 3-5',           off: '通关 3-5' },
+  { key: 3,         name: '逃出生天',  on: '通关 4-1',           off: '通关 4-1' },
+  { key: 'save',      name: '自我救赎', on: '第一次拿到钥匙',     off: '失去了才能获得' },
+  { key: 'sacrifice', name: '献祭大师', on: '三把钥匙拿满',       off: '完成未完成的，祭品' },
+  { key: 'pointless', name: '多此一举', on: '3-4 按下按钮后死亡', off: '跳一跳' },
+  { key: 'clever',    name: '小蔡的巧思', on: '4-1 走保送路线通关', off: '？？？' }
+];
+var ACH_IMG = [];
+if (typeof Image !== 'undefined') {
+  var _on  = ['s0','s1','s2','s3','h0','h1','h2','h3'];
+  var _off = ['u0','u1','u2','u3','uh0','uh1','uh2','uh3'];
+  for (var _ai = 0; _ai < 8; _ai++) {
+    var ia = new Image(); ia.src = 'ach/' + _on[_ai] + '.jpg';
+    var ib = new Image(); ib.src = 'ach/' + _off[_ai] + '.jpg';
+    ACH_IMG.push({ on: ia, off: ib });
+  }
+}
+
 /* ==================================================================
    关卡数据 —— 一屏一关（固定视角）
    ------------------------------------------------------------------
@@ -989,6 +1011,8 @@ function loadLevel(i) {
   game.goalX = L.goal.x;                                  // 会走的门：当前 x（重生 = 门回原位）
   game.goalDone = false; game.goalMoving = false;
   game.achQueue = [];                        // 成就播报队列
+  game.achT = 0;                             // 成就面板动画
+  game.achSel = null;                        // 当前查看的成就索引
   game.settingsOpen = false;                 // 设置弹窗是否打开
   game.resetOpen = false;                    // 重置确认弹窗
   game.resetT = 0;                           // 重置弹窗滑入动画
@@ -1404,6 +1428,30 @@ canvas.addEventListener('mousedown', function (e) {
     return;
   }
 
+  // ===== 成就详情弹窗：点叉关闭，点其他地方也关 =====
+  if (game.achSel !== null && game.achSel !== undefined) {
+    var DW2 = 400, DH2 = 300, DX2 = (VW - DW2) / 2, DY2 = (VH - DH2) / 2;
+    game.achSel = null;   // 点任何地方都关闭
+    return;
+  }
+  // ===== 成就面板：叉叉 / 点图标 =====
+  if (game.achOpen && (game.achT || 0) > 0) {
+    var AW2 = 620, AH2 = 420, AX2 = (VW - AW2) / 2, AY2 = (VH - AH2) / 2;
+    if (pt.x > AX2 + AW2 - 44 && pt.x < AX2 + AW2 - 8 && pt.y > AY2 + 8 && pt.y < AY2 + 44) {
+      game.achOpen = false; game.achSel = null; return;
+    }
+    var cellW2 = (AW2 - 80) / 4, cellH2 = (AH2 - 120) / 2, isz2 = Math.min(cellW2, cellH2) - 24;
+    for (var cai = 0; cai < 8; cai++) {
+      var ccol = cai % 4, crow = (cai / 4) | 0;
+      var ccx = AX2 + 40 + cellW2 * ccol + cellW2 / 2;
+      var ccy = AY2 + 60 + cellH2 * crow + cellH2 / 2;
+      if (pt.x > ccx - isz2 / 2 && pt.x < ccx + isz2 / 2 && pt.y > ccy - isz2 / 2 && pt.y < ccy + isz2 / 2) {
+        game.achSel = cai; Sound.sfxTrap && Sound.sfxTrap(); return;
+      }
+    }
+    return;   // 面板打开时其它点击不穿透
+  }
+
   // ===== 重置确认弹窗：点叉叉关闭 =====
   if (game.resetOpen) {
     var RW2 = 420, RH2 = 230, RX2 = (VW - RW2) / 2, RY2 = (VH - RH2) / 2;
@@ -1433,7 +1481,7 @@ canvas.addEventListener('mousedown', function (e) {
     }
     if (pt.x > bx2 && pt.x < bx2 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
       if (inG) { game.settingsOpen = false; game.state = 'levels'; game.levelsWorld = CUR.w; game.cursorL = CUR.i; }  // 退出
-      else game.achOpen = !game.achOpen;                                                    // 成就
+      else { game.achOpen = !game.achOpen; if (game.achOpen) game.achT = 0; game.achSel = null; }   // 成就
       return;
     }
     // ③ 重置按钮（只在菜单界面）
@@ -3207,6 +3255,72 @@ function drawSettings(dt) {
   }
   ctx.restore();
 
+  // ===== 成就面板 =====
+  if (game.achOpen) game.achT = Math.min(1, (game.achT || 0) + (1 / 60) * 5);
+  else game.achT = Math.max(0, (game.achT || 0) - (1 / 60) * 12);
+  if ((game.achT || 0) > 0 && !game.resetOpen) {
+    var at = game.achT, ae = at * at * (3 - 2 * at);
+    var AW = 620, AH = 420, AX = (VW - AW) / 2, AY = (VH - AH) / 2 + (1 - ae) * 320;
+    ctx.save();
+    ctx.globalAlpha = ae;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, VW, VH);
+    ctx.fillStyle = '#1a0a06'; ctx.fillRect(AX, AY, AW, AH);
+    ctx.strokeStyle = '#c9884a'; ctx.lineWidth = 3; ctx.strokeRect(AX, AY, AW, AH);
+    // 关闭叉
+    var axx = AX + AW - 26, axy = AY + 26;
+    ctx.strokeStyle = '#e8b98a'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(axx - 8, axy - 8); ctx.lineTo(axx + 8, axy + 8);
+    ctx.moveTo(axx + 8, axy - 8); ctx.lineTo(axx - 8, axy + 8);
+    ctx.stroke();
+    // 8 个图标：4 列 × 2 行
+    var cellW = (AW - 80) / 4, cellH = (AH - 120) / 2, isz = Math.min(cellW, cellH) - 24;
+    for (var ai = 0; ai < 8; ai++) {
+      var col = ai % 4, row = (ai / 4) | 0;
+      var cx2 = AX + 40 + cellW * col + cellW / 2;
+      var cy2 = AY + 60 + cellH * row + cellH / 2;
+      var got = !!(save.achievements && save.achievements[ACH_META[ai].key]);
+      var im = ACH_IMG[ai] ? (got ? ACH_IMG[ai].on : ACH_IMG[ai].off) : null;
+      if (im && im.complete && im.naturalWidth) {
+        // 等比例缩放（取最大内接正方形，保持长宽比）
+        var iw = im.naturalWidth, ih = im.naturalHeight;
+        var sc = Math.min(isz / iw, isz / ih);
+        ctx.drawImage(im, cx2 - iw * sc / 2, cy2 - ih * sc / 2, iw * sc, ih * sc);
+      } else {
+        ctx.fillStyle = '#2a1410'; ctx.fillRect(cx2 - isz / 2, cy2 - isz / 2, isz, isz);
+      }
+      ACH_META[ai]._x = cx2; ACH_META[ai]._y = cy2; ACH_META[ai]._r = isz / 2;
+      text(ACH_META[ai].name, cx2, cy2 + isz / 2 + 16, 13, got ? '#ffd23f' : '#8a6050', 'center', true);
+    }
+    ctx.restore();
+  }
+
+  // ===== 成就详情（点某个图标）=====
+  if (game.achSel !== null && game.achSel !== undefined) {
+    var d = ACH_META[game.achSel];
+    var gotD = !!(save.achievements && save.achievements[d.key]);
+    var DW = 400, DH = 300, DX = (VW - DW) / 2, DY = (VH - DH) / 2;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(0, 0, VW, VH);
+    ctx.fillStyle = '#1a0a06'; ctx.fillRect(DX, DY, DW, DH);
+    ctx.strokeStyle = '#c9884a'; ctx.lineWidth = 3; ctx.strokeRect(DX, DY, DW, DH);
+    // 关闭叉
+    ctx.strokeStyle = '#e8b98a'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(DX + DW - 34, DY + 16); ctx.lineTo(DX + DW - 18, DY + 32);
+    ctx.moveTo(DX + DW - 18, DY + 16); ctx.lineTo(DX + DW - 34, DY + 32);
+    ctx.stroke();
+    // 大图标（等比例）
+    var dm = ACH_IMG[game.achSel] ? (gotD ? ACH_IMG[game.achSel].on : ACH_IMG[game.achSel].off) : null;
+    if (dm && dm.complete && dm.naturalWidth) {
+      var dsz = 150, sc2 = Math.min(dsz / dm.naturalWidth, dsz / dm.naturalHeight);
+      ctx.drawImage(dm, VW / 2 - dm.naturalWidth * sc2 / 2, DY + 40, dm.naturalWidth * sc2, dm.naturalHeight * sc2);
+    }
+    text(d.name, VW / 2, DY + 220, 22, gotD ? '#ffd23f' : '#8a6050', 'center', true);
+    text(gotD ? d.on : d.off, VW / 2, DY + 256, 15, '#c9a888', 'center');
+    ctx.restore();
+  }
+
   // ===== 重置确认弹窗（盖在设置弹窗上）=====
   if (game.resetOpen) game.resetT = Math.min(1, (game.resetT || 0) + (1 / 60) * 5);
   else game.resetT = Math.max(0, (game.resetT || 0) - (1 / 60) * 12);   // 和设置弹窗同速
@@ -4563,6 +4677,7 @@ loadLevel(0);
 game.state = 'title';
 if (typeof location !== 'undefined' && location.search.indexOf('lv=') >= 0) { var _lv = parseInt(location.search.split('lv=')[1]) || 0; loadLevel(_lv); game.state = 'play'; applyWorldPalette(Math.floor(_lv / 5)); Sound.startBgm(); }
 if (typeof location !== 'undefined' && location.search.indexOf('settings=1') >= 0) { game.settingsOpen = true; game.settingsT = 1; }
+if (typeof location !== 'undefined' && location.search.indexOf('ach=1') >= 0) { game.achOpen = true; game.achT = 1; }
 if (typeof location !== 'undefined' && location.search.indexOf('reset=1') >= 0) { game.settingsOpen = true; game.settingsT = 1; game.resetOpen = true; game.resetT = 1; game.resetCode = '4271'; game.resetInput = '42'; }
 
 /* 调试：?screen=world|levels|demon|play|win  可以直接跳到某个界面看效果
