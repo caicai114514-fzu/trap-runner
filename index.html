@@ -536,26 +536,20 @@ var LEVELS = [
     spikes: [], arrows: []
   },
   {
-    name: '3-5 · 过山车', hint: '这一关，什么都有一点。',
-    width: 960, spawn: [40, 380],
-    goal: { x: 890, y: 300, w: 46, h: 70 },
+    name: '3-5 · 赌命', hint: '两个按钮，只有一个是真的。',
+    width: 960, spawn: [70, 280],
+    goal: { x: 880, y: 280, w: 46, h: 70 },
+    gamble: { answers: [0, 1, 1, 0], riseStep: 38 },   // 0=左按钮对，1=右按钮对；4 轮
+    gambleButtons: [
+      { x: 55,  y: 285, w: 42, h: 20 },     // 左按钮
+      { x: 863, y: 285, w: 42, h: 20 }      // 右按钮
+    ],
     platforms: [
-      { x: 0,   y: 470, w: 280, h: 70, kind: 'solid' },
-      { x: 380, y: 470, w: 130, h: 70, kind: 'solid' },
-      { x: 600, y: 470, w: 110, h: 70, kind: 'solid' },
-      { x: 790, y: 470, w: 170, h: 70, kind: 'solid' },
-      { x: 380, y: 396, w: 90,  h: 16, kind: 'vanish' },
-      { x: 700, y: 470, w: 70,  h: 18, kind: 'bounce', power: 1520, popTime: 0.10 },
-      { x: 830, y: 370, w: 130, h: 22, kind: 'solid', oneWay: true }
+      { x: 0,   y: 320, w: 200, h: 150, kind: 'solid' },     // 左高台（出生）
+      { x: 760, y: 320, w: 200, h: 150, kind: 'solid' },     // 右高台（门）
+      { x: 200, y: 470, w: 560, h: 70, kind: 'solid', riser: true }   // 中间地板（会上升）
     ],
-    saws: [
-      { x: 300, y: 442, r: 24, tx: 560, ty: 442, speed: 210 }
-    ],
-    spikes: [
-      { x: 610, y: 444, w: 90,  h: 26 },
-      { x: 800, y: 344, w: 100, h: 26, hidden: true, triggerX: 760 }
-    ],
-    arrows: []
+    spikes: [], saws: [], arrows: []
   },
 
   /* ================= 大关四 · 险路尽头（全部叠起来）================= */
@@ -862,6 +856,8 @@ function loadLevel(i) {
   game.tp = null;          // 3-4 传送动画状态
   game.ring = null;        // 3-4 七球绕人一圈 → 加速旋转 → 贯穿
   game.goalFly = null;     // 3-4 门的粒子传送（美术层）
+  game.gRound = 0;         // 3-5 博弈：当前第几轮
+  game.gambleDone = false;  // 3-5 博弈结束
   game.goalDead2 = false;  // 3-4 旧门已删除（代码层，碰不到）
   game.buttonVisible = !(L.button && L.button.hidden);  // 默认显示；hidden 的按钮(2-5)等平台出现才显示
   game.wallSweep = 0;
@@ -1879,6 +1875,33 @@ function update(dt) {
       }
       Sound.sfxTeleport();
       Sound.sfxTrap(); game.shake = 8;
+    }
+  }
+
+  // ===== 3-5 博弈：每轮左右二选一，按对地板升，按错死 =====
+  var GM = L6.gamble;
+  if (GM && !game.gambleDone) {
+    var gb = L6.gambleButtons || [];
+    for (var gbi = 0; gbi < gb.length; gbi++) {
+      var bb = gb[gbi];
+      if (p.x < bb.x + bb.w && p.x + p.w > bb.x && p.y < bb.y + bb.h && p.y + p.h > bb.y) {
+        var correct = GM.answers[game.gRound] === gbi;
+        if (correct) {
+          game.gRound++;
+          Sound.sfxCoin();
+          // 地板上升一段
+          var riser = null;
+          for (var rri = 0; rri < game.plats.length; rri++) if (game.plats[rri].riser) riser = game.plats[rri];
+          if (riser) riser.y = Math.max(320, riser.y - GM.riseStep);
+          if (game.gRound >= GM.answers.length) { game.gambleDone = true; Sound.sfxWin(); }
+        } else {
+          // 按错：直接死（不同的惊喜死法）
+          game.gWrong = game.gRound;
+          die();
+          return;
+        }
+        break;
+      }
     }
   }
 
