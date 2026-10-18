@@ -595,7 +595,7 @@ var LEVELS = [
     coins: [
       { x: 350, y: 240 },
       { x: 550, y: 240 },
-      { x: 720, y: 240, fake: true }       // 第三枚假金币：吃完第二枚才开始追，追完消失
+      { x: 720, y: 240, fake: true, hidden: true }   // 第三枚假金币：平时不显示，吃满两枚才出现追人，追完消失
     ],
     spikes: [
       // ② 密集刺墙：从通道口(180)每隔50px一排、每排2根，0.12s一波铺到门口
@@ -1023,7 +1023,8 @@ function loadLevel(i) {
   game.timeLimit = L.timeLimit || 0;         // 限时（秒），到点所有球开始追你
   game.timeLeft = game.timeLimit;
   game.coins = (L.coins || []).map(function (c) {
-    return { x: c.x, y: c.y, fake: !!c.fake, flip: !!c.flip, got: false, t: Math.random() * 6 };
+    // 4-1：假金币初始隐藏（hidden:true），吃满两枚才现身
+    return { x: c.x, y: c.y, fake: !!c.fake, flip: !!c.flip, got: false, hidden: !!c.hidden, gone: false, t: Math.random() * 6 };
   });
   game.flipT = -1;                    // >=0 表示翻转动画进行中
   game.sinkPhase = 'idle'; game.sinkT = 0; game.sinkY = 0; game.sinkLock = false;   // 门下沉
@@ -2427,7 +2428,7 @@ function update(dt) {
   for (var ci = 0; ci < game.coins.length; ci++) {
     var co = game.coins[ci];
     co.t += dt;
-    if (co.got || co.gone) continue;   // gone 的假金币：看不见、也碰不到
+    if (co.got || co.gone || co.hidden) continue;   // 隐藏/消失的假金币：看不见、也碰不到
     if (co.chasing) {
       co.x -= MOVE * dt;                                   // 和玩家同速地向左压过来
       if (co.chaseFrom - co.x > 450) { co.gone = true; }   // 压更远一段再消失
@@ -2451,7 +2452,7 @@ function update(dt) {
         if (game.gotCoins >= realTotal) {
           var lastCoin = null;
           for (var lc = 0; lc < game.coins.length; lc++) if (game.coins[lc].fake && !game.coins[lc].got) lastCoin = game.coins[lc];
-          if (lastCoin && !lastCoin.chasing) { lastCoin.chasing = true; lastCoin.chaseFrom = lastCoin.x; }
+          if (lastCoin && !lastCoin.chasing) { lastCoin.hidden = false; lastCoin.chasing = true; lastCoin.chaseFrom = lastCoin.x; Sound.sfxTrap(); }
         }
       }
     }
@@ -2802,7 +2803,7 @@ function drawSaws() {
 function drawCoins() {
   for (var i = 0; i < game.coins.length; i++) {
     var c = game.coins[i];
-    if (c.got || c.gone) continue;      // 吃掉/消失的都不画
+    if (c.got || c.gone || c.hidden) continue;      // 吃掉/消失/还没出现的都不画
     // 注意：爆炸金币和普通金币长得一模一样，不给任何提示
     var bob = Math.sin(c.t * 3) * 2.5;
     ctx.fillStyle = '#ffd23f';
