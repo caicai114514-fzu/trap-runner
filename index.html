@@ -598,14 +598,15 @@ var LEVELS = [
       { x: 720, y: 240, fake: true }       // 第三枚假金币：吃完第二枚才开始追
     ],
     spikes: [
-      // ② 通道地上一排刺：走到 x>350 才一起伸出来，持续 1.5 秒再收回
-      { x: 380, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 },
-      { x: 405, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 },
-      { x: 430, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 },
-      { x: 455, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 },
-      { x: 480, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 },
-      { x: 505, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 },
-      { x: 530, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 1.5 }
+      // ② 一排排从地板升起追人：第一排(x=350)由玩家触发，后面的排按 waveDelay 依次冒出
+      { x: 350, y: 240, w: 20, h: 30, hidden: true, triggerX: 350, needFloorDone: true, holdTime: 2.5, waveDelay: 0.00, waveLeader: true },
+      { x: 375, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 2.5, waveDelay: 0.00 },
+      { x: 450, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 2.5, waveDelay: 0.35 },
+      { x: 475, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 2.5, waveDelay: 0.35 },
+      { x: 550, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 2.5, waveDelay: 0.70 },
+      { x: 575, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 2.5, waveDelay: 0.70 },
+      { x: 650, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 2.5, waveDelay: 1.05 },
+      { x: 675, y: 240, w: 20, h: 30, hidden: true, needFloorDone: true, holdTime: 2.5, waveDelay: 1.05 }
     ],
     // ② 距离触发的按钮：离门一定距离就伸出，按了传回出生点
     button: { x: 700, y: 250, w: 40, h: 20, hidden: true, revealDist: 120, tpOnPress: true },
@@ -887,6 +888,8 @@ function loadLevel(i) {
       keepSafe: !!s.keepSafe,   // 反转后仍安全（2-5 的第二个刺）
       holdTime: (s.holdTime === undefined ? 0 : s.holdTime),   // 伸出后持续这么久再收回（0=不收回）
       needFloorDone: !!s.needFloorDone,   // 4-1：必须等左边地板收伸完成一次才触发
+      waveDelay: (s.waveDelay === undefined ? 0 : s.waveDelay),   // 4-1：波浪式依次冒出的延迟
+      waveLeader: !!s.waveLeader,
       holdT: 0, retracted: false,
       onPop: !!s.onPop,         // 等跳板把人弹起来之后才长出来
       moveTo: s.moveTo || null, // 触发后瞬移到这里（判定立刻过去，视觉上快速平移）
@@ -943,6 +946,7 @@ function loadLevel(i) {
   game.gotCoins = 0;       // 4-1 金币计数（重开要清零）
   game.floorRetract = false;  // 4-1 左2地板是否在收
   game.floorDone = false;     // 4-1 地板收伸只发生一次
+  game.spikeWaveT = undefined;   // 4-1 刺波浪计时（第一排触发后开始走）
   game.floorT = 0;
   game.gRound = 0;         // 3-5 博弈：当前第几轮
   game.gBtns = false;      // 3-5 按钮：站到中间地板上才出现
@@ -1568,7 +1572,14 @@ function update(dt) {
       else if (sp.atXlt !== null) reveal = (p.x + p.w / 2 < sp.atXlt);   // 玩家往左走到某点才露头
       else if (sp.atYlt !== null) reveal = (p.y < sp.atYlt);      // 只有上到高处才露头
       else reveal = (p.x + p.w > sp.triggerX) && (!sp.needFloorDone || game.floorDone);
-      if (reveal) { sp.shown = true; Sound.sfxTrap(); game.shake = 5; }
+      if (!reveal && sp.waveDelay > 0 && game.spikeWaveT !== undefined) {
+        reveal = (game.spikeWaveT >= sp.waveDelay);      // 波浪：第一排触发后按延迟依次冒出
+      }
+      if (reveal) {
+        sp.shown = true; Sound.sfxTrap(); game.shake = 5;
+        if (sp.waveLeader && game.spikeWaveT === undefined) game.spikeWaveT = 0;
+        if (game.spikeWaveT !== undefined && game.spikeWaveT >= 0) game.spikeWaveT += dt;
+      }
       // 4-1：伸出后持续 holdTime 秒，然后整体收进去
       if (sp.shown && sp.holdTime > 0 && !sp.retracted) {
         sp.holdT += dt;
