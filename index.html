@@ -1160,7 +1160,7 @@ function winLevel() {
   Sound.sfxWin();
   markCleared(CUR.w, CUR.i);       // 记进存档
   // 大关最后一关通关 → 解锁成就（每个大关的最后一小关）
-  var lastSlot = (CUR.w === 3) ? 1 : (LEVELS_PER_WORLD - 1);   // 第四大关只有表/里魔王两关
+  var lastSlot = (CUR.w === 3) ? 0 : (LEVELS_PER_WORLD - 1);   // 第四大关只剩表魔王一关
   if (CUR.i === lastSlot) unlockAchievement(CUR.w);
   // 表魔王：没经过检查点 = 走了捷径 → 弹死人话 + 解锁里魔王
   var SC = LEVELS[game.li].shortcutCheck;
@@ -1177,7 +1177,7 @@ function winLevel() {
   var gx = (game.goalX !== undefined) ? game.goalX : g.x;   // 会走的门：用当前真实位置
   game.winDoor = { k: 1, cx: gx + g.w / 2, cy: g.y + g.h / 2 };
   game.winFrom = { x: game.p.x, y: game.p.y };
-  if (CUR.w === 3 && CUR.i === 1) {   // 第四大关只有两关，通关里魔王即全通
+  if (CUR.w === 3 && CUR.i === 0) {   // 第四大关只有表魔王一关，通关即全通
     game.state = 'complete';
     Sound.sfxAllClear();
     return;
@@ -1240,7 +1240,7 @@ function debugClearCurrent() {
   game.flash = '通关 ' + (CUR.w + 1) + '-' + (CUR.i + 1);
   game.tauntT = 1.4;
   // 大关最后一关：N 跳关也算通关，同样解锁成就（放最后，成就会盖掉"通关 x-y"）
-  var lastSlotN = (CUR.w === 3) ? 1 : (LEVELS_PER_WORLD - 1);
+  var lastSlotN = (CUR.w === 3) ? 0 : (LEVELS_PER_WORLD - 1);
   if (CUR.i === lastSlotN) unlockAchievement(CUR.w);
 }
 
@@ -1385,12 +1385,7 @@ canvas.addEventListener('mousedown', function (e) {
       if (pt.x > VW / 2 - 70 && pt.x < VW / 2 + 70 && pt.y > upY2 - 30 && pt.y < upY2 + 90) {
         game.cursorL = 0; enterLevel(3, 0); return;
       }
-      if (pt.x > VW / 2 - 60 && pt.x < VW / 2 + 60 && pt.y > dnY2 - 50 && pt.y < dnY2 + 60) {
-        game.cursorL = 1;
-        if (!save.demonInner) { Sound.sfxTrap && Sound.sfxTrap(); return; }
-        enterLevel(3, 1); return;
-      }
-      return;
+      return;   // 里魔王已取消
     }
     for (var j = 0; j < LEVELS_PER_WORLD; j++) {
       var n = LEVEL_POS[j];
@@ -3988,18 +3983,11 @@ function drawDemonSelect(W) {
 
   var dnY = ly2;
 
-  // 里魔王地狱门：放在中间（原来那只小眼睛的位置）
-  if (inner) {
-    drawHellGate(VW / 2, dnY - 30, 82, 58, inner);
-    text('里魔王', VW / 2, dnY + 46, 14, '#dd4433', 'center', true);
-  }
-
-  // 最下面：一只大眼睛（原来的设计，保留）
+  // 里魔王已取消：下方只保留装饰眼睛
   watchingEye(VW / 2, dnY + 120, 30);
 
-  // 光标
-  var cur = game.cursorL === 0 ? 0 : 1;
-  cursorMark(VW / 2, (cur === 0 ? upY : dnY) - 26);
+  // 光标只停在表魔王那扇门
+  cursorMark(VW / 2, upY - 26);
 }
 
 
