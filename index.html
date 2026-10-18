@@ -1484,7 +1484,7 @@ canvas.addEventListener('mousedown', function (e) {
       game._dbgPt = { x: Math.round(pt.x), y: Math.round(pt.y) };
     }
     var _sT = (game.settingsT || 0), _sE = _sT * _sT * (3 - 2 * _sT);
-    var SW2 = 320, SH2 = 372, SX = (VW - SW2) / 2, SY = (VH - SH2) / 2 + (1 - _sE) * 280;
+    var SW2 = 320, SH2 = 436, SX = (VW - SW2) / 2, SY = (VH - SH2) / 2 + (1 - _sE) * 280;
     // 右上角小叉
     if (pt.x > SX + SW2 - 40 && pt.x < SX + SW2 - 12 && pt.y > SY + 12 && pt.y < SY + 40) {
       game.settingsOpen = false; return;   // 只置 false，让 settingsT 自然退场
@@ -1502,6 +1502,13 @@ canvas.addEventListener('mousedown', function (e) {
     if (pt.x > bx2 && pt.x < bx2 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
       if (inG) { game.settingsOpen = false; game.state = 'levels'; game.levelsWorld = CUR.w; game.cursorL = CUR.i; }  // 退出
       else { game.achOpen = !game.achOpen; if (game.achOpen) game.achT = 0; game.achSel = null; }   // 成就
+      return;
+    }
+    // ④ 退出游戏（关闭窗口）
+    var qy2 = by2 + BW2 + 22 + 54;
+    var qrw = BW2 * 2 + GAP2, qrx = SX + (SW2 - qrw) / 2;
+    if (pt.x > qrx && pt.x < qrx + qrw && pt.y > qy2 && pt.y < qy2 + 42) {
+      try { window.close(); } catch (e) {}
       return;
     }
     // ③ 重置按钮（只在菜单界面）
@@ -3181,7 +3188,7 @@ function drawSettings(dt) {
 
   var t = game.settingsT;
   var e = t * t * (3 - 2 * t);
-  var SW = 320, SH = 372, SX = (VW - SW) / 2, SY = (VH - SH) / 2 + (1 - e) * 280;
+  var SW = 320, SH = 436, SX = (VW - SW) / 2, SY = (VH - SH) / 2 + (1 - e) * 280;
 
   ctx.save();
   ctx.globalAlpha = e;
@@ -3280,6 +3287,12 @@ function drawSettings(dt) {
     ctx.fillRect(rx, ry, rw, 42);
     ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(rx, ry, rw, 42);
     text('重置', SX + SW / 2, ry + 21, 19, '#e8b98a', 'center', true);
+    // ④ 退出程序（和重置一样大）
+    var qy = ry + 54;
+    ctx.fillStyle = '#2a1410';
+    ctx.fillRect(rx, qy, rw, 42);
+    ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(rx, qy, rw, 42);
+    text('退出游戏', SX + SW / 2, qy + 21, 19, '#e8b98a', 'center', true);
   }
   ctx.restore();
 
