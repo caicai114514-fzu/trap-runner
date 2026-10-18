@@ -3764,6 +3764,13 @@ function text(str, x, y, size, color, align, bold) {
 }
 
 function drawHUD() {
+  // 通知（成就播报 / 拿到钥匙）：关卡内也要能看到
+  if (game.tauntT > 0 && game.flash) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, game.tauntT / 0.4);
+    text(game.flash, VW / 2, 118, 22, PAL.player, 'center', true);
+    ctx.restore();
+  }
   var L = LEVELS[game.li];
   text(WORLDS[CUR.w].name, 26, 30, 18, PAL.text, 'left', true);
   text((CUR.w + 1) + ' - ' + (CUR.i + 1), 26, 56, 14, PAL.dim, 'left');
