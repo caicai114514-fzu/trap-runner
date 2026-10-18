@@ -1023,6 +1023,7 @@ function loadLevel(i) {
   game.goalX = L.goal.x;                                  // 会走的门：当前 x（重生 = 门回原位）
   game.goalDone = false; game.goalMoving = false;
   game.achQueue = [];                        // 成就播报队列
+  game.flashT = 0;                           // 通知显示计时（独立于死亡台词）
   game.achT = 0;                             // 成就面板动画
   game.achSel = null;                        // 当前查看的成就索引
   game.settingsOpen = false;                 // 设置弹窗是否打开
@@ -1166,7 +1167,6 @@ function die(kind) {
   if (game.state !== 'play') return;
   game.state = 'dead';
   game.timer = 0;
-  game.flash = '';   // 死亡清掉旧通知，避免它跟着每次死亡重复显示
   game.deaths++;
   game.totalDeaths++;
   save.deaths++;               // 总死亡次数进存档（选关界面那只小幽灵看的就是它）
@@ -1315,7 +1315,7 @@ function skipLevel() {
   game.levelsWorld = CUR.w;
   game.cursorL = Math.min((CUR.w === 3 ? 2 : LEVELS_PER_WORLD) - 1, CUR.i + 1);
 }
-function flashMsg(s) { game.flash = s; game.tauntT = 1.4; }
+function flashMsg(s) { game.flash = s; game.flashT = 1.6; }
 
 /* 两级界面的元素位置（画和点都用它） */
 var DOOR_POS  = [ {x:158,y:352}, {x:408,y:246}, {x:652,y:342}, {x:822,y:184} ];
@@ -1717,6 +1717,7 @@ function update(dt) {
     flashMsg(game.achQueue.shift());
   }
 
+  if (game.flashT > 0) game.flashT = Math.max(0, game.flashT - dt);
   if (game.shake > 0) game.shake = Math.max(0, game.shake - 60 * dt);
   if (game.tauntT > 0) game.tauntT -= dt;
 
@@ -3768,9 +3769,9 @@ function text(str, x, y, size, color, align, bold) {
 
 function drawHUD() {
   // 通知（成就播报 / 拿到钥匙）：关卡内也要能看到
-  if (game.tauntT > 0 && game.flash) {
+  if (game.flashT > 0 && game.flash) {
     ctx.save();
-    ctx.globalAlpha = Math.min(1, game.tauntT / 0.4);
+    ctx.globalAlpha = Math.min(1, game.flashT / 0.4);
     text(game.flash, VW / 2, 118, 22, PAL.player, 'center', true);
     ctx.restore();
   }
