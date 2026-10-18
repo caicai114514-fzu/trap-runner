@@ -577,31 +577,31 @@ var LEVELS = [
   /* ================= 大关四 · 险路尽头（全部叠起来）================= */
   {
     name: '4-1 · 表魔王', hint: '墙里有一条路。',
-    width: 960, spawn: [120, 400],
-    goal: { x: 890, y: 180, w: 46, h: 70 },
-    hiddenPathY: 300,
-    shortcutCheck: { x: 300, y: 430, w: 60, h: 40 },
+    width: 960, spawn: [110, 140],
+    goal: { x: 884, y: 110, w: 46, h: 70 },
+    hiddenPathY: 250,
+    shortcutCheck: { x: 300, y: 210, w: 60, h: 40 },
     platforms: [
-      // ===== 左边阶梯（3 级，往下走）=====
-      { x: 0,   y: 250, w: 90,  h: 290, kind: 'solid' },
-      { x: 0,   y: 320, w: 150, h: 220, kind: 'solid' },
-      { x: 0,   y: 390, w: 210, h: 150, kind: 'solid' },
-      // ===== 中间长通道 =====
-      { x: 210, y: 470, w: 540, h: 70,  kind: 'solid' },
-      // ===== 右边阶梯（3 级，往上走到门）=====
-      { x: 750, y: 390, w: 210, h: 150, kind: 'solid' },
-      { x: 810, y: 320, w: 150, h: 220, kind: 'solid' },
-      { x: 870, y: 250, w: 90,  h: 290, kind: 'solid' },
-      // ===== 墙里的隐藏路线（贴图不画，实际能走）=====
-      { x: 60,  y: 100, w: 780, h: 40,  kind: 'solid', hiddenPath: true },   // 顶部横带
-      { x: 840, y: 100, w: 40,  h: 300, kind: 'solid', hiddenPath: true },   // 右侧竖带（通到门上方）
-      // ===== 左下角隐藏跳板 =====
-      { x: 20,  y: 470, w: 46,  h: 10,  kind: 'bounce', power: 1700, popTime: 0.10, secretPad: true }
+      // ===== 左边阶梯（从 180 下到 270，浮空）=====
+      { x: 0,   y: 180, w: 90,  h: 90, kind: 'solid' },   // 第 1 级（最高）
+      { x: 0,   y: 220, w: 150, h: 50, kind: 'solid' },   // 第 2 级
+      { x: 0,   y: 250, w: 210, h: 20, kind: 'solid' },   // 第 3 级
+      // ===== 中间通道（和阶梯底齐平，浮空，下面全是背景）=====
+      { x: 210, y: 250, w: 540, h: 20, kind: 'solid' },
+      // ===== 右边阶梯（镜像：从 270 升到 180）=====
+      { x: 750, y: 250, w: 210, h: 20, kind: 'solid' },
+      { x: 810, y: 220, w: 150, h: 50, kind: 'solid' },
+      { x: 870, y: 180, w: 90,  h: 90, kind: 'solid' },
+      // ===== 墙里的隐藏路线（贴图不画）=====
+      { x: 60,  y: 60,  w: 780, h: 36, kind: 'solid', hiddenPath: true },
+      { x: 840, y: 60,  w: 40,  h: 200, kind: 'solid', hiddenPath: true },
+      // ===== 左下角隐藏跳板（弹到顶部隐藏带）=====
+      { x: 18,  y: 250, w: 46,  h: 10, kind: 'bounce', power: 1700, popTime: 0.10, secretPad: true }
     ],
     coins: [
-      { x: 420, y: 440 },
-      { x: 580, y: 440 },
-      { x: 740, y: 440, fake: true }
+      { x: 420, y: 220 },
+      { x: 580, y: 220 },
+      { x: 740, y: 220, fake: true }
     ],
     spikes: [], arrows: []
   },
