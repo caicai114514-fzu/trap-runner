@@ -474,7 +474,8 @@ var LEVELS = [
       { x: 0,   y: 350, w: 30,  h: 120, kind: 'solid', slideWall: true }   // 下半：玩家到底层往左走时向左缩进
     ],
     spikes: [
-      { x: 690, y: 444, w: 270, h: 26 }
+      { x: 690, y: 444, w: 270, h: 26 },                                      // 1楼右侧刺
+      { x: 700, y: 324, w: 112, h: 26, hidden: true, triggerX: 640 }         // 2楼弹出的刺（走到640触发，宽112极限）
     ],
     keys: [{ x: 18, y: 420, hidden: true, revealOnly: true }],   // 钥匙初始隐藏（左墙缩进后才浮现）
     arrows: []
