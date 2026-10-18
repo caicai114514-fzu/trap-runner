@@ -1239,6 +1239,9 @@ function debugClearCurrent() {
   Sound.sfxWin();
   game.flash = '通关 ' + (CUR.w + 1) + '-' + (CUR.i + 1);
   game.tauntT = 1.4;
+  // 大关最后一关：N 跳关也算通关，同样解锁成就（放最后，成就会盖掉"通关 x-y"）
+  var lastSlotN = (CUR.w === 3) ? 1 : (LEVELS_PER_WORLD - 1);
+  if (CUR.i === lastSlotN) unlockAchievement(CUR.w);
 }
 
 function skipLevel() {
