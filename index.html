@@ -1928,7 +1928,7 @@ function update(dt) {
         }
       }
       // 沉到底之后，按钮才开始伸出来
-      if (game.riserSank && ris0.y >= 470 - 0.5 && !game.gRetract) {
+      if (game.riserSank && ris0.y >= 470 - 0.5 && !game.gRetract && game.gDelay <= 0 && game.gRiseTo === null) {
         if (game.btnAnim < 0) game.btnAnim = 0;
         if (game.btnAnim < 1) game.btnAnim = Math.min(1, game.btnAnim + dt * 2.6);
       }
