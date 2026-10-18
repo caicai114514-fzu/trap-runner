@@ -1,0 +1,4822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Trap Runner</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#0d0409;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+  #wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  canvas{display:block;background:#2b0b12;border-radius:0;
+    box-shadow:none}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c" width="960" height="540"></canvas></div>
+<script>
+(function () {
+'use strict';
+
+var canvas = document.getElementById('c');
+/* 全屏：按 cover 缩放铺满窗口（保持 16:9，超出部分裁掉），不再留黑边 */
+function fitCanvas() {
+  var s = Math.max(window.innerWidth / 960, window.innerHeight / 540);
+  canvas.style.width = (960 * s) + 'px';
+  canvas.style.height = (540 * s) + 'px';
+}
+window.addEventListener('resize', fitCanvas);
+window.addEventListener('orientationchange', function () { setTimeout(fitCanvas, 120); });
+fitCanvas();
+var ctx = canvas.getContext('2d');
+var VW = canvas.width, VH = canvas.height;
+
+/* 开始页的播放按钮：正方形边框 + 里面一个三角形 */
+var START_BTN = { x: Math.round(VW / 2 - 46), y: Math.round(VH / 2 + 44), w: 92, h: 92 };
+
+/* ==================================================================
+   音频引擎：Web Audio 程序化芯片音乐 + 音效（不需要任何音频文件）
+   ================================================================== */
+var Sound = {
+  ac: null, master: null, bgmGain: null, sfxGain: null,
+  started: false, step: 0, nextTime: 0, timer: null,
+  bpm: 138,
+
+  init: function () {
+    if (this.ac) return;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    this.ac = new AC();
+    this.master = this.ac.createGain();
+    this.master.gain.value = 0.5;
+    this.master.connect(this.ac.destination);
+    this.bgmGain = this.ac.createGain();
+    this.bgmGain.gain.value = 0.28;
+    this.bgmGain.connect(this.master);
+    this.sfxGain = this.ac.createGain();
+    this.sfxGain.gain.value = 0.5;
+    this.sfxGain.connect(this.master);
+  },
+
+  freq: function (midi) { return 440 * Math.pow(2, (midi - 69) / 12); },
+
+  // 一个音符
+  note: function (midi, t, dur, type, vol, dest) {
+    if (!this.ac) return;
+    var o = this.ac.createOscillator();
+    var g = this.ac.createGain();
+    o.type = type || 'square';
+    o.frequency.setValueAtTime(this.freq(midi), t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol == null ? 0.3 : vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(dest || this.bgmGain);
+    o.start(t); o.stop(t + dur + 0.02);
+  },
+
+  noise: function (t, dur, vol) {
+    if (!this.ac) return;
+    var n = Math.floor(this.ac.sampleRate * dur);
+    var buf = this.ac.createBuffer(1, n, this.ac.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    var s = this.ac.createBufferSource(); s.buffer = buf;
+    var g = this.ac.createGain(); g.gain.value = vol == null ? 0.25 : vol;
+    var f = this.ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1400;
+    s.connect(f); f.connect(g); g.connect(this.sfxGain);
+    s.start(t);
+  },
+
+  sfxJump: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime, o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(320, t);
+    o.frequency.exponentialRampToValueAtTime(760, t + 0.09);
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.14);
+  },
+
+  sfxDeath: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime, o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(420, t);
+    o.frequency.exponentialRampToValueAtTime(60, t + 0.42);
+    g.gain.setValueAtTime(0.3, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.47);
+    this.noise(t, 0.3, 0.18);
+  },
+
+  sfxSpring: function () {         // 跳板弹起：弹簧"嘣"的一声，带上升扫频
+    if (!this.ac) return;
+    var t = this.ac.currentTime, ac = this.ac;
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(220, t);
+    o.frequency.exponentialRampToValueAtTime(1100, t + 0.16);   // 往上窜
+    g.gain.setValueAtTime(0.34, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.24);
+    this.noise(t, 0.05, 0.18);                                   // 一点"噗"的摩擦感
+  },
+
+  sfxBounce: function () {          // 球落地：低沉的"咚"
+    if (!this.ac) return;
+    var t = this.ac.currentTime, o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(560, t + 0.13);
+    g.gain.setValueAtTime(0.52, t);                    // 音量 0.16 → 0.52
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.20);
+    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.22);
+    this.noise(t, 0.07, 0.24);                         // 撞击噪声也放大
+  },
+
+  sfxChainsaw: function () {       // 链锯：照参考音频——中低频锯齿，4 次间歇"嗡——嗡——嗡"
+    if (!this.ac) return;
+    var t = this.ac.currentTime;
+
+    // 4 次爆发，每次间隔 0.9 秒（参考音频包络：1.8/2.8/3.7/4.6s 各有一次峰值）
+    for (var burst = 0; burst < 4; burst++) {
+      var bt = t + burst * 0.9;
+
+      // 主音：350Hz 锯齿（参考频谱最强峰），转速不稳地抖
+      (function (bt) {
+        var o = this.ac.createOscillator(), g = this.ac.createGain();
+        o.type = 'sawtooth';
+        for (var i = 0; i < 16; i++) {
+          o.frequency.setValueAtTime(330 + Math.random() * 60, bt + i * 0.018);
+        }
+        g.gain.setValueAtTime(0.0001, bt);
+        g.gain.exponentialRampToValueAtTime(0.30, bt + 0.05);   // 快速起音
+        g.gain.setValueAtTime(0.30, bt + 0.15);
+        g.gain.exponentialRampToValueAtTime(0.0001, bt + 0.30); // 渐弱收尾
+        o.connect(g); g.connect(this.sfxGain);
+        o.start(bt); o.stop(bt + 0.32);
+      }).call(this, bt);
+
+      // 次音：150Hz 方波（低八度，参考频谱第二强峰），给"轰鸣"打底
+      (function (bt) {
+        var o = this.ac.createOscillator(), g = this.ac.createGain();
+        o.type = 'square';
+        for (var i = 0; i < 16; i++) {
+          o.frequency.setValueAtTime(145 + Math.random() * 20, bt + i * 0.02);
+        }
+        g.gain.setValueAtTime(0.0001, bt);
+        g.gain.exponentialRampToValueAtTime(0.20, bt + 0.06);
+        g.gain.setValueAtTime(0.20, bt + 0.15);
+        g.gain.exponentialRampToValueAtTime(0.0001, bt + 0.30);
+        o.connect(g); g.connect(this.sfxGain);
+        o.start(bt); o.stop(bt + 0.32);
+      }).call(this, bt);
+    }
+  },
+
+  sfxCoin: function () {          // 吃真金币：两音上行，清脆
+    if (!this.ac) return;
+    var t = this.ac.currentTime;
+    this.note(88, t, 0.10, 'square', 0.20, this.sfxGain);
+    this.note(95, t + 0.07, 0.18, 'square', 0.18, this.sfxGain);
+  },
+
+  sfxBoom: function () {          // 假金币爆炸：低频冲击 + 两层噪声，要够吓人
+    if (!this.ac) return;
+    var t = this.ac.currentTime, o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(220, t);
+    o.frequency.exponentialRampToValueAtTime(18, t + 0.75);
+    g.gain.setValueAtTime(1.0, t);                                   // 0.5 → 1.0
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.85);
+    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.9);
+    // 亚低频冲击：震胸口那一下
+    var o2 = this.ac.createOscillator(), g2 = this.ac.createGain();
+    o2.type = 'sine';
+    o2.frequency.setValueAtTime(70, t);
+    o2.frequency.exponentialRampToValueAtTime(28, t + 0.35);
+    g2.gain.setValueAtTime(0.9, t);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    o2.connect(g2); g2.connect(this.sfxGain); o2.start(t); o2.stop(t + 0.5);
+    this.noise(t, 0.55, 0.75);                                       // 0.45/0.40 → 0.55/0.75
+    this.noise(t + 0.04, 0.40, 0.55);
+    this.noise(t + 0.12, 0.30, 0.30);
+  },
+
+  sfxWin: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime, seq = [72, 76, 79, 84], self = this;
+    seq.forEach(function (m, i) { self.note(m, t + i * 0.09, 0.3, 'triangle', 0.3, self.sfxGain); });
+  },
+
+  sfxTeleport: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime, ac = this.ac;
+    // 1) 炸开：短促噪声
+    this.noise(t, 0.10, 0.26);
+    // 2) 下沉：低频 square 快速滑落
+    var o1 = ac.createOscillator(), g1 = ac.createGain();
+    o1.type = 'square';
+    o1.frequency.setValueAtTime(320, t);
+    o1.frequency.exponentialRampToValueAtTime(55, t + 0.22);
+    g1.gain.setValueAtTime(0.001, t);
+    g1.gain.exponentialRampToValueAtTime(0.20, t + 0.015);
+    g1.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+    o1.connect(g1); g1.connect(this.sfxGain);
+    o1.start(t); o1.stop(t + 0.26);
+    // 3) 聚拢：上行扫频（像被吸回去）
+    var o2 = ac.createOscillator(), g2 = ac.createGain();
+    o2.type = 'sawtooth';
+    o2.frequency.setValueAtTime(180, t + 0.20);
+    o2.frequency.exponentialRampToValueAtTime(1400, t + 0.58);
+    g2.gain.setValueAtTime(0.001, t + 0.20);
+    g2.gain.exponentialRampToValueAtTime(0.18, t + 0.30);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.62);
+    o2.connect(g2); g2.connect(this.sfxGain);
+    o2.start(t + 0.20); o2.stop(t + 0.64);
+    // 4) 重组：一记清脆高音
+    this.note(84, t + 0.60, 0.18, 'triangle', 0.20, this.sfxGain);
+  },
+
+  sfxTrap: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime;
+    this.noise(t, 0.08, 0.2);
+    this.note(46, t, 0.12, 'square', 0.22, this.sfxGain);
+  },
+
+  sfxAllClear: function () {
+    if (!this.ac) return;
+    var t = this.ac.currentTime, self = this;
+    [69, 72, 76, 81, 84, 88].forEach(function (m, i) {
+      self.note(m, t + i * 0.11, 0.5, 'triangle', 0.32, self.sfxGain);
+    });
+  },
+
+  // 芯片 BGM：Am - F - C - G 循环
+  progression: [
+    { bass: 45, arp: [57, 60, 64, 60] },  // Am
+    { bass: 41, arp: [53, 57, 60, 57] },  // F
+    { bass: 48, arp: [55, 60, 64, 60] },  // C
+    { bass: 43, arp: [55, 59, 62, 59] }   // G
+  ],
+
+  startBgm: function () {
+    if (!this.ac || this.started) return;
+    this.started = true;
+    this.nextTime = this.ac.currentTime + 0.08;
+    this.step = 0;
+    var self = this;
+    this.timer = setInterval(function () { self.schedule(); }, 25);
+  },
+
+  schedule: function () {
+    if (!this.ac) return;
+    var spb = 60 / this.bpm;      // 每拍秒数
+    var stepDur = spb / 4;        // 十六分音符
+    while (this.nextTime < this.ac.currentTime + 0.12) {
+      var s = this.step % 16;
+      var bar = Math.floor(this.step / 16) % 4;
+      var ch = this.progression[bar];
+      var t = this.nextTime;
+      // 低音：每拍一下
+      if (s % 4 === 0) this.note(ch.bass - 12, t, stepDur * 3.2, 'triangle', 0.42);
+      if (s % 4 === 2) this.note(ch.bass, t, stepDur * 1.6, 'triangle', 0.26);
+      // 琶音
+      if (s % 2 === 0) {
+        var n = ch.arp[(s / 2) % 4];
+        this.note(n + 12, t, stepDur * 1.5, 'square', 0.13);
+      }
+      // 偶尔加个高音点缀
+      if (s === 14) this.note(ch.arp[2] + 24, t, stepDur * 1.2, 'square', 0.08);
+      this.nextTime += stepDur;
+      this.step++;
+    }
+  },
+
+  muted: false,
+  toggle: function () {
+    this.muted = !this.muted;
+    if (!this.bgmGain) return this.muted;
+    this.bgmGain.gain.setTargetAtTime(this.muted ? 0 : 0.28, this.ac.currentTime, 0.05);
+    return this.muted;
+  }
+};
+
+// 设置弹窗用的两个图标（同目录下的 png）
+if (typeof Image !== 'undefined') {
+  Sound.imgOn = new Image(); Sound.imgOn.src = 'sound-on.png';
+  Sound.imgOff = new Image(); Sound.imgOff.src = 'sound-off.png';
+}
+
+/* ---- 成就展示 ---- */
+var ACH_META = [
+  { key: 0,         name: '脚下很稳',  on: '通关 1-5',           off: '通关 1-5' },
+  { key: 1,         name: '火眼金睛',  on: '通关 2-5',           off: '通关 2-5' },
+  { key: 2,         name: '披荆斩棘',  on: '通关 3-5',           off: '通关 3-5' },
+  { key: 3,         name: '逃出生天',  on: '通关 4-1',           off: '通关 4-1' },
+  { key: 'save',      name: '自我救赎', on: '第一次拿到钥匙',     off: '失去了才能获得' },
+  { key: 'sacrifice', name: '献祭大师', on: '三把钥匙拿满',       off: '完成未完成的，祭品' },
+  { key: 'pointless', name: '多此一举', on: '3-4 按下按钮后死亡', off: '跳一跳' },
+  { key: 'clever',    name: '小蔡的巧思', on: '4-1 走保送路线通关', off: '？？？' }
+];
+var ACH_IMG = [];
+if (typeof Image !== 'undefined') {
+  var _on  = ['s0','s1','s2','s3','h0','h1','h2','h3'];
+  var _off = ['u0','u1','u2','u3','uh0','uh1','uh2','uh3'];
+  for (var _ai = 0; _ai < 8; _ai++) {
+    var ia = new Image(); ia.src = 'ach/' + _on[_ai] + '.jpg';
+    var ib = new Image(); ib.src = 'ach/' + _off[_ai] + '.jpg';
+    ACH_IMG.push({ on: ia, off: ib });
+  }
+}
+
+/* ==================================================================
+   关卡数据 —— 一屏一关（固定视角）
+   ------------------------------------------------------------------
+   参考 Level Devil：每关都压缩进 960×540 一屏之内，相机永不滚动。
+   这样坑的位置每次都在同一个地方，玩家死一次就能记住，
+   第二次是"我知道有坑"却依然可能中招 —— 这才是坑向游戏的乐趣。
+   （width 必须等于视口宽 VW，相机算法会自动锁死在 0）
+
+   坐标约定：地面顶部 y=470、厚 70；门高 70，站在地面上 → y=400
+   kind: solid | fake（踩塌）| vanish（踩碎）| appear（突然出现）
+   spike: hidden=true 时，玩家 x 越过 triggerX 后弹出
+   能力上限：跳跃高 188px，平地可跨间隙约 223px
+   ================================================================== */
+var LEVELS = [
+  /* ================= 大关一 · 脚下不稳（假地板 / 消失板）================= */
+  {
+    name: '1-1 · 就这？', hint: '走到右边的门。真的，就这。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 400, h: 70, kind: 'solid' },
+      { x: 400, y: 470, w: 150, h: 70, kind: 'fake' },
+      { x: 550, y: 470, w: 410, h: 70, kind: 'solid' }
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '1-2 · 信任崩塌', hint: '三块板，只有一块是真的。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    // 钥匙一开始收在左边那块地板里；走过悬空板之后才慢慢滑到坑底浮出来。
+    // 想拿就得从中间跳下去 —— 而那一跳是必死的。
+    keys: [{ x: 100, y: 520, hidden: true, from: [100, 520],
+             armX: 610, triggerX: 250, outT: 0.6,      // 先到第三块板，再退回出发点
+             slideTo: 800, slideTime: 7.0 }],           // 慢慢滑，给你时间算
+    platforms: [
+      { x: 0, y: 470, w: 200, h: 70, kind: 'solid' },
+      { x: 290, y: 390, w: 120, h: 24, kind: 'solid' },
+      { x: 445, y: 390, w: 120, h: 24, kind: 'fake' },     // 摆正中间：两边各留 35px 缝
+      { x: 600, y: 390, w: 120, h: 24, kind: 'solid' },
+      { x: 760, y: 470, w: 200, h: 70, kind: 'solid' }
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '1-3 · 甜头', hint: '先给你一点甜头。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 480, h: 70, kind: 'solid' },
+      { x: 480, y: 470, w: 480, h: 70, kind: 'flip' }      // 后半块会整块翻掉
+    ],
+    coins: [
+      { x: 200, y: 440 }, { x: 280, y: 440 }, { x: 360, y: 440 },   // 地上这一串，走过去就能吃
+      { x: 520, y: 368, flip: true }                                 // 这颗要跳一下才够得到 —— 也是它翻你
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '1-4 · 一口气', hint: '前三块会缩，第四块是稳的。',
+    width: 960, spawn: [70, 380], goal: { x: 862, y: 400, w: 46, h: 70 },
+    // 门可以被"勾引"：从第四块平台往右跳一下（人不用真过去），
+    // 门当场失效、脚下变坑，视觉上快速落下；等 2 秒再长回来。
+    sinkGoal: { triggerX: 828, depth: 320, time: 0.14, riseDelay: 2.0 },
+    platforms: [
+      { x: 0, y: 470, w: 150, h: 70, kind: 'solid' },
+      { x: 230, y: 450, w: 90, h: 24, kind: 'vanish', retractT: 0.14 },
+      { x: 390, y: 430, w: 90, h: 24, kind: 'vanish', retractT: 0.14 },
+      { x: 550, y: 410, w: 90, h: 24, kind: 'vanish', retractT: 0.14 },
+      { x: 710, y: 400, w: 90, h: 24, kind: 'feint' },      // 第四块：踩上去先缩一截吓你，再弹回来
+      { x: 850, y: 470, w: 110, h: 70, kind: 'sinkFloor' }  // 门脚下这块：跟着门一起没
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '1-5 · 虚晃一枪', hint: '它先假装要塌。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    // 第一段：身后地板左缘一路往右追（306px/s，你 315，跑得赢），追到 604 停
+    // 中间那片：跑到 620 就先抖一下（虚晃一枪，其实不塌，站得住），
+    //          抖 0.24 秒后「所有平台」碰撞立刻失效（人马上踩空），但视觉上是往下缩进去，不是直接消失，只有门留在原地
+    // 唯一的活路：趁还在抖的时候起跳，整个人撞进门里
+    shrinkFloor: { triggerX: 180, speed: 306, stopX: 604 },
+    quake: { triggerX: 620, shakeTime: 0.24, sinkTime: 0.34 },
+    platforms: [
+      { x: 0, y: 470, w: 660, h: 70, kind: 'solid' },       // 第一段：会从左边缩
+      { x: 660, y: 470, w: 150, h: 70, kind: 'pitFloor' },  // 中间那片：先抖，再塌
+      { x: 810, y: 470, w: 150, h: 70, kind: 'solid' }      // 右岸
+    ],
+    spikes: [], arrows: []
+  },
+
+  /* ================= 大关二 · 眼见为虚（假刺 / 箭头 / 假门）================= */
+  {
+    name: '2-1 · 弹簧', hint: '那块地板看着挺正常的。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    // 中间藏了一块跳板：踩上去皮会伸起来，然后自动把你弹飞 ——
+    // 同时天花板立刻长出刺，你正好撞上去。第二次记得绕开它。
+    // 绕开之后，后面还有一根位置触发的刺等着。
+    platforms: [
+      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },
+      { x: 420, y: 469, w: 90, h: 18, kind: 'bounce', power: 1420, popTime: 0.10 }
+    ],
+    spikes: [
+      { x: 400, y: 0, w: 130, h: 210, dir: 'down', onPop: true },
+      { x: 720, y: 414, w: 110, h: 56, hidden: true, triggerX: 640 }
+    ],
+    arrows: []
+  },
+  {
+    name: '2-2 · 会走的刺', hint: '刺不一定是死的。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    jump: 540,
+    // 全部刺都是"三根 15px 的独立窄刺"，和门口那排一模一样（直接复制）。
+    // 会移动的两组，靠给每根不同的 followDist 来保持 17px 的间距一起平移。
+    platforms: [
+      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' }
+    ],
+    spikes: [
+      // ① 一离地就滑到你落点（三根一起，间距 17）
+      { x: 280, y: 444, w: 15, h: 26, atX: 230, fallOnly: true, follow: true, followDist: 125 },
+      { x: 297, y: 444, w: 15, h: 26, atX: 230, fallOnly: true, follow: true, followDist: 142 },
+      { x: 314, y: 444, w: 15, h: 26, atX: 230, fallOnly: true, follow: true, followDist: 159 },
+      // ② 走到 440 就抢占你的起跳点（三根一起，间距 17）
+      { x: 540, y: 444, w: 15, h: 26, atX: 470, follow: true, followDist:  19, moveSpeed: 5.0 },
+      { x: 557, y: 444, w: 15, h: 26, atX: 470, follow: true, followDist:  36, moveSpeed: 5.0 },
+      { x: 574, y: 444, w: 15, h: 26, atX: 470, follow: true, followDist:  53, moveSpeed: 5.0 },
+      // ③ 门口三根，不动（原样）
+      { x: 750, y: 444, w: 15, h: 26 },
+      { x: 767, y: 444, w: 15, h: 26 },
+      { x: 784, y: 444, w: 15, h: 26 }
+    ],
+    arrows: []
+  },
+  {
+    name: '2-3 · 上下', hint: '上面那条路看着平坦多了。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    // 上面：二楼居中抬高到 360（跳得上去），一踏上去天花板就垂刺
+    // 下面：二楼正下方那段地面是【伸缩坑】，踩上就往左缩
+    //       坑上面铺满整排【假刺】—— 和二楼一样长，看着吓人，踩上去没事
+    // ★ 走下面（不站二楼）时，天花板刺完全不出现
+    platforms: [
+      { x: 0,   y: 470, w: 650, h: 70, kind: 'solid' },     // 地面左（含假刺那一段，都是实地）
+      { x: 650, y: 470, w: 120, h: 70, kind: 'fake' },      // ★ 伸缩坑：假刺走完之后才碰到
+      { x: 770, y: 470, w: 190, h: 70, kind: 'solid' },     // 地面右
+      { x: 310, y: 360, w: 340, h: 22, kind: 'solid' },     // 二楼：居中、抬高
+    ],
+    spikes: [
+      // 假刺：和二楼一样长（310~650），整排铺在地面上，踩上去没事 —— 虚惊一场
+      { x: 310, y: 444, w: 340, h: 26, fake: true }
+    ],
+    saws: [
+      // 上面那条死路：一个大到跳不过去的锯片，贴着二楼表面从左往右来回碾
+      // r=90（直径 180）> 跳跃水平距离 137 → 你跳也跳不过，只能被碾死
+      { x: 1080, y: 330, r: 165, tx: -80, ty: 330, speed: 1500, hidden: true, showOnPlatY: 360 }
+    ],
+    arrows: [
+      { x: 250, y: 438, dir: 'up' }                          // 箭头在地面，指着二楼
+    ]
+  },
+  {
+    name: '2-4 · 镜花', hint: '门就在那儿。看着挺正常的。',
+    sacrificeTaunt: '不错的祭品',
+    width: 960, spawn: [560, 440],
+    goal: { x: 60, y: 400, w: 46, h: 70 },              // 真门：左上，贴地（不放在平台上）
+    fakeGoal: { x: 880, y: 400, w: 46, h: 70 },  // 假门：关卡一开始就在右边（贴地）
+    goalRevealTime: 3.5,
+    // 墙：一根穿过转轴的长杆，它【自己转】（碰撞跟着转）。
+    //   转轴在中间偏下(250,380)；上端贴天花板顺时针向右滑；下端长度固定 90，向左扫。
+    //   竖直时把真门和玩家隔开；转开后路就通了。
+    wall: { pivotX: 480, pivotY: 380, w: 26, len: 470, spin: 55 },
+    button: { x: 660, y: 450, w: 40, h: 20 },           // 按钮：贴地，墙右边的路上
+    keys: [{ x: 880, y: -60, drop: true, dropY: 347, onPlatY: 375 }],
+    platforms: [
+      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' },      // 地面（真门/按钮都直接贴这块地）
+      { x: 855, y: 375, w: 105, h: 22, kind: 'solid', oneWay: true }   // 假门头顶的悬空平台（钥匙掉这儿）
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '2-5 · 虚', hint: '这次有三种谎话一起说。',
+    width: 960, spawn: [90, 260], goal: { x: 890, y: 400, w: 46, h: 70 },
+    goalHidden: true, goalRevealTime: 1.6,
+    safeZones: [[505, 605]],
+    platforms: [
+      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid', deadly: true },   // 致命地板（反转后变安全）
+      { x: 0,   y: 300, w: 240, h: 22, kind: 'solid' },                  // 左边二楼（出生）
+      { x: 505, y: 300, w: 130, h: 22, kind: 'appear', triggerX: 505 }   // ★ 头顶平台：站到第二个刺上才长出来
+    ],
+    button: { x: 550, y: 322, w: 40, h: 20, upsideDown: true, hidden: true },   // 倒按钮：平台出现才显示
+    spikes: [
+      { x: 295, y: 444, w: 100, h: 26, fake: true },
+      { x: 505, y: 444, w: 100, h: 26, fake: true, keepSafe: true },     // 第二个刺：始终安全
+      { x: 715, y: 444, w: 100, h: 26, fake: true }
+    ],
+    arrows: []
+  },
+  {
+    name: '3-1 · 锯片', hint: '它比你快。但它的路线是死的。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [{ x: 0, y: 470, w: 960, h: 70, kind: 'solid' }],
+    saws: [{ x: 300, y: 442, r: 26, tx: 620, ty: 442, speed: 140, chase: true, chaseDelay: 0.35, chaseSpeed: 560 }],
+    spikes: [], arrows: []
+  },
+  {
+    name: '3-2 · 推手', hint: '背后那堵墙，是来送你的。',
+    width: 960, spawn: [70, 380], goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 500, h: 70, kind: 'solid' },
+      { x: 620, y: 470, w: 340, h: 70, kind: 'solid' },
+      { x: 300, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 360, moveV: 700, moveTo: 464 },
+      { x: 620, y: 470, w: 44, h: 220, kind: 'riseWall' },
+      { x: 840, y: 380, w: 36, h: 90, kind: 'piston', triggerX: 700, moveV: -1020, moveTo: 620 }   // ★ 右边镜像活塞：往左推，停时左边界=右平台左缘620，跳得过
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '3-3 · 回溯', hint: '门不会等你。',
+    sacrificeTaunt: '你的肉体和灵魂一样美味',
+    width: 960, spawn: [760, 40],
+    goal: { x: 120, y: 400, w: 46, h: 70 },
+    goalMoveVX: 75,
+    goalStopX: 960,
+    goalMoveTriggerX: 600,
+    // 平台：4楼缺口左 / 3楼缺口右 / 2楼缺口在【中间且更大】
+    platforms: [
+      { x: 105, y: 110, w: 855, h: 22, kind: 'solid' },      // 4 楼：缺口左(0~105)
+      { x: 0,   y: 230, w: 855, h: 22, kind: 'solid' },      // 3 楼：缺口右(855~960)
+      { x: 500, y: 350, w: 460, h: 22, kind: 'solid' },      // 2 楼（只剩右段，左边全空）
+      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid' },      // 1 楼
+      { x: 0,   y: 0,   w: 30,  h: 350, kind: 'solid' },     // 左边那堵顶天立地的墙（上半，不动）
+      { x: 0,   y: 350, w: 30,  h: 120, kind: 'solid', slideWall: true }   // 下半：玩家到底层往左走时向左缩进
+    ],
+    spikes: [
+      { x: 690, y: 444, w: 270, h: 26 },                                      // 1楼右侧刺（门要跑的）
+      { x: 400, y: 84, w: 90, h: 26, hidden: true, atXlt: 520 }            // ★ 4楼(最上层)的弹出刺：走到 x<520 触发，挡在你往左的路上
+    ],
+    keys: [{ x: 18, y: 420, hidden: true, revealOnly: true }],   // 钥匙初始隐藏（左墙缩进后才浮现）
+    arrows: []
+  },
+  {
+    name: '3-4 · 弹雨', hint: '它们会追人。',
+    width: 960, spawn: [70, 380],
+    noGlow: true,                              // 门不要那层光
+    teleportOnButton: true,                    // 按下按钮后人炸成碎片、飞到屏幕正中重组
+    goal: { x: 910, y: 400, w: 46, h: 70 },    // 门再往右
+    goalHidden: false,
+    platforms: [
+      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid' },      // 平地板
+      { x: 880, y: 250, w: 80, h: 22, kind: 'solid', oneWay: true }   // 门上方二楼平台：能从下面穿过去
+    ],
+    // 按钮在二楼平台上，初始不显示：穿过最后一个球后才出现
+    button: { x: 900, y: 230, w: 40, h: 20, hidden: true, revealAfterBall: true },
+    balls: [
+      // 七个球等间距：x = 120 / 240 / 360 / 480 / 600 / 720 / 840（间距 120）
+      // 相位交替：顶、底、顶、底、顶、底、顶
+      { x: 120, bounces: 2, speed: 230, noHoming: true },
+      { x: 240, bounces: 2, speed: 235, fromBottom: true, noHoming: true },
+      { x: 360, bounces: 2, speed: 240, noHoming: true },
+      { x: 480, bounces: 2, speed: 245, fromBottom: true, noHoming: true },
+      { x: 600, bounces: 2, speed: 250, noHoming: true },
+      { x: 720, bounces: 3, speed: 255, fromBottom: true, noHoming: true },
+      { x: 840, bounces: 3, speed: 260, noHoming: true, toPlatform: true }    // 最后一个：能变成平台
+    ],
+    spikes: [], arrows: []
+  },
+  {
+    name: '3-5 · 赌命', hint: '两个按钮，只有一个是真的。',
+    width: 960, spawn: [110, 200],
+    goal: { x: 850, y: 180, w: 46, h: 70 },
+    gamble: { answers: [0, 0, 1, 0], riseStep: 55 },   // 前三轮：左 左 右
+    gambleButtons: [
+      { x: 258, y: 228, w: 42, h: 20 },     // 中间地板左端（往里一点）
+      { x: 660, y: 228, w: 42, h: 20 }      // 中间地板右端（往里一点）
+    ],
+    platforms: [
+      { x: 0,   y: 250, w: 220, h: 220, kind: 'solid' },
+      { x: 740, y: 250, w: 220, h: 220, kind: 'solid' },
+      { x: 220, y: 250, w: 520, h: 70, kind: 'solid', riser: true }   // 一开始和高台齐平
+    ],
+    spikes: [], saws: [], arrows: []
+  },
+
+  /* ================= 大关四 · 险路尽头（全部叠起来）================= */
+  {
+    name: '4-1 · 表魔王', hint: '先铺好地，再放东西。',
+    width: 960, spawn: [147, 220],
+    goal: { x: 804, y: 200, w: 46, h: 70 },   // 门卡在右边第二级阶梯下，下边缘贴地板(270)
+    hiddenCorridorY: 230,                    // 人在这条高度以上就是走隐藏通道（碰到门直接通关）
+    goalTeleportOnTouch: true,               // 第三层陷阱：第一次碰门 → 门自己传送到最左边
+    missileAfterGoalTp: true,                // 门传送完，身后飞来一枚导弹追你
+    platforms: [
+      { x: 0,   y: 270, w: 90,  h: 270, kind: 'solid' },                // 地板左1
+      { x: 90,  y: 270, w: 90,  h: 270, kind: 'solid', retractFloor: true },  // 左2阶梯对应地板（会收）
+      { x: 180, y: 270, w: 780, h: 270, kind: 'solid' },                // 地板其余
+      // ===== 天花板：横梁 + 阶梯形状，中间空隙全部填实（底部阶梯状 140/170/200）=====
+      { x: 0,   y: -40, w: 960, h: 140, kind: 'solid', noTop: true },  // 横梁
+      { x: 0,   y: 100, w: 90,  h: 40,  kind: 'solid', noTop: true },  // 左1（底140）
+      { x: 90,  y: 100, w: 90,  h: 70,  kind: 'solid', noTop: true },  // 左2（底170）
+      { x: 180, y: 100, w: 600, h: 100, kind: 'solid', noTop: true },  // 中段（底200）
+      { x: 780, y: 100, w: 90,  h: 70,  kind: 'solid', noTop: true },  // 右2（底170）
+      { x: 870, y: 100, w: 90,  h: 40,  kind: 'solid', noTop: true },  // 右1（底140）
+      // ===== 隐藏保送通道：天花板下面那条看不见的平台（790 之后开口，人掉下去正好进门）=====
+      { x: -60, y: 236, w: 850, h: 44, kind: 'solid', oneWay: true, hiddenPath: true },
+      // ===== 最左边台阶下的隐藏跳板（吃了金币就自动失效）=====
+      { x: 0,   y: 270, w: 90,  h: 10, kind: 'bounce', power: 1150, popTime: 0.10, secretPad: true }
+    ],
+    coins: [
+      { x: 350, y: 250 },
+      { x: 550, y: 250 },
+      { x: 720, y: 250, fake: true }                 // 第三枚假金币：开局就在，吃满两枚才开始追，追完消失
+    ],
+    spikes: [
+      // ② 密集刺墙：从通道口(180)每隔50px一排、每排2根，0.12s一波铺到门口
+      { x: 180, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 350, needFloorDone: true, waveDelay: 0.0, waveLeader: true },
+      { x: 202, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.0 },
+      { x: 230, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.12 },
+      { x: 252, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.12 },
+      { x: 280, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.24 },
+      { x: 302, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.24 },
+      { x: 330, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.36 },
+      { x: 352, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.36 },
+      { x: 380, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.48 },
+      { x: 402, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.48 },
+      { x: 430, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.6 },
+      { x: 452, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.6 },
+      { x: 480, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.72 },
+      { x: 502, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.72 },
+      { x: 530, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.84 },
+      { x: 552, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.84 },
+      { x: 580, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.96 },
+      { x: 602, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 0.96 },
+      { x: 630, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 1.08 },
+      { x: 652, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 1.08 },
+      { x: 680, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 1.2 },
+      { x: 702, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 1.2 },
+      { x: 730, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 1.32 },
+      { x: 752, y: 240, w: 18, h: 30, hidden: true, fake: true, triggerX: 999999, needFloorDone: true, waveDelay: 1.32 },
+    ],
+    // ② 距离触发的按钮：离门一定距离就伸出，按了传回出生点
+    button: { x: 760, y: 250, w: 40, h: 20, hidden: true, revealDist: 120, tpOnPress: true },
+    arrows: []
+  },
+  {
+    name: '4-2 · 里魔王', hint: '没有近路了。',
+    width: 960, spawn: [70, 380], jump: 900,
+    goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0,   y: 470, w: 280, h: 70, kind: 'solid' },
+      { x: 280, y: 470, w: 120, h: 70, kind: 'fake' },
+      { x: 400, y: 470, w: 240, h: 70, kind: 'solid' },
+      { x: 640, y: 470, w: 120, h: 70, kind: 'fake' },
+      { x: 760, y: 470, w: 200, h: 70, kind: 'solid' }
+    ],
+    spikes: [
+      { x: 285, y: 444, w: 110, h: 26 },
+      { x: 645, y: 444, w: 110, h: 26 }
+    ],
+    saws: [{ x: 430, y: 442, r: 24, tx: 760, ty: 442, speed: 230 }],
+    arrows: []
+  },
+  {
+    name: '4-3 · 下楼', hint: '从二楼下来，一步一步。',
+    width: 960, spawn: [100, 200],
+    goal: { x: 880, y: 400, w: 46, h: 70 },
+    hiddenPathY: 105,                     // 只有真正站进通道(y≈62)才隐身，起跳时还看得见
+    platforms: [
+      { x: 0,   y: 0,   w: 960, h: 52,  kind: 'solid' },                                   // 天花板
+      { x: 0,   y: 90,  w: 860, h: 42,  kind: 'solid', oneWay: true, hiddenPath: true },   // 隐藏保送通道
+      { x: 0,   y: 250, w: 200, h: 22,  kind: 'solid' },                                   // 二楼
+      { x: 200, y: 250, w: 60,  h: 22,  kind: 'vanish' },                                  // ① 消失板
+      { x: 0,   y: 470, w: 400, h: 70,  kind: 'solid' },                                   // 一楼左
+      { x: 520, y: 470, w: 440, h: 70,  kind: 'solid' },                                   // 一楼右
+      { x: 400, y: 380, w: 220, h: 22,  kind: 'solid' },                                   // 中层平台
+      { x: 340, y: 470, w: 56,  h: 10,  kind: 'bounce', power: 1250, popTime: 0.10 },      // ② 跳板
+      { x: 620, y: 350, w: 36,  h: 120, kind: 'piston', triggerX: 640, moveV: 600, moveTo: 780 }   // ⑤ 活塞
+    ],
+    spikes: [
+      { x: 480, y: 354, w: 80, h: 26, hidden: true, triggerX: 440 }                        // ③ 隐藏刺
+    ],
+    saws: [
+      { x: 420, y: 352, r: 22, tx: 600, ty: 352, speed: 190 }                              // ④ 锯片
+    ],
+    arrows: []
+  },
+  {
+    name: '4-4 · 三合一', hint: '刺、锯、活塞。都在。',
+    width: 960, spawn: [70, 380], jump: 900,
+    goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 340, h: 70, kind: 'solid' },
+      { x: 460, y: 470, w: 180, h: 70, kind: 'solid' },
+      { x: 760, y: 470, w: 200, h: 70, kind: 'solid' },
+      { x: 100, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 180, moveV: 560, moveTo: 340 }
+    ],
+    saws: [{ x: 500, y: 442, r: 24, tx: 620, ty: 442, speed: 180 }],
+    spikes: [{ x: 300, y: 414, w: 110, h: 56, hidden: true, triggerX: 250 }],
+    arrows: []
+  },
+  {
+    name: '4-5 · 尽头', hint: '前面出现过的东西，都会再来一遍。',
+    width: 960, spawn: [70, 380], jump: 900,
+    goal: { x: 880, y: 400, w: 46, h: 70 },
+    platforms: [
+      { x: 0, y: 470, w: 280, h: 70, kind: 'solid' },
+      { x: 280, y: 470, w: 120, h: 70, kind: 'fake' },
+      { x: 400, y: 470, w: 180, h: 70, kind: 'solid' },
+      { x: 700, y: 470, w: 260, h: 70, kind: 'solid' },
+      { x: 100, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 200, moveV: 560, moveTo: 400 }
+    ],
+    saws: [{ x: 720, y: 442, r: 24, tx: 900, ty: 442, speed: 200 }],
+    spikes: [{ x: 430, y: 414, w: 110, h: 56, hidden: true, triggerX: 400 }],
+    balls: [{ x: 600, bounces: 3 }],
+    arrows: []
+  }
+];
+
+/* ==================================================================
+   游戏状态与物理
+   ================================================================== */
+var GRAVITY = 2400, MOVE = 315, JUMP_V = 810, MAX_FALL = 1500;   // 跳跃力整体调低（950 → 810）：容错从 ~73px 压到 ~27px
+var PISTON_RISE = 0.16, PISTON_SINK = 0.18;   // 活塞钻出地面 / 缩回地下所需时间
+
+var TAUNTS = ['就这？', '再来一次', '差一点点', '你被坑了', '哈哈哈哈哈',
+              '这也信？', '再想想', '手别抖', '别急', '熟悉的味道'];
+
+/* ============================================================
+   正式版：四个大关 + 存档
+   ============================================================ */
+var LEVELS_PER_WORLD = 5;
+
+var WORLDS = [
+  { name:'一 · 脚下不稳', sub:'不能全信脚下的东西', color:'#ffd23f',
+    bg:'#241d06', bgDeep:'#150f03', terr:'#3a2f08', terrTop:'#5e4b0a', terrEdge:'#4a3a07' },
+  { name:'二 · 眼见为虚', sub:'看到的不一定是真的', color:'#ed9970',
+    bg:'#261310', bgDeep:'#160908', terr:'#3d1f18', terrTop:'#5e2f23', terrEdge:'#4c261d' },
+  { name:'三 · 机关重重', sub:'世界会主动害你', color:'#ff8a4a',
+    bg:'#2a1208', bgDeep:'#180a04', terr:'#3e1a07', terrTop:'#5c2609', terrEdge:'#4a1f08' },
+  { name:'四 · 险路尽头', sub:'我在看着你', color:'#cc3322',
+    bg:'#2a0706', bgDeep:'#180404', terr:'#3e0c07', terrTop:'#5c120a', terrEdge:'#4a0e08', demon:true }
+];
+
+/* 约定：1-2 / 2-4 / 3-3 是钥匙关（这里存的是 0-based 的小关号） */
+var KEY_LEVEL = [1, 3, 2];
+
+/* 每个大关一套关卡内配色：平台 / 机关 / 背景都跟着主题走。
+   平台：保留明暗关系，把色相往主题色上拉。
+   机关：统一用"比背景再深一点"的同色系 —— 会融进场景里，
+         不再靠亮色提醒你"这里有危险"。留一点明暗差，仔细看还是分得出来。 */
+function applyWorldPalette(w) {
+  var W = WORLDS[w] || WORLDS[0];
+  var c = W.color;
+  // 机关色：以本关背景为底，再压深一档（delta 负值 = 稍微亮一点）
+  var TRAP_DARK = 0.34;
+  function trapShade(delta) {
+    return mix(PAL.bg, '#000000', Math.max(0, Math.min(1, TRAP_DARK + delta)));
+  }
+
+  // 关卡背景：比菜单的深底提亮一档。
+  // 深色机关必须比背景更深才立得住，背景太黑的话它们就没地方待了。
+  PAL.bg     = mix(W.bg, c, 0.17);
+  PAL.bgDeep = PAL.bg;                       // 纯色，不再有下半部分那条
+  // 平台
+  PAL.ground    = mix('#7d5a44', c, 0.38);   // 平台主体
+  PAL.groundTop = mix('#ff8a4a', c, 0.62);   // 平台顶边（最抢眼的一条）
+  // 机关
+  PAL.spike     = trapShade(0.08);
+  PAL.piston    = trapShade(-0.02);
+  PAL.pistonTop = trapShade(-0.26);          // 活塞顶盖留点亮，不然完全看不见
+  PAL.appear    = trapShade(-0.20);
+  PAL.vanish    = trapShade(-0.08);
+  // 锯片例外：它是高速移动的东西，藏起来就是耍赖 —— 用亮金属色，一眼看得见
+  PAL.saw       = mix('#d8c9b2', c, 0.26);
+  // 假地板不是"机关"：它要装成正常地板，所以贴着平台色
+  PAL.fake      = mix('#734f38', c, 0.28);
+}
+
+var SAVE_KEY = 'trap-runner-save-v1';
+var save = { cleared:{}, keys:{}, deaths:0, demonInner:false };
+
+function loadSave() {
+  if (typeof location !== 'undefined' && location.search.indexOf('di=1') >= 0) save.demonInner = true;
+  var o = null;
+  try {
+    var raw = localStorage.getItem(SAVE_KEY);
+    if (raw) o = JSON.parse(raw);
+  } catch (e) {}
+  /* 注意：这里要"原地改"，不能 save = {...} 整个换对象 ——
+     换了之后 __TRAP__.save 这类外部引用就指向旧对象了。 */
+  save.cleared = (o && typeof o.cleared === 'object' && o.cleared) || {};
+  save.keys    = (o && typeof o.keys    === 'object' && o.keys)    || {};
+  save.deaths  = (o && typeof o.deaths  === 'number') ? o.deaths : 0;
+  save.achievements = (o && typeof o.achievements === 'object' && o.achievements) || {};
+  save.demonInner = !!(o && o.demonInner);
+}
+function writeSave() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
+}
+function resetSave() {
+  save.cleared = {}; save.keys = {}; save.deaths = 0; save.achievements = {};
+  writeSave();
+}
+
+function keyCount() {
+  var n = 0;
+  for (var w = 0; w < 3; w++) if (save.keys[w]) n++;
+  return n;
+}
+function isCleared(w, i) { return !!save.cleared[w + '-' + i]; }
+function worldCleared(w) {
+  for (var i = 0; i < LEVELS_PER_WORLD; i++) if (!isCleared(w, i)) return false;
+  return true;
+}
+function worldUnlocked(w) {
+  if (w === 0) return true;
+  if (w === 3) return keyCount() >= 3;          // 险路尽头：集齐三把钥匙才开
+  return worldCleared(w - 1);
+}
+function levelUnlocked(w, i) {
+  if (!worldUnlocked(w)) return false;
+  if (w === 3 && i === 1) return !!save.demonInner;   // 里魔王：走捷径才解锁
+  if (i === 0) return true;
+  return isCleared(w, i - 1);
+}
+function markCleared(w, i) {
+  save.cleared[w + '-' + i] = 1;
+  writeSave();
+}
+var ACHIEVEMENTS = [
+  { w: 0, name: '脚下很稳' },
+  { w: 1, name: '火眼金睛' },
+  { w: 2, name: '披荆斩棘' },
+  { w: 3, name: '逃出生天' },
+  // 隐藏成就
+  { id: 'save',      name: '自我救赎',   hidden: true },
+  { id: 'sacrifice', name: '献祭大师',   hidden: true },
+  { id: 'pointless', name: '多此一举',   hidden: true },
+  { id: 'clever',    name: '小蔡的巧思', hidden: true }
+];
+function unlockAchievement(key) {
+  if (!save.achievements) save.achievements = {};
+  if (save.achievements[key]) return false;   // 只播报第一次
+  save.achievements[key] = 1;
+  writeSave();
+  if (!game.newAch) game.newAch = [];
+  game.newAch.push(key);
+  var a = null;
+  for (var ai = 0; ai < ACHIEVEMENTS.length; ai++) {
+    if (ACHIEVEMENTS[ai].id === key || ACHIEVEMENTS[ai].w === key) a = ACHIEVEMENTS[ai];
+  }
+  if (a) {
+    if (arguments[1]) {
+      // 立即播报（拿钥匙会马上死，等不到队列）
+      flashMsg('🏆 获得成就：' + a.name);
+      if (game.achQueue && game.achQueue.length) game.achQueue.shift();
+    } else {
+      if (!game.achQueue) game.achQueue = [];
+      game.achQueue.push('🏆 获得成就：' + a.name);
+    }
+    Sound.sfxAllClear();
+  }
+  return true;
+}
+function giveKey(w) {
+  save.keys[w] = 1;
+  writeSave();
+  Sound.sfxWin();
+  unlockAchievement('save', true);
+  var kn = 0;
+  for (var kx = 0; kx < 3; kx++) if (save.keys[kx]) kn++;
+  if (kn >= 3) unlockAchievement('sacrifice', true);
+}
+
+var CUR = { w: 0, i: 0 };        // 当前正在玩的是哪个大关的哪个小关
+var SLOT_LEVELS = LEVELS_PER_WORLD * 4;   // 20 关
+
+/* 关卡内容还没做，先把现有 8 关循环填进 20 个槽位 */
+function slotToLevelIndex(w, i) {
+  return (w * LEVELS_PER_WORLD + i) % LEVELS.length;
+}
+
+var game = {
+  li: 0,
+  p: null,
+  cam: 0,
+  deaths: 0,
+  totalDeaths: 0,
+  particles: [],
+  shake: 0,
+  state: 'title',       // title | world | levels | play | dead | win | complete
+  timer: 0,
+  taunt: '',
+  tauntT: 0,
+  best: null,
+  coyote: 0,
+  jumpBuf: 0,
+  mouse: null,          // 鼠标在画布上的位置（开始按钮悬停 / 那只眼睛盯着看）
+  cursorW: 0,           // 第一级：光标停在哪个门上
+  cursorL: 0,           // 第二级：光标停在哪个小关上
+  levelsWorld: 0,       // 第二级当前展示的是哪个大关
+  flash: ''             // 屏幕上飘一下的提示（比如"获得钥匙"）
+};
+
+function loadLevel(i) {
+  var L = LEVELS[i];
+  game.li = i;
+  // 反转关：把「路」和「墙」的配色互换（背景=墙色，平台=路色）
+  applyWorldPalette(Math.floor(i / LEVELS_PER_WORLD));
+  if (L.invertColors) {
+    var _t = PAL.ground; PAL.ground = PAL.bg; PAL.bg = _t;
+    var _t2 = PAL.groundTop; PAL.groundTop = '#2a0a06'; PAL.bgDeep = _t; 
+  }
+  game.p = {
+    x: L.spawn[0], y: L.spawn[1], vx: 0, vy: 0, w: 26, h: 28,
+    onGround: false, face: 1, alive: true, sq: 1, ground: null,
+    anim: 0, animState: 'idle'
+  };
+  // 复制平台/尖刺的可变状态
+  game.plats = L.platforms.map(function (p) {
+    var isPiston = p.kind === 'piston';
+    return {
+      x: p.x, y: p.y, w: p.w, h: p.h, kind: p.kind,
+      state: (p.kind === 'appear' || isPiston) ? 'hidden' : 'active',
+      triggerX: p.triggerX || 0, timer: 0, appeared: 0,
+      // 默认全实心：从下面顶头、从侧面会挡住。
+      // （早期为了修"卡板边"把薄平台做成单向，代价是跳上去的途中会从板身里穿过去，
+      //   看起来像穿模。现在改成：要平台单向得在关卡数据里显式写 oneWay: true）
+      oneWay: !!p.oneWay || p.kind === 'bounce',   // 跳板必须单向，否则弹起后会被自己顶头清零
+      x0: p.x,
+      w0: p.w,                  // 消失板收缩动画用的原始宽度
+      retractT: p.retractT || 0.20,   // 收缩用时（越小消失越快）
+      power: p.power || 1420,          // bounce 跳板：弹力（之前没复制，一直用默认值）
+      pop: 0,                          // bounce 跳板：皮鼓起来的进度 0~1
+      popped: false,
+      sinkT2: p.sinkTime || 0.26,     // pitFloor 往下缩用时
+      sunk: false,
+      y0: p.y,                  // sinkFloor 下沉用的原始高度
+      moveV: p.moveV || 0,      // 会走的障碍：出现后自己移动，把玩家顶走
+      moveTo: p.moveTo || 0,
+      baseY: p.y,               // 活塞：原始高度（升降都相对它算）
+      phase: isPiston ? 'hidden' : '', phaseT: 0,
+      isWall: !!p.isWall,
+      deadly: !!p.deadly,
+      riseT: 0, risePhase: 'idle', riseY: 0,  // riseWall：升起的墙
+      slideWall: !!p.slideWall,           // 3-3：会往左缩进的下半堵墙
+      riser: !!p.riser,                  // 3-5：博弈对就上升的地板
+      hiddenPath: !!p.hiddenPath,        // 4-1：天花板里的隐藏通道（有碰撞不绘制）
+      secretPad: !!p.secretPad,          // 4-1：吃了第一枚金币就失效的隐藏跳板
+      noTop: !!p.noTop,                  // 4-1：天花板纯色，不画顶部亮线
+      retractFloor: !!p.retractFloor    // 4-1：走到金币终点附近就往左收进去的地板
+    };
+  });
+  game.spikes = L.spikes.map(function (s) {
+    return {
+      x: s.x, y: s.y, w: s.w, h: s.h, hidden: !!s.hidden,
+      triggerX: s.triggerX || 0, dir: s.dir || 'up',
+      fake: !!s.fake,           // 假刺：长得一模一样，但不致命
+      keepSafe: !!s.keepSafe,   // 反转后仍安全（2-5 的第二个刺）
+      holdTime: (s.holdTime === undefined ? 0 : s.holdTime),   // 伸出后持续这么久再收回（0=不收回）
+      needFloorDone: !!s.needFloorDone,   // 4-1：必须等左边地板收伸完成一次才触发
+      waveDelay: (s.waveDelay === undefined ? 0 : s.waveDelay),   // 4-1：波浪式依次冒出的延迟
+      waveLeader: !!s.waveLeader,
+      holdT: 0, retracted: false,
+      onPop: !!s.onPop,         // 等跳板把人弹起来之后才长出来
+      moveTo: s.moveTo || null, // 触发后瞬移到这里（判定立刻过去，视觉上快速平移）
+      atX: (s.atX === undefined ? null : s.atX),     // 横坐标触发
+      fallOnly: !!s.fallOnly,                          // 只在人下落时才认横坐标触发
+      atXlt: (s.atXlt === undefined ? null : s.atXlt), // 横坐标触发（小于）
+      atY: (s.atY === undefined ? null : s.atY),     // 竖坐标触发
+      needX: (s.needX === undefined ? null : s.needX), // 竖坐标触发还要求人已经过了这个 x
+      atYlt: (s.atYlt === undefined ? null : s.atYlt), // 玩家在这一高度以上才触发（走下面不触发）
+      onPlatY: (s.onPlatY === undefined ? null : s.onPlatY), // 只有站在 y≈这个值的平台上才触发
+      moved: false, animT: 0, fromX: s.x, fromY: s.y,
+      follow: !!s.follow, followDist: (s.followDist === undefined ? 200 : s.followDist),
+      moveSpeed: (s.moveSpeed === undefined ? 2.6 : s.moveSpeed),
+      shown: !s.hidden && !s.onPop, anim: (s.hidden || s.onPop) ? 0 : 1
+    };
+  });
+  game.saws = (L.saws || []).map(function (s) {
+    var tx = (s.tx === undefined) ? s.x : s.tx;
+    var ty = (s.ty === undefined) ? s.y : s.ty;
+    return {
+      x0: s.x, y0: s.y, tx: tx, ty: ty,
+      x: s.x, y: s.y, r: s.r || 20,
+      speed: s.speed || 0,
+      t: s.t0 || 0, dir: 1,                       // 沿路径的位置 0~1，来回
+      rot: (s.t0 || 0) * 6,
+      spin: (s.spin === undefined ? 3.4 : s.spin), // 自转角速度
+      hidden: !!s.hidden,                         // 一开始藏着
+      showOnPlatY: (s.showOnPlatY === undefined ? null : s.showOnPlatY), // 站上这个高度的平台才出现
+      once: !!s.once,                             // 只滚一趟（不来回）
+      chase: !!s.chase,                           // 跳过去后顿一下，然后快速追过来
+      chaseDelay: (s.chaseDelay === undefined ? 0.55 : s.chaseDelay),  // 停顿时长
+      chaseSpeed: (s.chaseSpeed === undefined ? 430 : s.chaseSpeed),   // 追的速度
+      chasing: false, chaseT: 0, triggered: false,
+      shown: !s.hidden, done: false
+    };
+  });
+  game.reverse = L.reverse ? -1 : 1;         // 反向关：一开始就是反的
+  game.flipOnLand = !!L.flipOnLand;          // 每次落地再反一次
+  game.wasOnGround = false;
+  game.goalReveal = (L.fakeGoal || L.goalHidden) ? 0 : 1;   // 真门的显现进度
+  game.goalX = L.goal.x;                                  // 会走的门：当前 x（重生 = 门回原位）
+  game.goalDone = false; game.goalMoving = false;
+  game.achQueue = [];                        // 成就播报队列
+  game.flashT = 0;                           // 通知显示计时（独立于死亡台词）
+  game.achT = 0;                             // 成就面板动画
+  game.achSel = null;                        // 当前查看的成就索引
+  game.settingsOpen = false;                 // 设置弹窗是否打开
+  game.resetOpen = false;                    // 重置确认弹窗
+  game.resetT = 0;                           // 重置弹窗滑入动画
+  game.resetCode = '';
+  game.resetInput = '';
+  game.resetMsg = '';
+  game.settingsT = 0;                        // 设置弹窗滑入动画进度
+  game.achOpen = false;
+  game.buttonPressed = false;                // 按钮是否按下
+  game.buttonRiseT = 1;                      // 按钮伸出进度（0=埋在地里，1=完全伸出）
+  game.wallAngle = 90;                       // 墙初始【竖直】(90°)；按按钮后匀速转起来
+  game.wallOn = false;                       // 墙是否开始旋转
+  game.fakeGoalDead = false;                 // 假门是否已失效（按下按钮后）
+  game.fakeGoalShown = !!(L.fakeGoal && !L.fakeGoal.hidden);  // 假门一开始就在（除非显式 hidden）
+  game.newWallDone = false; game.newWallT = 0; game.newWallRect = null;
+  game.reversed = false;   // 2-5：按下按钮后世界规则反转（刺危险/地板安全）
+  game.keyReveal = false;  // 3-3：左墙缩进后，隐藏的钥匙才显现
+  game.tp = null;          // 3-4 传送动画状态
+  game.ring = null;        // 3-4 七球绕人一圈 → 加速旋转 → 贯穿
+  game.goalFly = null;     // 3-4 门的粒子传送（美术层）
+  game.missileSpawned = false;   // 4-1 门传送后那枚导弹只放一次
+  game.goalTpedOnce = false;     // 4-1 门传送标记（重开要清）
+  game.fromHiddenPath = false;   // 4-1 走隐藏通道标记（重开要清，否则门传送/导弹永远不触发）
+  game.goalHide = false;
+  game.gotCoins = 0;       // 4-1 金币计数（重开要清零）
+  game.floorRetract = false;  // 4-1 左2地板是否在收
+  game.floorDone = false;     // 4-1 地板收伸（两轮都做完了）
+  game.floorPhase = 0;        // 4-1 地板收缩阶段：0=没做 1=金币那轮做完 2=导弹那轮也做完
+  game.spikeWaveT = undefined;   // 4-1 刺波浪计时（第一排触发后开始走）
+  game.spikeWaveDone = false;    // 4-1 整波刺只触发一次
+  game.floorT = 0;
+  game.gRound = 0;         // 3-5 博弈：当前第几轮
+  game.gBtns = false;      // 3-5 按钮：站到中间地板上才出现
+  game.riserSank = false;  // 3-5 地板是否已经开始下降
+  game.riserSunk = false;  // 3-5 地板是否已经沉到底
+  game.gBtnLock = false;   // 3-5 按钮锁：离开范围才能再按
+  game.gRetract = false;   // 按钮正在收回去
+  game.gDelay = 0;         // 收回去之后等多久才升
+  game.gRiseTo = null;     // 地板要升到的目标 y
+  game.jumpLocked = false; // 地板在动的期间禁止跳跃（也不响音效）
+  game.gShrink = false;    // 3-5 按错：地板从两边往中间收
+  game.gWrongPending = null; // 3-5 按错了，等按钮收完+0.5s 再执行惩罚
+  game.gFinal = false;     // 3-5 第四轮：按钮收完就撤地板，玩家必须立刻跳
+  game.passedShortcut = false;  // 表魔王：是否经过了正常路线的检查点
+  game.gFinalDelay = undefined;  // 第四轮的反应时间
+  game.missiles = [];      // 3-5 四个黑球绕人（半径周期变化）；重生 = 导弹清零
+  if (game.ring3) {
+    var R3d = game.ring3;
+    var baseR = 110 + Math.sin(R3d.t * 3.2) * 46;      // 半径来回伸缩
+    var crash = R3d.t > 3.85 ? (R3d.t - 3.85) / 0.15 : 0;   // 最后一瞬收向中心
+    var rr3 = baseR * (1 - crash);
+    for (var bj = 0; bj < 4; bj++) {
+      var ba = (bj / 4) * Math.PI * 2 - Math.PI / 2 + R3d.ang;
+      var bx3 = R3d.cx + Math.cos(ba) * rr3;
+      var by3 = R3d.cy + Math.sin(ba) * rr3;
+      ctx.fillStyle = '#120409';
+      ctx.beginPath(); ctx.arc(bx3, by3, 22, 0, 7); ctx.fill();
+      ctx.fillStyle = '#2a1a12';
+      ctx.beginPath(); ctx.arc(bx3 - 6, by3 - 6, 7, 0, 7); ctx.fill();
+    }
+  }
+
+  // 3-5 追踪导弹
+  game.ring3 = null;       // 3-5 四黑球绕人（第三个惊喜）
+  game.btnAnim = -1;       // 3-5 按钮弹出动画（-1=未开始, 0~1=进度）
+  game.gambleDone = false;  // 3-5 博弈结束
+  game.goalDead2 = false;  // 3-4 旧门已删除（代码层，碰不到）
+  game.buttonVisible = !(L.button && L.button.hidden);  // 默认显示；hidden 的按钮(2-5)等平台出现才显示
+  game.wallSweep = 0;
+  if (typeof location !== 'undefined' && location.search.indexOf('wa=') >= 0) {
+    game.wallAngle = parseInt(location.search.split('wa=')[1]) || 0; game.wallOn = true; game.buttonPressed = true;
+  }
+  game.revealStarted = false;
+  game.balls = (L.balls || []).map(function (b) {
+    return {
+      x: b.x, y: (b.y === undefined ? (b.fromBottom ? 436 : 100) : b.y), r: b.r || 34,   // 最高点统一 100
+      bounceH: (b.bounceH === undefined ? 110 : b.bounceH),
+      noHoming: !!b.noHoming,               // 永不追踪（只做普通弹跳）
+      toPlatform: !!b.toPlatform,           // 触发后变成可站立的半圆平台
+      asPlatform: false,
+      vy: (b.vy !== undefined) ? b.vy : (b.fromBottom ? -Math.sqrt(2 * GRAVITY * 0.32 * 336) : 0),   // 从下往上：同样的弹起能量
+      vx: 0, bounce: 0, maxBounce: b.bounces || 3,
+      speed: b.speed || 300, homing: false, spin: 0,
+      delay: b.chaseDelay === undefined ? 1.4 : b.chaseDelay    // 弹够之后还要等这么久才追
+
+    };
+  });
+  game.timeLimit = L.timeLimit || 0;         // 限时（秒），到点所有球开始追你
+  game.timeLeft = game.timeLimit;
+  game.coins = (L.coins || []).map(function (c) {
+    // 4-1：假金币初始隐藏（hidden:true），吃满两枚才现身
+    return { x: c.x, y: c.y, fake: !!c.fake, flip: !!c.flip, got: false, hidden: !!c.hidden, gone: false, t: Math.random() * 6 };
+  });
+  game.flipT = -1;                    // >=0 表示翻转动画进行中
+  game.sinkPhase = 'idle'; game.sinkT = 0; game.sinkY = 0; game.sinkLock = false;   // 门下沉
+  game.goalDead = false;                                                            // 门是否已失效
+  game.shrinkX = 0;                                          // 地板左缘右移量
+  game.jumpLock = 0;
+  game.popFired = false;      // 弹起后短暂禁止跳跃，免得被普通跳跃覆盖
+  game.quakePhase = 'idle'; game.quakeT = 0; game.quakeOff = 0;   // 抖动 → 全塌
+  game.keyThisLife = false;          // 这一命有没有捡到钥匙
+  game.keyGetT = 999;                // 拿到钥匙之后过了多久（决定是不是"献祭"）
+  game.keys = (L.keys || []).map(function (k) {
+    // 钥匙只能拿一次：本大关的钥匙已经到手，就再也不出现
+    if (save.keys[Math.floor(game.li / LEVELS_PER_WORLD)]) {
+      return { x: k.x, y: k.y, got: true, t: 0, show: 0, hidden: true, gone: true };
+    }
+    return {
+      x: k.x, y: k.y, got: false, t: 0,
+      show: k.show || 0,                   // 出场动画进度 0~1
+      hidden: !!k.hidden,                  // 一开始收着
+      revealOnly: !!k.revealOnly,          // 只靠 keyReveal 显现（3-3）
+      triggerX: k.triggerX || 0,           // 玩家走过这里才开始浮现
+      outT: k.outT || 1.1,                 // 浮现用多久
+      fx: (k.from === undefined ? k.x : k.from[0]),   // 从哪浮现（默认原地）
+      fy: (k.from === undefined ? k.y : k.from[1]),
+      slideToX: (k.slideTo === undefined ? null : k.slideTo),   // 一路滑到这儿
+      slideT: 0, slideTime: k.slideTime || 2.6, gone: false,
+      armX: (k.armX === undefined ? null : k.armX),             // 检查点一：先得到过这儿
+      armed: false, started: false,                             // 检查点二：再回到 triggerX 左边才启动
+      drop: !!k.drop, dropY: (k.dropY === undefined ? null : k.dropY),  // 从天掉下来
+      onPlatY: (k.onPlatY === undefined ? null : k.onPlatY), started: false  // 站上这个高度的平台才掉
+    };
+  });
+  game.arrows = L.arrows || [];
+  game.cam = 0;
+  game.particles = [];
+  game.shake = 0;
+  game.state = 'play';
+  game.timer = 0;
+  game.tauntT = 0;
+  game.coyote = 0;
+}
+
+/* kind: 'boom'（默认，爆尸体）| 'fall'（掉坑，不爆） */
+function die(kind) {
+  // 隐藏成就：在 3-4 摁下按钮后死亡
+  if (game.buttonPressed && CUR.w === 2 && CUR.i === 3) unlockAchievement('pointless');
+  if (game.state !== 'play') return;
+  game.state = 'dead';
+  game.timer = 0;
+  game.deaths++;
+  game.totalDeaths++;
+  save.deaths++;               // 总死亡次数进存档（选关界面那只小幽灵看的就是它）
+  writeSave();
+  // 死人话：
+  //   普通死 → 黄色，语气轻一点，别那么惊悚
+  //   献祭死 → 血红。判定不是"拿过钥匙就死"，而是"死的时候正在钥匙旁边"
+  //            （也就是真的为了拿它才死的）
+  // 判定：拿到钥匙之后 2.6 秒内就死了 —— 也就是"拿完就没命了"。
+  // 拿完钥匙跑很远才死的不算，那是自己作死，不是献祭。
+  var sacrificed = game.keyThisLife && game.keyGetT < 2.6;
+  if (game.crushed) {
+    game.crushed = false;
+    game.taunt = '谁让你按了哈哈哈哈';
+    game.tauntColor = '#c0392b';
+    game.shake = 24;
+    game.tauntT = 1.6;
+    Sound.sfxDeath();
+    return;
+  }
+  if (sacrificed) {
+    game.taunt = (LEVELS[game.li].sacrificeTaunt || '你献祭了自己，这是你应得的');
+    game.tauntColor = '#c0392b';
+    game.shake = 20;                    // 献祭额外震一下
+  } else {
+    game.taunt = TAUNTS[(Math.random() * TAUNTS.length) | 0];
+    game.tauntColor = PAL.player;       // 黄色，轻一点
+  }
+  game.tauntT = 1.4;
+  game.shake = 14;
+  if (kind !== 'missile') Sound.sfxDeath();   // 导弹炸死就只留爆炸声，不再叠死亡音效
+  // 掉坑：不爆尸体，就是人没了（约定：除了掉坑，其它死法都爆尸体）
+  if (kind === 'fall') return;
+
+  // 死亡粒子：全用火柴人自己那套黄，亮的那几颗当溅出来的尸块。
+  var DEBRIS = ['#9c7a1e', '#b8901f', '#c9a02b', '#d8b02f', '#e8bb35', '#ffd23f', '#fff0a8'];
+  var p = game.p;
+  for (var i = 0; i < 32; i++) {
+    game.particles.push({
+      x: p.x + p.w / 2, y: p.y + p.h / 2,
+      vx: (Math.random() - 0.5) * 380,
+      vy: (Math.random() - 0.95) * 400,
+      life: 0.8 + Math.random() * 0.6, max: 1,
+      c: DEBRIS[(Math.random() * DEBRIS.length) | 0]
+    });
+  }
+}
+
+function winLevel() {
+  if (game.state !== 'play') return;
+  game.newAch = [];
+  game.completeAchLines = null;
+  Sound.sfxWin();
+  markCleared(CUR.w, CUR.i);       // 记进存档
+  // 隐藏成就：走保送路线通关 4-1
+  if (CUR.w === 3 && CUR.i === 0 && game.fromHiddenPath) unlockAchievement('clever');
+  // 大关最后一关通关 → 解锁成就（每个大关的最后一小关）
+  var lastSlot = (CUR.w === 3) ? 0 : (LEVELS_PER_WORLD - 1);   // 第四大关只剩表魔王一关
+  if (CUR.i === lastSlot) unlockAchievement(CUR.w);
+  // 表魔王：没经过检查点 = 走了捷径 → 弹死人话 + 解锁里魔王
+  var SC = LEVELS[game.li].shortcutCheck;
+  if (SC && !game.passedShortcut) {
+    save.demonInner = true;        // 解锁里魔王
+    writeSave();
+    game.taunt = '你个不劳而获的家伙';
+    game.tauntColor = '#c0392b';
+    game.tauntT = 1.8;
+    game.shake = 12;
+  }
+  // 记下过关门动画的起点：门中心 + 玩家当前位置
+  var g = LEVELS[game.li].goal;
+  var gx = (game.goalX !== undefined) ? game.goalX : g.x;   // 会走的门：用当前真实位置
+  game.winDoor = { k: 1, cx: gx + g.w / 2, cy: g.y + g.h / 2 };
+  game.winFrom = { x: game.p.x, y: game.p.y };
+  if (CUR.w === 3 && CUR.i === 0) {   // 第四大关只有表魔王一关，通关即全通
+    game.state = 'complete';
+    Sound.sfxAllClear();
+    return;
+  }
+  game.state = 'win';
+  game.timer = 0;
+}
+
+/* ---------------- 输入 ----------------
+   用「动作名」记录按键，并且优先读 e.code（物理键位）。
+   这样能绕开中文输入法、大小写、键盘布局导致的丢键，
+   也能保证「按住跳跃 + 同时按方向键」两者都生效、不互相打架。 */
+var keys = {};
+var ACT = {
+  Space: 'jump', ArrowUp: 'jump', KeyW: 'jump',
+  ArrowLeft: 'left', KeyA: 'left',
+  ArrowRight: 'right', KeyD: 'right',
+  ArrowDown: 'down', KeyS: 'down',
+  KeyR: 'restart', KeyM: 'music', Enter: 'enter'
+};
+function keyAction(e) {
+  if (e.code && ACT[e.code]) return ACT[e.code];
+  var k = (e.key || '').toLowerCase();
+  if (k === ' ' || k === 'spacebar') return 'jump';
+  if (k === 'arrowup' || k === 'w') return 'jump';
+  if (k === 'arrowleft' || k === 'a') return 'left';
+  if (k === 'arrowright' || k === 'd') return 'right';
+  if (k === 'arrowdown' || k === 's') return 'down';
+  if (k === 'r') return 'restart';
+  if (k === 'm') return 'music';
+  if (k === 'n') return 'skip';
+  if (k === 'enter') return 'enter';
+  return null;
+}
+function startGame() {
+  game.deaths = 0; game.totalDeaths = 0;
+  Sound.startBgm();
+  // 开始 → 一级目录：门合上 → 换场景 → 开门
+  startTransition(function () {
+    game.state = 'world';
+    game.cursorW = 0;
+  });
+}
+
+/* 从第二级选关界面进入某一关 */
+function loadSlot(w, i) {
+  CUR.w = w; CUR.i = i;
+  applyWorldPalette(w);          // 关卡内的配色跟着大关走
+  game.deaths = 0;
+  game.taunt = ''; game.tauntT = 0;
+  Sound.startBgm();
+  loadLevel(slotToLevelIndex(w, i));
+}
+
+/* 调试：直接通关当前关（关卡内容还没做） */
+function debugClearCurrent() {
+  if (game.state !== 'play') return;
+  markCleared(CUR.w, CUR.i);
+  game.state = 'levels';
+  game.levelsWorld = CUR.w;
+  game.cursorL = Math.min((CUR.w === 3 ? 2 : LEVELS_PER_WORLD) - 1, CUR.i + 1);
+  Sound.sfxWin();
+  game.flash = '通关 ' + (CUR.w + 1) + '-' + (CUR.i + 1);
+  game.tauntT = 1.4;
+  // 大关最后一关：N 跳关也算通关，同样解锁成就（放最后，成就会盖掉"通关 x-y"）
+  var lastSlotN = (CUR.w === 3) ? 0 : (LEVELS_PER_WORLD - 1);
+  if (CUR.i === lastSlotN) unlockAchievement(CUR.w);
+}
+
+function skipLevel() {
+  game.deaths = 0;
+  game.state = 'levels';
+  game.levelsWorld = CUR.w;
+  game.cursorL = Math.min((CUR.w === 3 ? 2 : LEVELS_PER_WORLD) - 1, CUR.i + 1);
+}
+function flashMsg(s) { game.flash = s; game.flashT = 1.6; }
+
+/* 两级界面的元素位置（画和点都用它） */
+var DOOR_POS  = [ {x:158,y:352}, {x:408,y:246}, {x:652,y:342}, {x:822,y:184} ];
+var LEVEL_POS = [ {x:150,y:342}, {x:302,y:258}, {x:462,y:322}, {x:640,y:244}, {x:806,y:310} ];
+
+window.addEventListener('keydown', function (e) {
+  if (e.isComposing || e.keyCode === 229) return;        // 输入法组字中，忽略
+
+  /* 死亡后：按任意键继续（留 0.35s 缓冲，免得死亡瞬间手还按着键就跳过了） */
+  if (game.state === 'dead') {
+    if (game.timer > 0.35) { e.preventDefault(); game.deaths = 0; loadSlot(CUR.w, CUR.i); }
+    return;
+  }
+
+  /* ---- 调试键必须先判 ----
+     B / C 在 keyAction 里没有对应的动作名，如果放在下面，
+     会被 `if (!a) return` 直接拦掉（A 之所以好使，是因为它映射成了 left）。 */
+  // 重置弹窗的输入（优先于一切）
+  if (game.resetOpen) {
+    if (e.code === 'Escape') { game.resetOpen = false; game.resetInput = ''; game.resetMsg = ''; return; }   // 走退场动画
+    if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+      e.preventDefault();
+      if (game.resetInput === game.resetCode) {
+        // 重置：清空存档
+        save = { cleared: {}, keys: {}, deaths: 0, demonInner: false, achievements: {} };
+        writeSave();
+        game.resetOpen = false; game.settingsOpen = false; game.settingsT = 0;
+        game.resetInput = ''; game.resetMsg = '';
+        game.state = 'title';
+        flashMsg('🗑 游戏进度已重置'); Sound.sfxTrap && Sound.sfxTrap();
+      } else {
+        game.resetMsg = '重置码不对，请重新输入';
+        game.resetInput = '';
+      }
+      return;
+    }
+    var dg = e.key && e.key.length === 1 && e.key >= '0' && e.key <= '9';
+    if (dg && game.resetInput.length < 4) { game.resetInput += e.key; e.preventDefault(); return; }
+    if (e.code === 'Backspace') { game.resetInput = game.resetInput.slice(0, -1); e.preventDefault(); return; }
+    return;   // 弹窗打开时吃掉所有按键
+  }
+
+
+  var a = keyAction(e);
+  if (!a) return;
+  e.preventDefault();
+  if (!keys[a] && a === 'jump') jumpPressed = true;
+  keys[a] = true;
+  Sound.init();
+  if (Sound.ac && Sound.ac.state === 'suspended') Sound.ac.resume();
+
+  if (game.state === 'world') {
+    if (a === 'left' || a === 'up')    { game.cursorW = (game.cursorW + 3) % 4; return; }
+    if (a === 'right' || a === 'down') { game.cursorW = (game.cursorW + 1) % 4; return; }
+    if (a === 'jump' || a === 'enter') { enterWorld(game.cursorW); return; }
+    if (a === 'restart') { startTransition(function () { game.state = 'title'; }); return; }
+    return;
+  }
+  if (game.state === 'levels') {
+    var maxSlot = (game.levelsWorld === 3) ? 2 : 5;      // 第四大关只有 2 个入口
+    if (a === 'left' || a === 'up')    { game.cursorL = (game.cursorL + maxSlot - 1) % maxSlot; return; }
+    if (a === 'right' || a === 'down') { game.cursorL = (game.cursorL + 1) % maxSlot; return; }
+    if (a === 'restart') { startTransition(function () { game.state = 'world'; }); return; }   // R 回第一级（带门动画）
+    if (a === 'jump' || a === 'enter') {
+      if (game.levelsWorld === 3 && game.cursorL === 1 && !save.demonInner) { Sound.sfxTrap && Sound.sfxTrap(); return; }   // 里魔王没解锁
+      enterLevel(game.levelsWorld, game.cursorL); return;
+    }
+    return;
+  }
+
+  if ((game.state === 'title' || game.state === 'complete') && (a === 'jump' || a === 'enter')) startGame();
+  else if (a === 'music') Sound.toggle();
+  else if (a === 'restart' && game.state === 'play') loadSlot(CUR.w, CUR.i);
+});
+
+function enterWorld(w) {
+  if (!worldUnlocked(w)) {
+    flashMsg(w === 3 ? '🔒 这扇门打不开' : '🔒 还没有路通到这里');
+    return;
+  }
+  game.levelsWorld = w;
+  game.cursorL = 0;
+  var slotN = (w === 3 ? 2 : LEVELS_PER_WORLD);   // 第四大关只有 2 个入口
+  for (var i = 0; i < slotN; i++) if (!isCleared(w, i)) { game.cursorL = i; break; }
+  // 一级 → 二级目录：门合上 → 换场景 → 开门
+  var targetW = game.levelsWorld, targetL = game.cursorL;
+  startTransition(function () {
+    game.levelsWorld = targetW;
+    game.cursorL = targetL;
+    game.state = 'levels';
+  });
+  Sound.sfxWin();
+}
+function enterLevel(w, i) {
+  if (!levelUnlocked(w, i)) { flashMsg('🔒 先过了上一关'); return; }
+  // 进关卡：红门合上 → 停顿 → 打开，开门时露出的已经是关卡
+  startTransition(function () { loadSlot(w, i); });
+}
+window.addEventListener('keyup', function (e) {
+  var a = keyAction(e);
+  if (a) keys[a] = false;
+});
+window.addEventListener('blur', function () { keys = {}; });  // 切走窗口清键，防止"卡住一直跑/一直跳"
+canvas.addEventListener('mousedown', function (e) {
+  Sound.init();
+  if (Sound.ac && Sound.ac.state === 'suspended') Sound.ac.resume();
+  var pt = canvasPoint(e);
+
+  // ===== 左下角齿轮：开关设置弹窗（只在菜单界面有效）=====
+  // 齿轮在所有界面都能点（包括游戏内）
+  if (pt.x < 110 && pt.y > VH - 100) {
+    game.settingsOpen = !game.settingsOpen;
+    if (game.settingsOpen) game.settingsT = 0;   // 打开才归零，关闭走退场
+    return;
+  }
+
+  // ===== 成就详情弹窗：点叉关闭，点其他地方也关 =====
+  if (game.achSel !== null && game.achSel !== undefined) {
+    var DW2 = 400, DH2 = 300, DX2 = (VW - DW2) / 2, DY2 = (VH - DH2) / 2;
+    game.achSel = null;   // 点任何地方都关闭
+    return;
+  }
+  // ===== 成就面板：叉叉 / 点图标 =====
+  if (game.achOpen && (game.achT || 0) > 0) {
+    var AW2 = 620, AH2 = 420, AX2 = (VW - AW2) / 2, AY2 = (VH - AH2) / 2;
+    if (pt.x > AX2 + AW2 - 44 && pt.x < AX2 + AW2 - 8 && pt.y > AY2 + 8 && pt.y < AY2 + 44) {
+      game.achOpen = false; game.achSel = null; return;
+    }
+    var cellW2 = (AW2 - 80) / 4, cellH2 = (AH2 - 120) / 2, isz2 = Math.min(cellW2, cellH2) - 24;
+    for (var cai = 0; cai < 8; cai++) {
+      var ccol = cai % 4, crow = (cai / 4) | 0;
+      var ccx = AX2 + 40 + cellW2 * ccol + cellW2 / 2;
+      var ccy = AY2 + 60 + cellH2 * crow + cellH2 / 2;
+      if (pt.x > ccx - isz2 / 2 && pt.x < ccx + isz2 / 2 && pt.y > ccy - isz2 / 2 && pt.y < ccy + isz2 / 2) {
+        game.achSel = cai; Sound.sfxTrap && Sound.sfxTrap(); return;
+      }
+    }
+    return;   // 面板打开时其它点击不穿透
+  }
+
+  // ===== 重置确认弹窗：点叉叉关闭 =====
+  if (game.resetOpen) {
+    var RW2 = 420, RH2 = 230, RX2 = (VW - RW2) / 2, RY2 = (VH - RH2) / 2;
+    if (pt.x > RX2 + RW2 - 44 && pt.x < RX2 + RW2 - 8 && pt.y > RY2 + 8 && pt.y < RY2 + 44) {
+      game.resetOpen = false; game.resetInput = ''; game.resetMsg = '';
+      return;
+    }
+    return;   // 弹窗打开时其它点击不穿透
+  }
+
+  // ===== 设置弹窗内的点击 =====
+  if (game.settingsOpen) {
+    if (typeof location !== 'undefined' && location.search.indexOf('dbg=1') >= 0) {
+      game._dbgPt = { x: Math.round(pt.x), y: Math.round(pt.y) };
+    }
+    var _sT = (game.settingsT || 0), _sE = _sT * _sT * (3 - 2 * _sT);
+    var SW2 = 320, SH2 = 436, SX = (VW - SW2) / 2, SY = (VH - SH2) / 2 + (1 - _sE) * 280;
+    // 右上角小叉
+    if (pt.x > SX + SW2 - 40 && pt.x < SX + SW2 - 12 && pt.y > SY + 12 && pt.y < SY + 40) {
+      game.settingsOpen = false; return;   // 只置 false，让 settingsT 自然退场
+    }
+    // 两个按钮（各 110x110，同一水平线）
+    var BW2 = 110, GAP2 = 26;
+    var bx1 = SX + SW2 / 2 - BW2 - GAP2 / 2, bx2 = SX + SW2 / 2 + GAP2 / 2;
+    var by2 = SY + 92;   // 和绘制里的 by 保持一致
+    var inG = (game.state === 'play' || game.state === 'dead' || game.state === 'win');
+    if (pt.x > bx1 && pt.x < bx1 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
+      if (inG) { game.settingsOpen = false; loadSlot(CUR.w, CUR.i); }   // 重来（弹窗自然退场）
+      else Sound.toggle();                                                                  // 静音 / 非静音
+      return;
+    }
+    if (pt.x > bx2 && pt.x < bx2 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
+      if (inG) { game.settingsOpen = false; game.state = 'levels'; game.levelsWorld = CUR.w; game.cursorL = CUR.i; }  // 退出
+      else { game.achOpen = !game.achOpen; if (game.achOpen) game.achT = 0; game.achSel = null; }   // 成就
+      return;
+    }
+    // ④ 退出游戏（关闭窗口）
+    var qy2 = by2 + BW2 + 22 + 54;
+    var qrw = BW2 * 2 + GAP2, qrx = SX + (SW2 - qrw) / 2;
+    if (pt.x > qrx && pt.x < qrx + qrw && pt.y > qy2 && pt.y < qy2 + 42) {
+      try { window.close(); } catch (e) {}
+      return;
+    }
+    // ③ 重置按钮（只在菜单界面）
+    var rw2 = BW2 * 2 + GAP2, rx2 = SX + (SW2 - rw2) / 2, ry2 = by2 + BW2 + 22;
+    if (!inG && pt.x > rx2 && pt.x < rx2 + rw2 && pt.y > ry2 && pt.y < ry2 + 42) {
+      game.resetOpen = true;
+      game.resetT = 0;
+      game.resetCode = String(1000 + Math.floor(Math.random() * 9000));   // 随机四位
+      game.resetInput = ''; game.resetMsg = '';
+      Sound.sfxTrap && Sound.sfxTrap();
+      return;
+    }
+    return;   // 弹窗打开时，点别处不穿透
+  }
+
+  if (game.state === 'title') {
+    // 只有点到那个播放按钮才开始 —— 点屏幕别处不算
+    if (pointInStartButton(e)) startGame();
+  } else if (game.state === 'complete') {
+    if (pointInStartButton(e)) startGame();
+  } else if (game.state === 'world') {
+    for (var i = 0; i < 4; i++) {
+      var d = DOOR_POS[i];
+      if (Math.abs(pt.x - d.x) < 48 && Math.abs(pt.y - d.y) < 56) {
+        game.cursorW = i; enterWorld(i); return;
+      }
+    }
+  } else if (game.state === 'levels') {
+    if (pt.x >= VW-134 && pt.x <= VW-40 && pt.y >= 26 && pt.y <= 64) { startTransition(function () { game.state = 'world'; }); return; }
+    // 第四大关：点两扇地狱门
+    if (game.levelsWorld === 3) {
+      var upY2 = 120, dnY2 = 320;          // 和 drawDemonSelect 里的位置对应
+      if (pt.x > VW / 2 - 70 && pt.x < VW / 2 + 70 && pt.y > upY2 - 30 && pt.y < upY2 + 90) {
+        game.cursorL = 0; enterLevel(3, 0); return;
+      }
+      return;   // 里魔王已取消
+    }
+    for (var j = 0; j < LEVELS_PER_WORLD; j++) {
+      var n = LEVEL_POS[j];
+      if (Math.hypot(pt.x - n.x, pt.y - n.y) < 36) {
+        game.cursorL = j; enterLevel(game.levelsWorld, j); return;
+      }
+    }
+  } else if (game.state === 'dead') {
+    if (game.timer > 0.35) { game.deaths = 0; loadSlot(CUR.w, CUR.i); }
+  } else {
+    // 游戏内点鼠标：什么也不做（避免点设置齿轮/弹窗按钮时误触发跳跃）
+  }
+});
+canvas.addEventListener('mousemove', function (e) { game.mouse = canvasPoint(e); });
+canvas.addEventListener('mouseleave', function () { game.mouse = null; });
+
+function canvasPoint(e) {
+  var r = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) * (VW / r.width),
+    y: (e.clientY - r.top) * (VH / r.height)
+  };
+}
+function pointInStartButton(e) {
+  var p = canvasPoint(e), b = START_BTN;
+  return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+}
+function mouseOnStartButton() {
+  var m = game.mouse, b = START_BTN;
+  return !!m && m.x >= b.x && m.x <= b.x + b.w && m.y >= b.y && m.y <= b.y + b.h;
+}
+var jumpPressed = false;
+
+/* ---------------- 物理与更新 ---------------- */
+function aabb(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function update(dt) {
+  // 过场动画期间冻结一切，只推进门
+  if (TRANS.on) { updateTransition(dt); return; }
+
+  var p = game.p;
+
+  // 粒子
+  for (var i = game.particles.length - 1; i >= 0; i--) {
+    var q = game.particles[i];
+    q.vy += 1500 * dt;
+    q.x += q.vx * dt; q.y += q.vy * dt;
+    q.life -= dt;
+    if (q.life <= 0) game.particles.splice(i, 1);
+  }
+  // ===== 3-5 四黑球绕人：半径周期变化 + 越转越快 → 贯穿 =====
+  if (game.ring3) {
+    var R3 = game.ring3;
+    R3.t += dt;
+    R3.spin += 1.1 * R3.t * dt;              // 从 0 加速
+    R3.ang += R3.spin * dt * 6;
+    if (R3.t >= 4.0) {                       // 四秒后贯穿
+      game.ring3 = null; game.tp = null;
+      Sound.sfxDeath(); game.shake = 26;
+      die();
+      return;
+    }
+  }
+
+  // ===== 3-4 七球绕环：飞到中心周围 → 加速旋转 2s → 一起贯穿 =====
+  if (game.ring) {
+    var RG = game.ring;
+    RG.t += dt;
+    var CX = VW / 2, CY = VH / 2, RR = 150;
+    if (RG.phase === 'gather') {
+      var gk = Math.min(1, RG.t / 0.45); gk = gk * gk * (3 - 2 * gk);
+      for (var gi = 0; gi < game.balls.length; gi++) {
+        var gb = game.balls[gi], gf = RG.from[gi] || gb;
+        var ga = (gi / game.balls.length) * Math.PI * 2 - Math.PI / 2;
+        gb.x = gf.x + (CX + Math.cos(ga) * RR - gf.x) * gk;
+        gb.y = gf.y + (CY + Math.sin(ga) * RR - gf.y) * gk;
+        gb.frozen = true;
+      }
+      if (RG.t >= 0.45) { RG.phase = 'spin'; RG.t = 0; RG.spin = 0; Sound.sfxTrap(); game.shake = 6; }
+    } else if (RG.phase === 'spin') {
+      RG.spin += 0.9 * RG.t * dt;                 // 从 0 开始加速
+      RG.ang += RG.spin * dt * 7;
+      for (var si3 = 0; si3 < game.balls.length; si3++) {
+        var sb = game.balls[si3];
+        var sa = (si3 / game.balls.length) * Math.PI * 2 - Math.PI / 2 + RG.ang;
+        sb.x = CX + Math.cos(sa) * RR;
+        sb.y = CY + Math.sin(sa) * RR;
+        sb.frozen = true;
+      }
+      if (RG.t >= 2.0) { RG.phase = 'crush'; RG.t = 0; Sound.sfxTrap(); game.shake = 12; }
+    } else if (RG.phase === 'crush') {
+      var ck = Math.min(1, RG.t / 0.18);
+      for (var ci3 = 0; ci3 < game.balls.length; ci3++) {
+        var cb = game.balls[ci3];
+        var ca = (ci3 / game.balls.length) * Math.PI * 2 - Math.PI / 2 + RG.ang;
+        var cr = RR * (1 - ck);
+        cb.x = CX + Math.cos(ca) * cr;
+        cb.y = CY + Math.sin(ca) * cr;
+      }
+      if (RG.t >= 0.18) {
+        game.ring = null; game.tp = null;
+        game.crushed = true;
+        die();
+        return;
+      }
+    }
+  }
+
+  // 门的传送动画（3-4）：飞行途中门还不存在，落位之后才生效
+  if (game.goalFly) {
+    game.goalFly.t += dt;
+    game.goalDead2 = true;                                        // ★ 动画期间不能被碰到
+    // 逐帧：首帧门变粒子（goalHide），中间只有粒子，尾帧门在左边显形
+    if (game.goalFly.t >= 0.55) {
+      game.goalX = game.goalFly.toX;
+      game.goalHide = false;                                      // 尾帧：门在最左边出现
+      game.goalFly = null; game.goalDead2 = false;
+      // 第三层陷阱后续：门刚落到左边，身后就飞来一枚导弹（速度略慢于玩家）
+      if (LEVELS[game.li].missileAfterGoalTp && !game.missileSpawned) {
+        game.missileSpawned = true;
+        game.missiles.push({ x: p.x + p.w / 2 + 170, y: p.y + p.h / 2, speed: 280, t: 1 });
+        Sound.sfxTrap(); game.shake = 8;
+      }
+    }
+  }
+
+  // 传送+绕环期间：人死死钉在屏幕正中，不受重力也不受按键
+  if (game.ring || game.tp || game.ring3) {
+    if (game.ring3) {
+      game.p.x = game.ring3.cx - game.p.w / 2;      // 3-5：钉在右高台上
+      game.p.y = game.ring3.cy - game.p.h / 2;
+    } else {
+      game.p.x = VW / 2 - game.p.w / 2;             // 3-4：钉在屏幕正中
+      game.p.y = VH / 2 - game.p.h / 2;
+    }
+    game.p.vx = 0; game.p.vy = 0;
+    game.p.onGround = false;
+  }
+
+  // ===== 3-4 传送动画：人炸成碎片 → 碎片飞到屏幕正中 → 重组成人 =====
+  if (game.tp) {
+    game.tp.t += dt;
+    var tcx = (game.tp.tx !== undefined ? game.tp.tx + p.w / 2 : VW / 2);
+    var tcy = (game.tp.ty !== undefined ? game.tp.ty + p.h / 2 : VH / 2);
+    // 碎片刻散 0.12s 后，全部被吸向屏幕正中
+    if (game.tp.t > 0.12) {
+      for (var pj = 0; pj < game.particles.length; pj++) {
+        var qp = game.particles[pj];
+        if (!qp.debris || !qp.pulled) continue;
+        qp.vx += (tcx - qp.x) * 260 * dt - qp.vx * 16 * dt;
+        qp.vy += (tcy - qp.y) * 260 * dt - qp.vy * 16 * dt;
+      }
+    }
+    for (var pj2 = 0; pj2 < game.particles.length; pj2++) {
+      if (game.particles[pj2].debris) game.particles[pj2].pulled = true;
+    }
+    // 0.55 秒后碎片全部吸附到中心点（收缩成一个光点），避免看起来还散着
+    if (game.tp.t > 0.55) {
+      for (var ps2 = 0; ps2 < game.particles.length; ps2++) {
+        var qs = game.particles[ps2];
+        if (!qs.debris) continue;
+        qs.x += (tcx - qs.x) * Math.min(1, (game.tp.t - 0.55) * 40);
+        qs.y += (tcy - qs.y) * Math.min(1, (game.tp.t - 0.55) * 40);
+      }
+    }
+    // 0.62 秒后重组成人，出现在正中
+    if (game.tp.t > 0.75) {
+      p.x = game.tp.tx; p.y = game.tp.ty; p.vx = 0; p.vy = 0;
+      for (var pk = game.particles.length - 1; pk >= 0; pk--) if (game.particles[pk].debris) game.particles.splice(pk, 1);
+      Sound.sfxWin && Sound.sfxWin();
+      game.tp = null;
+    }
+    return;    // 动画期间玩家完全不能动
+  }
+
+  // 成就播报队列：一条播完（tauntT 归零）再播下一条
+  if (game.achQueue && game.achQueue.length && game.tauntT <= 0) {
+    flashMsg(game.achQueue.shift());
+  }
+
+  if (game.flashT > 0) game.flashT = Math.max(0, game.flashT - dt);
+  if (game.shake > 0) game.shake = Math.max(0, game.shake - 60 * dt);
+  if (game.tauntT > 0) game.tauntT -= dt;
+
+  if (game.state === 'dead') {
+    game.timer += dt;      // 不再自动重开 —— 等玩家按任意键
+    return;
+  }
+  if (game.state === 'win') {
+    game.timer += dt;
+    var tw = game.timer, wd = game.winDoor, pw = game.p;
+    if (wd) {
+      // 第一段：把人吸到门洞正中间（smoothstep，不是线性，看着更"被吸"）
+      var k1 = Math.min(1, tw / 0.15);
+      k1 = k1 * k1 * (3 - 2 * k1);
+      pw.x = game.winFrom.x + (wd.cx - pw.w / 2 - game.winFrom.x) * k1;
+      pw.y = game.winFrom.y + (wd.cy - pw.h / 2 - game.winFrom.y) * k1;
+      // 第二段：门快速收窄成一条线，人也跟着被压进去
+      wd.k = Math.max(0, 1 - Math.max(0, (tw - 0.15) / 0.26));
+    }
+    if (tw > 0.62 && !TRANS.on) {
+      // 出关卡：同样一次过场，开门时露出的已经是选关界面
+      startTransition(function () {
+        game.state = 'levels';
+        game.levelsWorld = CUR.w;
+        game.cursorL = Math.min((CUR.w === 3 ? 2 : LEVELS_PER_WORLD) - 1, CUR.i + 1);
+      });
+    }
+    return;
+  }
+  if (game.state !== 'play') return;
+
+  // 陷阱触发：突然出现的平台 / 地下钻出的活塞 / 隐藏尖刺
+  for (var j = 0; j < game.plats.length; j++) {
+    var pl = game.plats[j];
+
+    // --- 活塞：从地下钻出 → 一路把人往前顶 → 到坑沿再缩回地下 ---
+    if (pl.kind === 'piston') {
+      if (pl.phase === 'hidden') {
+        if (p.x + p.w > pl.triggerX) {
+          pl.phase = 'rising'; pl.phaseT = 0; pl.state = 'active';
+          Sound.sfxTrap(); game.shake = 5;
+        }
+      } else if (pl.phase === 'rising') {
+        pl.phaseT += dt;
+        var kr = Math.min(1, pl.phaseT / PISTON_RISE);
+        pl.y = pl.baseY + pl.h * (1 - kr);           // 从地下升到地面
+        if (kr >= 1) { pl.phase = 'moving'; pl.phaseT = 0; }
+      } else if (pl.phase === 'moving') {
+        pl.x += pl.moveV * dt;
+        // 推着玩家走（moveV 为负就一路往左推）
+        if (aabb(p, pl)) p.x = pl.moveV > 0 ? pl.x + pl.w : pl.x - p.w;
+        var reached = pl.moveV > 0 ? (pl.x >= pl.moveTo) : (pl.x <= pl.moveTo);
+        if (pl.moveTo && reached) { pl.phase = 'sinking'; pl.phaseT = 0; }
+      } else if (pl.phase === 'sinking') {
+        pl.phaseT += dt;
+        var ks = Math.min(1, pl.phaseT / PISTON_SINK);
+        pl.y = pl.baseY + pl.h * ks;                 // 完全缩回地下，一点不留
+        if (ks >= 1) { pl.phase = 'gone'; pl.state = 'gone'; }
+      }
+      continue;
+    }
+
+    // --- 升起的墙（riseWall）：玩家跳到半空时触发，升起来挡路，1.5 秒后缩回 ---
+    if (pl.kind === 'riseWall') {
+      if (pl.risePhase === 'idle' && !p.onGround && p.x + p.w > pl.x - 60 && p.x < pl.x + pl.w + 60) {
+        pl.risePhase = 'rising'; pl.riseT = 0; Sound.sfxTrap(); game.shake = 6;
+      }
+      if (pl.risePhase === 'rising') {
+        pl.riseT += dt;
+        pl.riseY = Math.min(1, pl.riseT / 0.15);         // 0.15 秒升起来（快得来不及站墙头）
+        if (pl.riseY >= 1) { pl.risePhase = 'holding'; pl.riseT = 0; }
+      } else if (pl.risePhase === 'holding') {
+        pl.riseT += dt;
+        if (pl.riseT >= 1.5) { pl.risePhase = 'sinking'; pl.riseT = 0; }   // 停 1.5 秒
+      } else if (pl.risePhase === 'sinking') {
+        pl.riseT += dt;
+        pl.riseY = Math.max(0, 1 - pl.riseT / 0.3);      // 0.3 秒缩回去
+        if (pl.riseY <= 0) { pl.risePhase = 'done'; }   // 只升起一次，缩回后不再触发
+      }
+      continue;
+    }
+
+    if (pl.kind === 'appear' && pl.state === 'hidden' && p.onGround && p.x + p.w > pl.triggerX && p.x < pl.triggerX + 140) {
+      pl.state = 'active'; pl.appeared = 0.18;   // 从空气里长出来
+      game.buttonVisible = true;                // 按钮跟着平台一起出现
+      Sound.sfxTrap(); game.shake = 5;
+    }
+    if (pl.appeared > 0) pl.appeared -= dt;
+    // 会走的障碍：出现后自己往前推。玩家被它堵住时，
+    // 水平碰撞会把玩家按在它身前，于是"被推着走"。
+    if (pl.moveV && pl.state === 'active') {
+      pl.x += pl.moveV * dt;
+      if (pl.moveTo && pl.x >= pl.moveTo) pl.state = 'gone';
+      if (aabb(p, pl)) {
+        p.x = pl.moveV > 0 ? pl.x + pl.w : pl.x - p.w;
+      }
+    }
+  }
+  for (var k = 0; k < game.spikes.length; k++) {
+    var sp = game.spikes[k];
+    if (sp.onPop) continue;                    // onPop 的刺由 popFired 单独管，别在这里抢
+    if (sp.retracted) continue;   // 已经收回过的刺：不再重新冒出
+    if (!sp.shown) {
+      var reveal = false;
+      if (sp.onPlatY !== null) reveal = !!(p.ground && Math.abs(p.ground.y - sp.onPlatY) < 6);  // 站在二楼平台上才露头
+      else if (sp.atXlt !== null) reveal = (p.x + p.w / 2 < sp.atXlt);   // 玩家往左走到某点才露头
+      else if (sp.atYlt !== null) reveal = (p.y < sp.atYlt);      // 只有上到高处才露头
+      else reveal = (p.x + p.w > sp.triggerX) && (!sp.needFloorDone || (game.floorPhase || 0) >= 1);
+      if (!reveal && sp.waveDelay > 0 && game.spikeWaveT !== undefined) {
+        reveal = (game.spikeWaveT >= sp.waveDelay);      // 波浪：第一排触发后按延迟依次冒出
+      }
+      if (reveal) {
+        sp.shown = true; Sound.sfxTrap(); game.shake = 5;
+        if (sp.waveLeader && game.spikeWaveT === undefined) game.spikeWaveT = 0;
+      }
+      // 4-1：伸出后持续 holdTime 秒，然后整体收进去
+      if (sp.shown && sp.holdTime > 0 && !sp.retracted) {
+        sp.holdT += dt;
+        if (sp.holdT >= sp.holdTime) { sp.retracted = true; sp.shown = false; }
+      }
+    }
+    if (sp.shown && sp.anim < 1 && !sp.retracting) sp.anim = Math.min(1, sp.anim + dt * 7);
+    if (sp.retracting && sp.shown) {
+      sp.anim -= dt * 7;                       // 慢慢缩回地面
+      if (sp.anim <= 0) { sp.anim = 0; sp.shown = false; sp.retracted = true; }
+    }
+
+    // 瞬移：判定立刻到新位置，视觉上从旧位置快速平移过去
+    if (!sp.moved && (sp.moveTo || sp.follow)) {
+      var air = !p.onGround;
+      var fire = (sp.atX !== null && p.x + p.w / 2 > sp.atX && (!sp.fallOnly || air)) ||
+                 (sp.atXlt !== null && p.x + p.w / 2 < sp.atXlt) ||
+                 (sp.atY !== null && p.y > sp.atY && (sp.needX === null || p.x + p.w / 2 > sp.needX)) ||
+                 (sp.atYlt !== null && p.y < sp.atYlt);
+      if (fire) {
+        sp.moved = true;
+        sp.fromX = sp.x; sp.fromY = sp.y;          // 起点
+        if (sp.follow) {
+          sp.targetX = p.x + sp.followDist;        // 目标：追到玩家落点
+          sp.targetY = sp.y;
+        } else {
+          sp.targetX = sp.moveTo[0]; sp.targetY = sp.moveTo[1];
+        }
+        sp.animT = 0; sp.shown = true; sp.anim = 1;
+        Sound.sfxTrap(); game.shake = Math.max(game.shake, 6);
+      }
+    }
+    // 判定和动画一起动：位置每帧从起点插值到目标，碰撞用的就是当前位置
+    if (sp.moved && sp.animT < 1) {
+      sp.animT = Math.min(1, sp.animT + dt * sp.moveSpeed);            // 默认 2.6 ≈ 0.38s
+      var ee = sp.animT * sp.animT * (3 - 2 * sp.animT);               // smoothstep
+      sp.x = sp.fromX + (sp.targetX - sp.fromX) * ee;
+      sp.y = sp.fromY + (sp.targetY - sp.fromY) * ee;
+    }
+  }
+  if (game.spikeWaveT !== undefined) {
+    game.spikeWaveT += dt;   // 4-1 波浪计时每帧推进
+    // 全部冒出后再停 2 秒，一起收回去；整个过程只发生一次
+    if (!game.spikeWaveDone && game.spikeWaveT > 1.32 + 2.0) {
+      for (var _swi = 0; _swi < game.spikes.length; _swi++) {
+        if (game.spikes[_swi].waveDelay !== undefined) game.spikes[_swi].retracting = true;
+      }
+      game.spikeWaveDone = true;
+    }
+  }
+
+  // 水平输入（反向关：整体乘以 game.reverse，+1 正常 / -1 反向）
+  var left = keys['left'];
+  var right = keys['right'];
+  p.vx = 0;
+  var dirK = game.reverse || 1;
+  if (left)  { p.vx = -MOVE * dirK; p.face = -1 * dirK; }
+  if (right) { p.vx =  MOVE * dirK; p.face =  1 * dirK; }
+
+  // 跳跃（土狼时间 + 输入缓冲 0.12s + 按住连跳）
+  // 跳跃力是「每关」的：关卡数据里的 jump 覆盖默认值。
+  // 这本身就是一种关卡设计手段 —— 跳得矮 = 容错小 = 能初见杀；
+  // 反过来调高还能做"跳太高反而撞上天花板尖刺"的坑。
+  var jumpV = LEVELS[game.li].jump || JUMP_V;
+  // 地板正在沉下去/升上来的过程中：跳跃完全禁用（连音效都不响）
+  if (game.jumpLocked) { jumpPressed = false; game.jumpBuf = 0; keys['jump'] = false; }
+  var wantJump = keys['jump'];
+  if (p.onGround) { game.coyote = 0.1; game.airJumped = false; } else game.coyote = Math.max(0, game.coyote - dt);
+  if (jumpPressed) game.jumpBuf = 0.12; else game.jumpBuf = Math.max(0, game.jumpBuf - dt);
+  if (wantJump) game.jumpBuf = Math.max(game.jumpBuf, 0.08);
+  if (game.jumpLock > 0) { game.jumpLock -= dt; game.jumpBuf = 0; game.coyote = 0; }
+  if (game.jumpLock <= 0 && game.jumpBuf > 0 && game.coyote > 0) {
+    p.vy = -jumpV; p.onGround = false; game.coyote = 0; game.jumpBuf = 0; p.sq = 0.72;
+    Sound.sfxJump();
+  } else if (game.airJumpUnlocked && game.jumpLock <= 0 && jumpPressed && !p.onGround && p.x + p.w / 2 > 800) {   // 只在右边高台底下才能浮空跳
+    // 空中跳：必须"重新按一下"才有，按住不放不会连跳（不是火箭）
+    p.vy = -jumpV * 0.95; game.jumpBuf = 0; p.sq = 0.8;
+    Sound.sfxJump();
+  }
+  jumpPressed = false;
+  // 短按小跳：松开跳跃键时截断上升（约按住时的 45% 高）
+  var hopV = jumpV * 0.63;
+  if (game.jumpLock <= 0 && p.vy < -hopV && !wantJump) p.vy = -hopV;   // 跳板弹起时不许被"松手"截断
+
+  // 水平移动 + 碰撞（单向薄平台不参与，避免跳跃时被平台边缘卡死）
+  p.x += p.vx * dt;
+  for (var m = 0; m < game.plats.length; m++) {
+    var a = game.plats[m];
+    if (a.state !== 'active' || a.oneWay || a.noCollide) continue;
+    if (a.kind === 'flip' && game.flipT >= 0) continue;      // 翻板过程中不挡路
+    if (a.riser) continue;                                    // 升降地板是地面，不能做水平推出
+    if (a.kind === 'riseWall') {
+      var rwH4 = a.h * a.riseY;
+      if (rwH4 <= 1) continue;
+      var rwb4 = { x: a.x, y: a.y - rwH4, w: a.w, h: rwH4 };
+      if (aabb(p, rwb4)) {
+        if (p.vx > 0) p.x = rwb4.x - p.w;      // 像硬墙一样：从左边推回
+        else if (p.vx < 0) p.x = rwb4.x + rwb4.w;
+      }
+      continue;
+    }
+    if (aabb(p, a)) {
+      if (p.vx > 0) p.x = a.x - p.w;
+      else if (p.vx < 0) p.x = a.x + a.w;
+    }
+  }
+
+  // 垂直移动 + 碰撞（变平台的球：球顶当半圆平台站）
+  var prevBottom = p.y + p.h;               // 移动前的脚底位置
+  p.vy = Math.min(MAX_FALL, p.vy + GRAVITY * dt);
+  p.y += p.vy * dt;
+  p.onGround = false; p.ground = null;
+  for (var n = 0; n < game.plats.length; n++) {
+    var b = game.plats[n];
+    if (b.state !== 'active' || b.noCollide) continue;       // noCollide = 已经"变成坑"了
+    if (b.kind === 'flip' && game.flipT >= 0) continue;      // 翻板过程中站不住
+    // 变成平台的球：球顶当半圆平台站
+    if (b.kind === 'riseWall') {
+      // 升起的墙：实体碰撞盒随 riseY 变高（从地面往上顶，跳不过去）
+      var rwH = b.h * b.riseY;
+      if (rwH <= 1) continue;
+      var rwb = { x: b.x, y: b.y - rwH, w: b.w, h: rwH };
+      if (aabb(p, rwb)) {
+        if (p.vy > 0 && prevBottom <= rwb.y + 8) { p.y = rwb.y - p.h; p.onGround = true; p.ground = b; p.vy = 0; }
+        else if (p.vy < 0) { p.y = rwb.y + rwb.h; p.vy = 0; }   // 顶头
+      }
+      continue;
+    }
+    if (aabb(p, b)) {
+      if (p.vy > 0 && prevBottom <= b.y + 8) {
+        // 只有从上方落下来才站得住
+        p.y = b.y - p.h; p.onGround = true; p.ground = b;
+        if (p.vy > 240) p.sq = 0.78;
+        p.vy = 0;
+      } else if (!b.oneWay && p.vy < 0) {
+        // 实心平台的底面可以顶头（墙就是靠这个挡住你的）
+        p.y = b.y + b.h; p.vy = 0;
+      }
+    }
+  }
+
+  // ===== 墙本体碰撞：墙转到哪，碰撞就在哪 =====
+  //   静止时是"挡路的墙"（水平推出），转动过程中扫到人就压死。
+  if (LEVELS[game.li].wall && !game.wallOn) {
+    // 墙没转之前是实体挡路；一旦开始转，身体让开（压死交给转完那一刻判定）
+    var wbs = wallBlocks();
+    var hitWall = false;
+    for (var wb = 0; wb < wbs.length; wb++) { if (aabb(p, wbs[wb])) { hitWall = true; break; } }
+    if (hitWall) {
+      if (game.wallOn) { die(); return; }      // 墙在转 → 碰到就被压死
+      // 没转的墙：只挡路（水平推出）
+      for (var wb2 = 0; wb2 < wbs.length; wb2++) {
+        var blk = wbs[wb2];
+        if (aabb(p, blk)) {
+          if (p.x + p.w / 2 > blk.x + blk.w / 2) p.x = blk.x + blk.w;
+          else p.x = blk.x - p.w;
+          p.vx = 0;
+        }
+      }
+    }
+  }
+
+  // 假地板：踩上只撑 0.12 秒 —— 走是绝对走不过去的，踩上去就得往下掉
+  // 会塌的板（假地板 / 消失板）：行为完全统一 ——
+  // 踩上去「立刻」开始往左缩进去，左缘钉死、宽度收到 0。
+  // 外观也和普通平台一模一样，不给任何提前剧透。
+  for (var t = 0; t < game.plats.length; t++) {
+    var c = game.plats[t];
+    if (c.state !== 'active') continue;
+
+    // feint（假动作）：踩上去先往里缩一截吓你一下，然后原样弹回来，根本不塌
+    if (c.kind === 'feint') {
+      if (c.feinting === undefined) { c.feinting = false; c.feintDone = false; }
+      // 人走了也照样缩完 —— 只有「没在动的」时候离开才复位
+      if (p.ground !== c && !c.feinting) { c.feintDone = false; c.w = c.w0; continue; }
+      if (!c.feinting && !c.feintDone) { c.feinting = true; c.feintDone = true; c.feintT = 0; Sound.sfxTrap(); }
+      if (c.feinting) {
+        c.feintT += dt;
+        var fk;
+        if (c.feintT < 0.09) fk = (c.feintT / 0.09) * 0.55;                 // 猛地缩进去（一半以上）
+        else if (c.feintT < 0.34) fk = 0.55;                                // 卡住一小会儿
+        else if (c.feintT < 0.62) fk = 0.55 * (1 - (c.feintT - 0.34) / 0.28); // 慢慢弹回来
+        else { fk = 0; c.feinting = false; }
+        c.w = c.w0 * (1 - fk);
+      }
+      continue;
+    }
+    if ((c.kind === 'fake' || c.kind === 'vanish') && c.retract === undefined) {
+      if (p.ground === c) { c.retract = 0; Sound.sfxTrap(); }        // 踩上就缩
+      else if (c.triggerX && p.x + p.w / 2 > c.triggerX) { c.retract = 0; Sound.sfxTrap(); }  // 或走到触发点就缩
+    }
+    if (c.retract !== undefined) {
+      c.retract += dt;
+      var rk = Math.min(1, c.retract / (c.retractT || 0.20));
+      c.w = Math.max(0, c.w0 * (1 - rk));
+      if (rk >= 1) { c.state = 'gone'; puff(c.x, c.y); }
+    }
+  }
+
+  // 挤压回弹
+  p.sq += (1 - p.sq) * Math.min(1, dt * 12);
+
+  // 火柴人的动画状态：走 / 跳 / 落 / 停
+  p.anim += dt;
+  if (!p.onGround) p.animState = (p.vy < 0) ? 'jump' : 'fall';
+  else if (Math.abs(p.vx) > 1) p.animState = 'walk';
+  else p.animState = 'idle';
+
+  // 锯片：沿路径来回滚 + 自转，碰到就死（圆形判定，比尖刺更"软"一点）
+  var pcx = p.x + p.w / 2, pcy = p.y + p.h / 2;
+  for (var w2 = 0; w2 < game.saws.length; w2++) {
+    var sw = game.saws[w2];
+    sw.rot += sw.spin * dt;
+    // 藏着的锯片：等你站上指定高度的平台才现身（伴随震屏）
+    if (!sw.shown && sw.showOnPlatY !== null) {
+      if (p.ground && Math.abs(p.ground.y - sw.showOnPlatY) < 6) {
+        sw.shown = true; game.shake = 14; Sound.sfxTrap();
+      }
+    }
+    if (!sw.shown) continue;                    // 没现身：不画不判定
+    // 玩家跳过锯片（越过它）→ 触发"顿一下再快速追"
+    if (sw.chase && !sw.triggered && p.x > sw.x + sw.r) {
+      sw.triggered = true; sw.chasing = true; sw.chaseT = 0; Sound.sfxTrap();
+    }
+    if (sw.chasing) {
+      sw.chaseT += dt;
+      if (sw.chaseT > sw.chaseDelay) {
+        // 停顿结束：快速朝玩家冲过去
+        var cdir = (p.x + p.w / 2 > sw.x) ? 1 : -1;
+        sw.x += cdir * sw.chaseSpeed * dt;
+        sw.y += (p.y + p.h / 2 - sw.y) * Math.min(1, dt * 8);   // 追的时候也贴向玩家高度
+      }
+    } else if (sw.speed > 0 && !sw.done) {
+      var len = Math.sqrt((sw.tx - sw.x0) * (sw.tx - sw.x0) + (sw.ty - sw.y0) * (sw.ty - sw.y0)) || 1;
+      sw.t += sw.dir * (sw.speed / len) * dt;
+      if (sw.t >= 1) {
+        sw.t = 1;
+        if (sw.once) { sw.done = true; }
+        else sw.dir = -1;
+      }
+      else if (sw.t <= 0) { sw.t = 0; sw.dir = 1; }
+      sw.x = sw.x0 + (sw.tx - sw.x0) * sw.t;
+      sw.y = sw.y0 + (sw.ty - sw.y0) * sw.t;
+    }
+    var ddx = pcx - sw.x, ddy = pcy - sw.y;
+    if (Math.sqrt(ddx * ddx + ddy * ddy) < sw.r * 0.80 + 8) { die('saw'); return; }
+  }
+
+  // onPop 的刺：每帧强制跟 popFired 同步 —— 没被弹起来之前绝对不显示。
+  // （之前只在"弹起那一刻"置 shown，结果初始化/重载路径上会被别的逻辑又点亮）
+  for (var op = 0; op < game.spikes.length; op++) {
+    var osp = game.spikes[op];
+    if (!osp.onPop) continue;
+    var should = !!game.popFired;
+    if (should && !osp.shown) Sound.sfxTrap();
+    osp.shown = should;
+    osp.anim = should ? 1 : 0;
+  }
+
+  // 尖刺致死（假刺长得一样，但踩上去没事——这是骗人的）
+  for (var s = 0; s < game.spikes.length; s++) {
+    var sp2 = game.spikes[s];
+    if (!sp2.shown) continue;
+    // 反转后（2-5 按完按钮）：假刺变成真刺，只有 keepSafe 那簇还安全
+    if (sp2.fake && !(game.reversed && !sp2.keepSafe)) continue;
+    var box = spikeBox(sp2);
+    if (aabb(p, box)) { die(); return; }
+  }
+
+  // 掉出地图
+  if (p.y > VH + 120) { die('fall'); return; }
+
+  game.keyGetT += dt;
+
+  // ===== 门下沉：跳过去就跟着沉，够不着（死后动画自动停住，因为 dead 分支直接 return）=====
+  var LV = LEVELS[game.li];
+  // ===== 隐藏跳板：踩上去皮会伸起来，然后自动把人大力弹飞 =====
+  for (var bp = 0; bp < game.plats.length; bp++) {
+    var bt = game.plats[bp];
+    if (bt.kind !== 'bounce') continue;
+    if (bt.state === 'gone' || bt.noCollide) continue;   // 吃金币后被删掉的跳板：不再触发
+    // 位置检测：人压在跳板那一小块上就触发（不要求 p.ground 是它）
+    // 只有"人真的站在这块板上"才触发：脚底贴着板面、水平有交集、不是往上飞
+    var onIt = Math.abs((p.y + p.h) - bt.y) < 7 &&
+               p.x + p.w > bt.x + 4 && p.x < bt.x + bt.w - 4 &&
+               p.vy >= -20;
+    if (!onIt) {
+      bt.pop = Math.max(0, bt.pop - dt * 6);   // 离开就慢慢瘪回去
+      if (bt.pop <= 0.02) bt.popped = false;   // 完全瘪回去才算复位，可以再弹
+      continue;
+    }
+    {
+      bt.pop = Math.min(1, bt.pop + dt / (bt.popTime || 0.10));
+      // 只在「刚压到底」的那一帧弹一次 —— 否则每一帧都会重弹 + 重放音效
+      if (bt.pop >= 1 && !bt.popped) {
+        bt.popped = true;
+        p.vy = -(bt.power || 1420);          // 自动起跳，不由玩家决定
+        p.y = bt.y - p.h - 3;                // 抬出板子，免得下一帧又被判"顶头"
+        p.onGround = false;
+        game.jumpLock = 0.18;                // 锁一会儿，否则会被土狼时间里的普通跳跃覆盖掉
+        game.popFired = true;                // 通知：人已经被弹起来了
+        game.coyote = 0; game.jumpBuf = 0;
+        Sound.sfxSpring();
+      }
+    }
+  }
+
+  // ===== 虚晃一枪：先抖一下骗你，然后所有平台秒变坑，只有门留在原地 =====
+  if (LV.quake && game.quakePhase !== 'done') {
+    var qk = LV.quake;
+    if (game.quakePhase === 'idle' && p.x + p.w / 2 > qk.triggerX) {
+      game.quakePhase = 'shake'; game.quakeT = 0; Sound.sfxTrap();
+    }
+    if (game.quakePhase === 'shake') {
+      game.quakeT += dt;
+      game.quakeOff = Math.sin(game.quakeT * 55) * 6;      // 只是抖，不塌 —— 骗你跳
+      for (var qi = 0; qi < game.plats.length; qi++) {
+        var qp = game.plats[qi];
+        if (qp.kind === 'pitFloor') qp.y = qp.y0 + game.quakeOff;   // 只有原本要缩的那片在抖
+      }
+      if (game.quakeT > qk.shakeTime) {
+        game.quakePhase = 'sinking'; game.quakeT = 0; Sound.sfxBoom();
+      }
+    } else if (game.quakePhase === 'sinking') {
+      game.quakeT += dt;
+      var qk2 = Math.min(1, game.quakeT / qk.sinkTime);
+      game.quakeOff = 0;
+      for (var qj = 0; qj < game.plats.length; qj++) {
+        var qp2 = game.plats[qj];
+        qp2.noCollide = true;                              // 秒变坑：碰撞立刻失效
+        qp2.y = qp2.y0 + qk2 * 420;
+        if (qk2 >= 1) { qp2.state = 'gone'; game.quakePhase = 'done'; }
+      }
+    }
+  }
+  if (LV.sinkGoal) {
+    var sg = LV.sinkGoal;
+    var depth = sg.depth === undefined ? 220 : sg.depth;
+    var stime = sg.time || 0.30;
+    // 只有"跳起来扑过去"才触发 —— 站着或走着不算。
+    // 触发的那一刻门就"在代码上没了"：判定区立即失效、脚下变坑，
+    // 视觉上再补一个快速落下的动画。
+    if (game.sinkPhase === 'idle' && !game.sinkLock && !p.onGround &&
+        p.x + p.w / 2 > sg.triggerX) {
+      game.sinkPhase = 'sinking'; game.sinkT = 0;
+      game.goalDead = true; Sound.sfxTrap();
+    }
+    // 升起之后上锁：玩家得先离开触发区，门才允许再被触发（避免反复升降）
+    if (game.sinkLock && p.x + p.w / 2 < sg.triggerX - 90) game.sinkLock = false;
+    if (game.sinkPhase === 'sinking') {
+      game.sinkT += dt;
+      game.sinkY = Math.min(1, game.sinkT / stime) * depth;
+      if (game.sinkY >= depth - 0.5) { game.sinkPhase = 'down'; game.sinkT = 0; }
+    } else if (game.sinkPhase === 'down') {
+      game.sinkT += dt;
+      if (game.sinkT > (sg.riseDelay === undefined ? 3 : sg.riseDelay)) { game.sinkPhase = 'rising'; game.sinkT = 0; }
+    } else if (game.sinkPhase === 'rising') {
+      game.sinkT += dt;
+      game.sinkY = Math.max(0, (1 - Math.min(1, game.sinkT / stime)) * depth);
+      if (game.sinkY <= 0.5) {
+        game.sinkPhase = 'idle'; game.sinkY = 0; game.sinkLock = true;
+        game.goalDead = false;               // 门长回来了，判定区跟着一起回来
+      }
+    }
+    // 门下面的那块地板跟着一起沉
+    for (var sfi = 0; sfi < game.plats.length; sfi++) {
+      if (game.plats[sfi].kind === 'sinkFloor') game.plats[sfi].y = game.plats[sfi].y0 + game.sinkY;
+    }
+  }
+
+  // ===== 前方那块地板"往下缩"变成坑 =====
+  for (var pf = 0; pf < game.plats.length; pf++) {
+    var fp2 = game.plats[pf];
+    if (fp2.kind !== 'pitFloor' || fp2.sunk) continue;
+    if (LV.quake) continue;                                 // 这一关交给 quake 剧本
+    if (p.x + p.w / 2 > fp2.triggerX) {
+      if (!fp2.sinking) { fp2.sinking = true; fp2.noCollide = true; Sound.sfxTrap(); }
+      fp2.y += (fp2.h / fp2.sinkT2) * dt;                   // 整块往下沉（纯视觉）
+      if (fp2.y > fp2.y0 + fp2.h * 1.7) { fp2.state = 'gone'; fp2.sunk = true; }
+    }
+  }
+
+  // ===== 地板从左往右缩：左缘一路往右追你，跑到某个位置停，再让前方塌掉 =====
+  if (LV.shrinkFloor) {
+    var shf = LV.shrinkFloor;
+    if (p.x + p.w / 2 > shf.triggerX) {
+      if (game.shrinkX < (shf.stopX || 500)) {
+        game.shrinkX = Math.min(shf.stopX || 500, game.shrinkX + shf.speed * dt);
+      }
+    }
+    var fl0 = game.plats[0];
+    fl0.x = fl0.x0 + game.shrinkX;
+    fl0.w = fl0.w0 - game.shrinkX;
+  }
+
+  // 翻转平台：吃金币触发，整块板绕中心转 180°，转完就没了。
+  // 转动期间碰撞失效 —— 所以人是"没地方站直接掉下去"。
+  if (game.flipT >= 0 && game.flipT < 1) {
+    game.flipT = Math.min(1, game.flipT + dt / 0.35);
+    if (game.flipT >= 1) {
+      for (var fp = 0; fp < game.plats.length; fp++) {
+        if (game.plats[fp].kind === 'flip') game.plats[fp].state = 'gone';
+      }
+      puff(VW / 2, 470);
+    }
+  }
+
+  // 反向关：每次落地 → 震一下 + 方向再次翻转（给玩家一个身体上的提示）
+  if (game.flipOnLand && p.onGround && !game.wasOnGround) {
+    game.reverse = -(game.reverse || 1);
+    game.shake = Math.max(game.shake, 7);
+    Sound.sfxTrap();
+  }
+  game.wasOnGround = p.onGround;
+
+  // 限时：到点之后所有球开始追你
+  if (game.timeLimit > 0) {
+    game.timeLeft -= dt;
+    if (game.timeLeft <= 0) for (var bi0 = 0; bi0 < game.balls.length; bi0++) game.balls[bi0].homing = true;
+  }
+
+  // 落球：先垂直弹几下，弹够次数（或者限时到）之后直接朝玩家飞过来
+  for (var bi = 0; bi < game.balls.length; bi++) {
+    var bl = game.balls[bi];
+    bl.spin += dt * 6;
+    // 玩家站到（下沉后的）球顶上 → 球重新开始弹
+    if (bl.asPlatform && Math.abs((p.x + p.w / 2) - bl.x) < bl.r) {
+      if (bl.frozen) { bl.frozen = false; bl.vy = -520; }   // 人走到球上方（只看 x 轴）→ 重新弹
+    }
+    if (bl.homing) {
+      var bx = (p.x + p.w / 2) - bl.x, by = (p.y + p.h / 2) - bl.y;
+      var bd = Math.sqrt(bx * bx + by * by) || 1;
+      bl.x += bx / bd * bl.speed * dt;
+      bl.y += by / bd * bl.speed * dt;
+    } else if (!bl.frozen) {
+      bl.vy = Math.min(900, bl.vy + GRAVITY * 0.32 * dt);   // 球的重力更小：掉得慢、弹得高
+      bl.y += bl.vy * dt;
+      // 有人站在球顶：带着他一起动
+      if (bl.riding && p.x + p.w > bl.x - bl.r && p.x < bl.x + bl.r && Math.abs((p.y + p.h) - (bl.y - bl.r)) < 6) {
+        p.y = (bl.y - bl.r) - p.h; p.vy = 0;
+      }
+      // 落地反弹
+      if (bl.y + bl.r > 470) {
+        bl.y = 470 - bl.r;
+        bl.vy = -Math.sqrt(2 * GRAVITY * 0.32 * 336);   // 固定弹起能量：所有球最高点一致(球心 y≈100)
+        bl.bounce++;
+        Sound.sfxBounce ? Sound.sfxBounce() : Sound.sfxTrap();   // 每次落地都响
+        if (!bl.noHoming && bl.bounce >= bl.maxBounce && !bl.armed) { bl.armed = true; bl.delay = (bl.delay === undefined ? 1.4 : bl.delay); }
+      }
+      if (bl.armed && !bl.homing) {
+        bl.delay -= dt;
+        if (bl.delay <= 0) bl.homing = true;
+      }
+    }
+    if (!game.ring && Math.abs((p.x + p.w / 2) - bl.x) < bl.r + 9 && Math.abs((p.y + p.h / 2) - bl.y) < bl.r + 11) {
+      die(); return;
+    }
+  }
+
+  // 假终点：走到触发点开始计时，真门缓缓显形。
+  // 计时长度是按"玩家从触发点走到假门的时间"配的，所以真门几乎在他撞上假门那刻才出现。
+  var L6 = LEVELS[game.li];
+
+  // 人走到（已下沉的）球上方 → 球重新开始弹（放在球逻辑之后，确保不会被覆盖）
+  for (var rb = 0; rb < game.balls.length; rb++) {
+    var rball = game.balls[rb];
+    if (rball.asPlatform && Math.abs((p.x + p.w / 2) - rball.x) < rball.r) {
+      if (rball.frozen) { rball.frozen = false; rball.vy = -520; }
+    }
+  }
+
+  // ===== 3-4：穿过最后一个球 → 二楼按钮出现 + 那个球变成可站的半圆平台 =====
+  if (L6.button && L6.button.revealAfterBall && !game.buttonVisible) {
+    var lastBall = null;
+    for (var lb = 0; lb < game.balls.length; lb++) if (game.balls[lb].toPlatform) lastBall = game.balls[lb];
+    if (lastBall && p.x + p.w / 2 > lastBall.x) {
+      game.buttonVisible = true;
+      game.airJumpUnlocked = true;      // ★ 获得浮空跳
+      game.airJumped = false;
+      // ===== 代码层：删掉右边那扇门，在玩家脚下新建一扇 =====
+      var oldGX = game.goalX;
+      game.goalDead2 = true;                                        // 旧门删除（立刻不可碰）
+      game.goalX = LEVELS[game.li].spawn[0] - 50;                   // 新门建在出生点偏左
+      // goalDead2 保持 true：等门飞到位才允许进入
+      // ===== 美术层：门炸成粒子，飞到新位置再重组成门 =====
+      game.goalFly = { t: 0, fromX: oldGX, toX: game.goalX, parts: [] };
+      for (var gpi = 0; gpi < 26; gpi++) {
+        game.goalFly.parts.push({
+          x: oldGX + Math.random() * LEVELS[game.li].goal.w,
+          y: LEVELS[game.li].goal.y + Math.random() * LEVELS[game.li].goal.h,
+          vx: (Math.random() - 0.5) * 220,
+          vy: (Math.random() - 0.5) * 220 - 60,
+          ox: Math.random(), oy: Math.random()
+        });
+      }
+      Sound.sfxTeleport();
+      Sound.sfxTrap(); game.shake = 8;
+    }
+  }
+
+  // 3-5 四个黑球绕人（半径周期变化）
+  if (game.ring3) {
+    var R3d = game.ring3;
+    var baseR = 110 + Math.sin(R3d.t * 3.2) * 46;      // 半径来回伸缩
+    var crash = R3d.t > 3.85 ? (R3d.t - 3.85) / 0.15 : 0;   // 最后一瞬收向中心
+    var rr3 = baseR * (1 - crash);
+    for (var bj = 0; bj < 4; bj++) {
+      var ba = (bj / 4) * Math.PI * 2 - Math.PI / 2 + R3d.ang;
+      var bx3 = R3d.cx + Math.cos(ba) * rr3;
+      var by3 = R3d.cy + Math.sin(ba) * rr3;
+      ctx.fillStyle = '#120409';
+      ctx.beginPath(); ctx.arc(bx3, by3, 22, 0, 7); ctx.fill();
+      ctx.fillStyle = '#2a1a12';
+      ctx.beginPath(); ctx.arc(bx3 - 6, by3 - 6, 7, 0, 7); ctx.fill();
+    }
+  }
+
+  // 3-5 追踪导弹：从天上掉下来，然后一路咬着你
+  for (var mi = game.missiles.length - 1; mi >= 0; mi--) {
+    var ms = game.missiles[mi];
+    ms.t += dt;
+    if (ms.y < 40 && ms.t < 0.45) {
+      ms.y += 620 * dt;                      // 先直直砸下来
+    } else {
+      var mdx = (p.x + p.w / 2) - ms.x, mdy = (p.y + p.h / 2) - ms.y;
+      var md = Math.sqrt(mdx * mdx + mdy * mdy) || 1;
+      ms.x += mdx / md * ms.speed * dt;      // 之后锁着你追
+      ms.y += mdy / md * ms.speed * dt;
+    }
+    if (Math.abs(ms.x - (p.x + p.w / 2)) < 20 && Math.abs(ms.y - (p.y + p.h / 2)) < 22) {
+      game.missiles.length = 0;
+      Sound.sfxBoom();
+      game.shake = 22;
+      die('missile'); return;
+    }
+  }
+
+  // ===== 3-5 博弈：每轮左右二选一，按对地板升，按错死 =====
+  var GM = L6.gamble;
+  if (GM && !game.gambleDone) {
+    var ris0 = null;
+    for (var rj = 0; rj < game.plats.length; rj++) if (game.plats[rj].riser) ris0 = game.plats[rj];
+    if (ris0) {
+      var risPrevY = ris0.y, wasOnRiser = (p.ground === ris0);   // 记住上一帧
+      if (!game.riserSank && p.ground === ris0) { game.riserSank = true; game.gBtns = true; game.jumpLocked = true; Sound.sfxTrap(); game.shake = 6; }
+      if (game.riserSank && !game.riserSunk) {
+        ris0.y = Math.min(470, ris0.y + dt * 190);
+        if (ris0.y >= 470 - 0.5) game.riserSunk = true;   // 沉到底就停，之后按钮才能把它升上去
+      }
+      // 人站在地板上：按地板的位移量带着走（不会被甩出去）
+      var risDy = ris0.y - risPrevY;
+      if (wasOnRiser && Math.abs(risDy) > 0.001) {
+        p.y += risDy; p.vy = 0; p.onGround = true; p.ground = ris0;
+      } else if (p.x + p.w > ris0.x && p.x < ris0.x + ris0.w && Math.abs((p.y + p.h) - ris0.y) < 40 && p.vy >= 0) {
+        p.y = ris0.y - p.h; p.vy = 0; p.onGround = true; p.ground = ris0;   // 刚踩上来时吸附
+      }
+      // 第四轮：反应时间到 → 撤地板
+      if (game.gFinalDelay > 0) {
+        game.gFinalDelay -= dt;
+        if (game.gFinalDelay <= 0) {
+          game.gShrink = true; game.gShrinkX = ris0.x; game.gShrinkW = ris0.w;
+          Sound.sfxTrap(); game.shake = 14;
+        }
+      }
+      // 按错：地板从两边往中间快速收，最后完全消失
+      if (game.gShrink) {
+        ris0.w = Math.max(0, ris0.w - dt * (game.gFinalDelay !== undefined ? 1100 : 2200));   // 第四轮慢一点给反应
+        ris0.x = game.gShrinkX + (game.gShrinkW - ris0.w) / 2;
+        if (ris0.w <= 0.5) { ris0.state = 'gone'; ris0.noCollide = true; game.gShrink = false; }
+      }
+      // 按钮收回动画
+      if (game.gRetract) {
+        game.btnAnim = Math.max(0, game.btnAnim - dt * 3.5);
+        if (game.btnAnim <= 0) {
+          game.gRetract = false; game.gDelay = 0.5;   // 收回后停 0.5 秒
+          if (game.gWrongPending !== null) game.gBtns = false;   // 按错的：收完才永久隐藏
+        }
+      }
+      // 收回后等 0.5 秒，地板才开始升
+      if (game.gDelay > 0) {
+        game.gDelay -= dt;
+        if (game.gDelay <= 0) {
+          if (game.gWrongPending !== null) {
+            // ---- 惩罚时间到 ----
+            var wr = game.gWrongPending; game.gWrongPending = null;
+            if (wr === 0) {
+              game.gShrink = true; game.gShrinkX = ris0.x; game.gShrinkW = ris0.w;   // 地板从两边往中间收
+              Sound.sfxTrap(); game.shake = 16;
+            } else if (wr === 2) {
+              // 惊喜三：把人掳到右高台顶，四个黑球绕着他转 4 秒再贯穿
+              var mcx = ris0.x + ris0.w / 2, mcy = ris0.y - 110;   // 中间升降平台正上方，浮空
+              game.tp = { t: 0, tx: mcx - p.w / 2, ty: mcy - p.h / 2 };
+              game.ring3 = { t: 0, ang: 0, spin: 0, cx: mcx, cy: mcy };
+              var DB = ['#9c7a1e', '#b8901f', '#c9a02b', '#d8b02f'];
+              for (var dj = 0; dj < 18; dj++) {
+                var da = Math.random() * Math.PI * 2, dv = 60 + Math.random() * 180;
+                game.particles.push({ x: p.x + p.w / 2, y: p.y + p.h / 2, vx: Math.cos(da) * dv, vy: Math.sin(da) * dv - 100, life: 1.4, max: 1.4, c: DB[(Math.random() * 4) | 0], debris: true, pulled: false });
+              }
+              Sound.sfxTeleport();
+            } else if (wr === 1) {
+              // 惊喜二：从天而降的追踪导弹
+              game.missiles.push({ x: p.x + p.w / 2, y: -90, speed: 210, t: 0 });   // 一枚，慢慢逼过来
+              Sound.sfxTrap(); game.shake = 12;
+            } else {
+              Sound.sfxTrap(); game.shake = 18; die();
+            }
+          } else if (game.gFinal) {
+            game.gFinal = false;
+            game.jumpLocked = false;                       // ★ 跳跃先恢复
+            game.gFinalDelay = 0.45;                       // 给你 0.45 秒反应时间
+          } else if (game.gRiseTo !== null) {
+            game.gRiseFrom = ris0.y; game.gRiseT = 0;
+          }
+        }
+      }
+      // 地板平滑上升（不是瞬移）
+      if (game.gRiseTo !== null && game.gRiseFrom !== undefined && ris0.y > game.gRiseTo) {
+        game.gRiseT = Math.min(1, (game.gRiseT || 0) + dt / 0.45);
+        var rk = game.gRiseT * game.gRiseT * (3 - 2 * game.gRiseT);
+        ris0.y = game.gRiseFrom + (game.gRiseTo - game.gRiseFrom) * rk;
+        if (p.ground === ris0 || Math.abs((p.y + p.h) - ris0.y) < 90) { p.y = ris0.y - p.h; p.vy = 0; p.onGround = true; p.ground = ris0; }
+        if (game.gRiseT >= 1 || Math.abs(ris0.y - game.gRiseTo) < 0.8) {
+          ris0.y = game.gRiseTo;
+          if (game.gRiseTo <= 250.5) { game.gBtns = false; game.jumpLocked = false; }   // 升到顶：按钮消失、跳跃解锁
+          game.gRiseTo = null; game.gRiseFrom = undefined; game.gRiseT = 0;
+          if (game.gRound >= GM.answers.length) { game.gambleDone = true; Sound.sfxWin(); }
+        }
+      }
+      // 沉到底之后，按钮才开始伸出来
+      if (game.riserSunk && !game.gRetract && game.gDelay <= 0 && game.gRiseTo === null && game.gRound < GM.answers.length) {
+        if (game.btnAnim < 0) game.btnAnim = 0;
+        if (game.btnAnim < 1) game.btnAnim = Math.min(1, game.btnAnim + dt * 2.6);
+      }
+    }
+    var gb = (game.gBtns && game.btnAnim >= 0.6) ? (L6.gambleButtons || []) : [];
+    var touchingAny = false;
+    for (var gbi = 0; gbi < gb.length; gbi++) {
+      var bb = gb[gbi];
+      var cx0 = p.x + p.w / 2;
+      var touching = (p.ground && p.ground.riser && cx0 > bb.x - 8 && cx0 < bb.x + bb.w + 8);
+      if (touching) touchingAny = true;
+      if (touching && !game.gBtnLock) {
+        var correct = (game.gRound >= 3) ? true : (GM.answers[game.gRound] === gbi);   // 第四轮按什么都算对
+        if (correct) {
+          game.gBtnLock = true;
+          game.gRound++;
+          Sound.sfxCoin();
+          // 地板上升一段
+          var riser = null;
+          for (var rri = 0; rri < game.plats.length; rri++) if (game.plats[rri].riser) riser = game.plats[rri];
+          if (riser) {
+            game.gRetract = true;                                  // 两个按钮收回去
+            if (game.gRound >= 4) {
+              game.gFinal = true;                                  // 第四轮：收完就撤地板
+            } else {
+              game.gRiseTo = Math.max(250, riser.y - GM.riseStep);
+            }
+          }
+        } else {
+          // ===== 按错：先和按对一样收按钮+停 0.5s，再执行惩罚 =====
+          game.gBtnLock = true;
+          game.gWrong = game.gRound;
+          game.gRetract = true;                 // 两个按钮先慢慢收回去（动画）
+          game.gWrongPending = game.gRound;     // 记住错在第几轮
+          Sound.sfxCoin();                      // 和按对一样的音效
+        }
+        break;
+      }
+    }
+    if (!touchingAny) game.gBtnLock = false;   // 离开按钮范围才能再按
+  }
+
+  // ② 距离触发的按钮：离门一定距离就从地板伸出来（走隐藏通道的人不触发）
+  if (L6.button && L6.button.revealDist !== undefined && !game.buttonVisible && !game.fromHiddenPath) {
+    if (p.x > L6.goal.x - L6.button.revealDist) { game.buttonVisible = true; game.buttonRiseT = 0; Sound.sfxTrap(); }
+  }
+  // 按钮伸出动画：0→1（从地板慢慢升起来）
+  if (game.buttonVisible && game.buttonRiseT !== undefined && game.buttonRiseT < 1) {
+    game.buttonRiseT = Math.min(1, game.buttonRiseT + dt * 4);
+  }
+
+  // ===== 按钮：碰一下触发整条连锁 =====
+  if (L6.button && !game.buttonPressed && (game.buttonVisible || !L6.button.hidden)) {
+    var bt = L6.button;
+    if (p.x < bt.x + bt.w && p.x + p.w > bt.x && p.y < bt.y + bt.h && p.y + p.h > bt.y) {
+      game.buttonPressed = true;
+      game.wallOn = true;                 // 墙开始旋转（有墙的关才用）
+      game.fakeGoalDead = true;           // 假门失效（碰了没反应）
+      game.reversed = true;               // ★ 2-5：世界规则反转
+      if (L6.button && L6.button.tpOnPress && !game.tp) {
+        var _sp = L6.spawn;
+        game.tp = { t: 0, tx: _sp[0], ty: _sp[1] };
+        var DB = ['#9c7a1e', '#b8901f', '#c9a02b', '#d8b02f', '#e8bb35', '#ffd23f', '#fff0a8'];
+        for (var _pj = 0; _pj < 30; _pj++) {
+          var _a = Math.random() * Math.PI * 2, _v = 60 + Math.random() * 220;
+          game.particles.push({ x: p.x + p.w / 2, y: p.y + p.h / 2, vx: Math.cos(_a) * _v, vy: Math.sin(_a) * _v - 110, life: 1.4, max: 1.4, c: DB[(Math.random() * 7) | 0], debris: true, pulled: false });
+        }
+        Sound.sfxTeleport();
+      }
+      if (L6.teleportOnButton && !game.tp) {
+        game.tp = { t: 0, tx: VW / 2 - p.w / 2, ty: VH / 2 - p.h / 2 };
+        game.ring = { t: 0, phase: 'gather', from: game.balls.map(function (b) { return { x: b.x, y: b.y }; }), spin: 0, ang: 0 };
+        // 用和死亡完全一样的尸块粒子
+        var DEBRIS2 = ['#9c7a1e', '#b8901f', '#c9a02b', '#d8b02f', '#e8bb35', '#ffd23f', '#fff0a8'];
+        for (var tpj = 0; tpj < 32; tpj++) {
+          var ta = Math.random() * Math.PI * 2, tsv = 60 + Math.random() * 220;
+          game.particles.push({
+            x: p.x + p.w / 2, y: p.y + p.h / 2,
+            vx: Math.cos(ta) * tsv, vy: Math.sin(ta) * tsv - 120,
+            life: 1.6, max: 1.6,
+            c: DEBRIS2[(Math.random() * DEBRIS2.length) | 0],
+            debris: true, pulled: false
+          });
+        }
+        Sound.sfxTeleport();
+        game.shake = 14;
+      }
+      game.shake = 8;
+      Sound.sfxTrap();
+    }
+  }
+
+  // ===== 表魔王捷径检查点：经过它才算"老实打" =====
+  if (LEVELS[game.li].shortcutCheck && !game.passedShortcut) {
+    var sc2 = LEVELS[game.li].shortcutCheck;
+    if (p.x + p.w > sc2.x && p.x < sc2.x + sc2.w && p.y + p.h > sc2.y && p.y < sc2.y + sc2.h) {
+      game.passedShortcut = true;
+    }
+  }
+
+  // 4-1：玩家走进天花板里的隐藏通道 → 标记（之后碰门直接通关）
+  if (p.ground && p.ground.hiddenPath) game.fromHiddenPath = true;   // 4-1：脚踩在隐藏通道上才算
+
+  // ===== 4-1：走到距金币终点一定位置，左2阶梯下的地板往左收，2秒后伸出 =====
+  if (LEVELS[game.li].coins) {
+    var lastC = null;
+    for (var _lc = 0; _lc < game.coins.length; _lc++) if (game.coins[_lc].fake) lastC = game.coins[_lc];
+    // 三个条件齐了才收地板：吃完两枚 + 假金币正在追 + 人走到坑口
+    var canRetract = false;
+    if (game.floorPhase === 0 && lastC && lastC.chasing && game.gotCoins >= 2) canRetract = true;   // 第一次：金币追你
+    if (game.floorPhase === 1 && game.missiles.length > 0) canRetract = true;                       // 第二次：导弹追你
+    if (canRetract && p.x < 200 && p.x > 60 && !game.floorRetract) {
+      game.floorRetract = true; game.floorT = 0; Sound.sfxTrap();
+    }
+  }
+  if (game.floorRetract) {
+    var rf = null;
+    for (var rfi = 0; rfi < game.plats.length; rfi++) if (game.plats[rfi].retractFloor) rf = game.plats[rfi];
+    if (rf) {
+      game.floorT += dt;
+      if (game.floorT < 0.15) { rf.x = 90 - (game.floorT / 0.15) * 90; }                    // 0.15s 收进去
+      else if (game.floorT < 2.0) { rf.x = 0; }                                             // 保持收着，等 2 秒
+      else if (game.floorT < 2.3) { rf.x = ((game.floorT - 2.0) / 0.3) * 90; }              // 0.3s 伸回来
+      else { rf.x = 90; game.floorRetract = false; game.floorT = 0; game.floorPhase = (game.floorPhase || 0) + 1; game.floorDone = (game.floorPhase >= 2); }
+    }
+  }
+
+  // ===== 致命地面（2-5）：这关地面一踩就死，刺反而是安全的 =====
+  if (p.ground && p.ground.deadly && !game.reversed) {
+    // 地板上"有刺的那几段"是安全的，其余地方一踩就死
+    // 反转前：所有刺下面都安全；反转后：只剩"第二个刺"(keepSafe)那一段安全
+    var safeZones = LEVELS[game.li].safeZones || [];
+    if (!game.reversed) {
+      safeZones = game.spikes.filter(function (sp) { return sp.fake; })
+        .map(function (sp) { return [sp.x, sp.x + sp.w + 15]; });
+    }
+    var cx = p.x + p.w / 2, isSafe = false;
+    for (var szi = 0; szi < safeZones.length; szi++) {
+      if (cx >= safeZones[szi][0] && cx <= safeZones[szi][1]) { isSafe = true; break; }
+    }
+    if (!isSafe) { die(); return; }
+  }
+
+  // ===== 墙：靠【转速】形成时间压力 =====
+  //   转的这 2.2 秒就是你的逃生窗口：墙转到底那一刻，还留在墙下端右边的人直接被压死。
+  //   拿钥匙要绕到假门头顶的平台，回来必然来不及 → 死
+  //   立刻往左跑过墙下端 → 活
+  if (L6.wall && game.wallOn) {
+    game.wallAngle += dt * (L6.wall.spin || 100);   // 匀速转圈，永不停
+
+    // 转到位之后【不停】：墙压在这儿，右侧（x>100）的人持续被压死
+    // 死亡区 = 墙的上半段扫过的那整片三角区域
+    //   顶点：转轴(250,450) + 天花板左(250,0) + 天花板右(950,0)
+    //   人在这片区域里 = 被扫到 → 死；跑到转轴左边（真门那一侧）才安全
+    var gw0 = wallGeom();
+    if (gw0) {   // 没有安全区：只判【转轴上半部分】的杆（下半部分可以从下面钻过去）
+      var NK = 34, hitW = false;
+      for (var ki = 0; ki <= NK; ki++) {
+        var kt = ki / NK;
+        var kx = gw0.upX + (gw0.ftX - gw0.upX) * kt;
+        var ky = gw0.upY + (gw0.ftY - gw0.upY) * kt;
+        if (kx > p.x - 13 && kx < p.x + p.w + 13 && ky > p.y - 13 && ky < p.y + p.h + 13) { hitW = true; break; }
+      }
+      if (hitW) { die(); return; }
+    }
+    // 拿到钥匙的代价：墙压下来（0.45 秒后必死）—— 这就是"不错的祭品"
+    if (game.keyThisLife && game.keyGetT > 0.45 && game.keyGetT < 0.55) { die(); return; }
+  }
+
+  // 3) 按按钮后跑到假门那边：原来墙的位置长出一堵新的墙，把回头路彻底堵死
+  // 新墙：按完按钮 + 人真的走到假门那儿，才会从地面升起来堵死退路
+  if (L6.wall && game.buttonPressed && !game.newWallDone && L6.fakeGoal) {
+    var fg0 = L6.fakeGoal;
+    if (p.x < fg0.x + fg0.w && p.x + p.w > fg0.x && p.y < fg0.y + fg0.h && p.y + p.h > fg0.y) {
+      game.newWallDone = true;
+      game.newWallT = 0;
+      Sound.sfxTrap(); game.shake = 12;
+    }
+  }
+  if (game.newWallDone) {
+    game.newWallT += dt;
+    var riseH = Math.min(470, (game.newWallT / 0.32) * 470);      // 0.32 秒从地面升到顶
+    var nw = { x: 238, y: 470 - riseH, w: 24, h: riseH };
+    game.newWallRect = nw;
+    if (aabb(p, nw)) {
+      if (p.x + p.w / 2 > nw.x + nw.w / 2) p.x = nw.x + nw.w;
+      else p.x = nw.x - p.w;
+      p.vx = 0;
+    }
+  }
+
+  // ===== goalHidden（2-5）：一开始连门都没有，按下按钮后才显现 =====
+  if (L6.goalHidden && game.buttonPressed && game.goalReveal < 1) {
+    game.goalReveal = Math.min(1, game.goalReveal + dt / (L6.goalRevealTime || 1.6));
+  }
+
+  // ===== 假门（初始隐藏，走近才出现）=====
+  if (L6.fakeGoal) {
+    var fg = L6.fakeGoal;
+    // 没有 hidden 的假门：关卡一开始就在
+    if (!fg.hidden) game.fakeGoalShown = true;
+    // 有 hidden 的：人走到 triggerX 才突然出现
+    if (!game.fakeGoalShown && p.x + p.w > (fg.triggerX || 700)) {
+      game.fakeGoalShown = true;
+      Sound.sfxTrap(); game.shake = 5;
+    }
+    if (game.fakeGoalShown && !game.fakeGoalDead) {
+      if (p.x < fg.x + fg.w && p.x + p.w > fg.x && p.y < fg.y + fg.h && p.y + p.h > fg.y) {
+        die(); return;                   // 假门：没按按钮，碰到直接死
+      }
+    }
+    // 真门计时：有按钮的关按按钮触发；没按钮的关退回"走到触发点"触发
+    if (game.goalReveal < 1) {
+      var revealNow = game.buttonPressed;
+      if (!L6.button && (L6.goalTriggerX || 0)) {
+        if (!game.revealStarted && p.x + p.w / 2 > L6.goalTriggerX) game.revealStarted = true;
+        revealNow = game.revealStarted;
+      }
+      if (revealNow) game.goalReveal = Math.min(1, game.goalReveal + dt / (L6.goalRevealTime || 3.5));
+    }
+  }
+
+  // 金币：真的吃了给个清脆音效；假的一碰就炸（用音效吓你一跳）
+  for (var ci = 0; ci < game.coins.length; ci++) {
+    var co = game.coins[ci];
+    co.t += dt;
+    if (co.got || co.gone || co.hidden) continue;   // 隐藏/消失的假金币：看不见、也碰不到
+    if (co.chasing) {
+      co.x -= MOVE * dt;                                   // 和玩家同速地向左压过来
+      // ★ 先判碰撞（撞到了就炸），再判"追满距离消失"——否则会在同一帧先消失
+      if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22 && co.fake) {
+        Sound.sfxBoom(); die(); return;
+      }
+      if (co.chaseFrom - co.x > 540) { co.gone = true; co.hidden = true; }
+      if (co.gone) continue;
+    }
+    if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22) {
+      if (co.fake) { Sound.sfxBoom(); die(); return; }   // 爆炸金币：碰到就炸死
+      co.got = true; Sound.sfxCoin();
+      if (co.flip) { game.flipT = 0; Sound.sfxTrap(); }     // 吃到"翻板金币"→整块地板开始翻
+      // 4-1：吃掉第一枚 → 隐藏跳板失效（后门被堵）
+      if (LEVELS[game.li].coins && game.gotCoins === undefined) game.gotCoins = 0;
+      if (LEVELS[game.li].coins) {
+        game.gotCoins = (game.gotCoins || 0) + 1;
+        if (game.gotCoins >= 1) {
+          for (var pj3 = 0; pj3 < game.plats.length; pj3++) {
+            if (game.plats[pj3].secretPad || game.plats[pj3].hiddenPath) { game.plats[pj3].state = 'gone'; game.plats[pj3].noCollide = true; }
+          }
+        }
+        // 吃满前两枚（不含最后一枚爆炸金币）→ 最后一枚开始追
+        var realTotal = LEVELS[game.li].coins.filter(function (c) { return !c.fake; }).length;
+        if (game.gotCoins >= realTotal) {
+          var lastCoin = null;
+          for (var lc = 0; lc < game.coins.length; lc++) if (game.coins[lc].fake && !game.coins[lc].got) lastCoin = game.coins[lc];
+          if (lastCoin && !lastCoin.chasing) { lastCoin.hidden = false; lastCoin.chasing = true; lastCoin.chaseFrom = lastCoin.x; Sound.sfxTrap(); }
+        }
+      }
+    }
+  }
+
+  // 捡钥匙：碰到就永久到手 —— 哪怕这一下你摔死了、或者踩刺死了，钥匙也留下
+  for (var ki = 0; ki < game.keys.length; ki++) {
+    var kk = game.keys[ki];
+    kk.t += dt;
+    if (kk.got) continue;
+    // 3-3：墙缩进后 keyReveal=true，隐藏的钥匙才浮现
+    if (kk.hidden && game.keyReveal && kk.show < 1) kk.show = Math.min(1, kk.show + dt * 2.5);
+    // 出场：一开始收着，玩家走过触发点之后慢慢浮现
+    if (kk.gone) continue;
+    // 检查点一：人得先跑到 armX 那边去
+    if (kk.armX !== null && !kk.armed && p.x + p.w / 2 > kk.armX) kk.armed = true;
+    // 检查点二：再回到出发点（triggerX 左边），机关才真正启动
+    if (kk.armX !== null && !kk.started) {
+      if (kk.armed && p.x + p.w / 2 < kk.triggerX) {
+        kk.started = true; Sound.sfxTrap();          // 这时候才听到"机关响了"
+      } else continue;
+    }
+    // 从天掉下来：按钮按下后，y 从起始(-50)一路掉到 dropY
+    if (kk.drop && kk.dropY !== undefined) {
+      if (kk.onPlatY !== null) {
+        // 站到指定高度的平台上才出现
+        if (!kk.started && game.buttonPressed && p.ground && Math.abs(p.ground.y - kk.onPlatY) < 6) kk.started = true;
+        if (kk.started) kk.y += (kk.dropY - kk.y) * Math.min(1, dt * 6);
+      } else if (game.buttonPressed) {
+        kk.y += (kk.dropY - kk.y) * Math.min(1, dt * 4);
+      }
+    }
+    if (kk.show < 1) {
+      if (!kk.hidden) kk.show = 1;
+      else if (kk.revealOnly) { if (!game.keyReveal) continue; kk.show = Math.min(1, kk.show + dt / kk.outT); }
+      else if (kk.armX !== null || p.x + p.w / 2 > kk.triggerX) kk.show = Math.min(1, kk.show + dt / kk.outT);
+      else continue;                     // 还没浮现，碰不到
+    }
+    // 浮现完成之后，如果配了 slideTo：就一路从左滑到右，滑到头就消失
+    if (kk.slideToX !== null && kk.show >= 1) {
+      kk.slideT += dt;
+      var sk = Math.min(1, kk.slideT / kk.slideTime);
+      kk.x = kk.fx + (kk.slideToX - kk.fx) * sk;
+      if (sk >= 1) { kk.gone = true; continue; }   // 滑过去了就没了，只能等下一命
+    }
+    if (kk.gone) continue;   // 已经拿过的钥匙不再触发
+    var kcx = kk.fx + (kk.x - kk.fx) * kk.show;
+    var kcy = kk.fy + (kk.y - kk.fy) * kk.show;
+    if (Math.abs(p.x + p.w / 2 - kcx) < 26 && Math.abs(p.y + p.h / 2 - kcy) < 28) {
+      kk.got = true;
+      game.keyThisLife = true;
+      game.keyGetT = 0;
+      save.keys[CUR.w] = 1;
+      writeSave();
+      Sound.sfxWin();
+      // 隐藏成就：第一次拿钥匙 / 三把拿满（立即播报，因为拿完马上就死了）
+      var achShown = unlockAchievement('save', true);
+      var keyN = 0;
+      for (var kw = 0; kw < 3; kw++) if (save.keys[kw]) keyN++;
+      if (keyN >= 3) achShown = unlockAchievement('sacrifice', true) || achShown;
+      if (!achShown) { game.flash = '拿到钥匙了'; game.tauntT = 1.6; }   // 已经有成就播报就别覆盖
+    }
+  }
+
+  // 左墙下半段缩进（3-3）：人在底层往左走到一定距离，墙下半截往左缩进，露出钥匙
+  if (LEVELS[game.li].platforms.some(function (q) { return q.slideWall; })) {
+    var swp = null;
+    for (var si2 = 0; si2 < game.plats.length; si2++) if (game.plats[si2].slideWall) swp = game.plats[si2];
+    if (swp && save.keys[2]) {
+      if (game.keyThisLife && game.keyGetT < 1.2) {
+        // 刚拿到钥匙：墙先保持缩进，给玩家时间跑开（否则会把人挤死）
+        swp.x = -40; swp.noCollide = true;
+      } else {
+        // 已经拿过钥匙且离开该区域：墙放回原位（保持挡路）
+        swp.x = 0; swp.noCollide = false;
+      }
+    } else if (swp && p.y > 400 && p.x + p.w / 2 < 190) {
+      swp.x = Math.max(-40, swp.x - dt * 220);          // 往左缩进
+      if (swp.x <= -39) { swp.noCollide = true; }
+      game.keyReveal = true;
+    }
+  }
+  // 左墙收进（旧逻辑，2-5/其它关）
+  if (LEVELS[game.li].platforms.some(function (q) { return q.vanishWall; })) {
+    var vw = null;
+    for (var vi = 0; vi < game.plats.length; vi++) if (game.plats[vi].vanishWall) vw = game.plats[vi];
+    if (vw && p.y > 380 && vw.w > 0) {
+      vw.w = Math.max(0, vw.w - dt * 130);
+      if (vw.w <= 0) { vw.noCollide = true; }
+    }
+  }
+
+  // 会走的门（3-3）：玩家下到底层(位置触发)后，门才开始往右走
+  if (LEVELS[game.li].goalMoveVX && !game.goalDone && !game.goalMoving) {
+    var _L = LEVELS[game.li];
+    if (_L.goalMoveTriggerX !== undefined) {
+      if (p.x + p.w / 2 < _L.goalMoveTriggerX) game.goalMoving = true;   // 横向位置触发
+    } else if (p.y > (_L.goalMoveTriggerY || 400)) {
+      game.goalMoving = true;
+    }
+  }
+  if (LEVELS[game.li].goalMoveVX && game.goalMoving && !game.goalDone) {
+    game.goalX += LEVELS[game.li].goalMoveVX * dt;
+    if (LEVELS[game.li].goalStopX !== undefined && game.goalX >= LEVELS[game.li].goalStopX) {
+      game.goalX = LEVELS[game.li].goalStopX; game.goalDone = true;
+    }
+  }
+
+  // 到达终点
+  var g0 = LEVELS[game.li].goal;
+  var LV2 = LEVELS[game.li];
+  // 假门关（fakeGoal）：真门必须完全显现(goalReveal>=1)才能通关，否则就是"看不见的门"不算数
+  var canWin = !game.goalDead && !game.goalDead2 && game.goalReveal > 0.02;   // 门一出现判定就生效（普通关 goalReveal 恒 1）
+  if (canWin) {
+    var g = { x: game.goalX, y: g0.y + (game.sinkY || 0), w: g0.w, h: g0.h };
+    if (aabb(p, g)) {
+      // 4-1：走过隐藏通道的人 → 碰到门直接进门，不触发传送陷阱
+      if (game.fromHiddenPath) { winLevel(); return; }
+      // 4-1 第三层陷阱：第一次碰到门 → 门炸成粒子飞走，传送到最左边
+      if (LEVELS[game.li].goalTeleportOnTouch && !game.goalTpedOnce) {
+        game.goalTpedOnce = true;
+        game.goalDead2 = true;
+        var fromX = game.goalX, toX = 16;
+        game.goalHide = true;                    // 首帧：门消失，只剩粒子
+        game.goalFly = { t: 0, fromX: fromX, toX: toX, parts: [] };
+        for (var gpi = 0; gpi < 26; gpi++) {
+          game.goalFly.parts.push({ ox: Math.random(), oy: Math.random() });
+        }
+        Sound.sfxTeleport();
+        game.shake = 14;
+        return;
+      }
+      winLevel(); return;
+    }
+  }
+
+  // 一屏一关：把玩家夹在屏幕内，不许走出可视区
+  if (p.x < 0) p.x = 0;
+  if (p.x + p.w > VW) { p.x = VW - p.w; p.vx = 0; }
+
+  // 相机：关卡宽度 = 视口宽度，所以 maxCam 恒为 0 —— 视角永远锁死，不滚动
+  var target = p.x + p.w / 2 - VW * 0.42;
+  var maxCam = Math.max(0, LEVELS[game.li].width - VW);
+  game.cam += (Math.max(0, Math.min(maxCam, target)) - game.cam) * Math.min(1, dt * 9);
+}
+
+function spikeBox(sp) {
+  // 弹出动画：尖刺会从底部/顶部"长"出来
+  var e = sp.anim;
+  if (sp.dir === 'down') {
+    var h2 = sp.h * e;
+    return { x: sp.x, y: sp.y, w: sp.w, h: h2 };
+  }
+  var h3 = sp.h * e;
+  return { x: sp.x, y: sp.y + (sp.h - h3), w: sp.w, h: h3 };
+}
+
+function puff(x, y) {
+  for (var i = 0; i < 10; i++) {
+    game.particles.push({
+      x: x, y: y,
+      vx: (Math.random() - 0.5) * 240,
+      vy: -Math.random() * 200,
+      life: 0.35 + Math.random() * 0.25, max: 1, c: '#8b95a5'
+    });
+  }
+}
+
+/* ---------------- 渲染 ---------------- */
+function roundRect(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/* ---------------- 美术：Level Devil 式极简 ----------------
+   只用三样东西：纯色块、直线、几何形。
+   没有渐变、没有纹理、没有粒子——靠明度分层说话：
+     最暗（背景暗红） → 中亮（平台暖棕） → 最亮（亮橙顶边 / 亮黄火柴人）
+   之前平台比背景还暗，糊在一起了；现在平台明显提亮，边界一眼可辨。 */
+var PAL = {
+  bg: '#24060c',          // 背景：一整块暗红（压得很暗）
+  bgDeep: '#140305',      // 下半部分更深
+  ground: '#7d5a44',      // 平台：暖棕实心（明显比背景亮）★
+  groundTop: '#ff8a4a',   // 平台顶边：一条亮橙线
+  fake: '#734f38',        // 假地板：只比正常暗一点点
+  appear: '#b8561c',      // 突然出现的障碍：跳出来时很显眼
+  piston: '#8a3410',      // 从地下钻出来的活塞
+  pistonTop: '#ffa04a',
+  vanish: '#57402f',      // 一触即碎：暗一档 + 虚线框
+  player: '#ffd23f',      // 火柴人：亮黄（全画面最亮）
+  pupil: '#2a1206',
+  spike: '#ff3b2f',       // 尖刺：纯红（会被大关配色覆盖）
+  saw: '#8a3410',         // 锯片（会被大关配色覆盖）
+  door: '#3fd18a',        // 出口：纯青
+  ink: '#0a0305',
+  text: '#ffdcb0', dim: '#a8785e', warn: '#ff5a3c', good: '#5ee6a8',
+  /* 选关界面用：锁着的元素 / 很弱的辅助色 */
+  locked: '#3a2a22', lockedEdge: '#4d382c', faint: '#5a4436'
+};
+
+function drawBackground() {
+  // 纯色背景。
+  // 之前下半部分会再压深一档（bgDeep），结果那条深色带比机关本身还深，
+  // 机关画在上面全被吃掉 —— 玩家根本看不见要躲什么。
+  ctx.fillStyle = PAL.bg;
+  ctx.fillRect(0, 0, VW, VH);
+}
+
+function drawPlatforms() {
+  var INV = !!(LEVELS[game.li] && LEVELS[game.li].invertColors);
+  // 反转关：整屏背景画成"路"的颜色（浅），平台画成"墙"的颜色（深）
+  if (INV) {
+    ctx.fillStyle = PAL.ground;
+    ctx.fillRect(0, 0, VW, VH);
+  }
+  for (var i = 0; i < game.plats.length; i++) {
+    var p = game.plats[i];
+    if (p.state === 'hidden') continue;
+    if (p.state === 'gone') continue;
+    if (p.hiddenPath) continue;          // 隐藏通道：贴图上完全看不见
+    var grow = p.appeared > 0 ? 1 - p.appeared / 0.18 : 1;
+    ctx.save();
+    if (p.appeared > 0) ctx.globalAlpha = 0.35 + 0.65 * grow;
+
+    if (p.kind === 'riseWall') {
+      var rwH2 = p.h * p.riseY;
+      if (rwH2 > 1) {
+        ctx.fillStyle = PAL.piston;
+        ctx.fillRect(p.x, p.y - rwH2, p.w, rwH2);
+        ctx.fillStyle = PAL.ink;
+        ctx.fillRect(p.x, p.y - rwH2, p.w, 5);
+      }
+      ctx.restore();
+      continue;
+    }
+    if (p.kind === 'vanish') {
+      // 和普通平台长得一模一样 —— 不给任何提示，踩上去才知道会缩
+      ctx.fillStyle = PAL.ground;
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.fillStyle = PAL.groundTop;
+      ctx.fillRect(p.x, p.y, p.w, 4);
+    } else {
+      // 活塞：只保留地面以上的部分，看起来才像"从地里钻出来"。
+      // 注意裁剪下边界是「地面表面」= baseY + h，不是 baseY ——
+      // 写成 baseY 会把整根活塞都裁掉（活塞本体正好在 baseY ~ baseY+h 之间）。
+      if (p.kind === 'piston') {
+        ctx.beginPath();
+        ctx.rect(p.x - 2, 0, p.w + 4, p.baseY + p.h);
+        ctx.clip();
+      }
+      // 跳板 = 一块板子 + 底下连着弹簧。
+      // 没踩时：板子平贴在地面里，弹簧完全压扁 —— 看起来就是普通地面。
+      // 踩上去：弹簧伸展，板子被顶起来，到顶就弹飞。
+      if (p.kind === 'bounce') {
+        var bpop = p.pop || 0;
+        if (bpop <= 0.02) continue;                   // 没踩 → 一根线都不画，就是普通地面
+        var topY = p.y + p.h;                         // 板子静止时贴着地面
+        var rise = 30 * bpop;                         // 板子升起高度
+        var by = topY - rise;
+        var coilH = 22 * (1 - bpop * 0.85);           // 弹簧剩余高度（越弹越伸展）
+        {
+          // 弹簧：中间一根立杆 + 上下两圈，画成被压住的样子
+          ctx.strokeStyle = PAL.groundTop;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          for (var ci = 0; ci <= 8; ci++) {
+            var cz = ci / 8;
+            var cx2 = p.x + p.w / 2 + (ci % 2 === 0 ? -13 : 13) * (0.45 + 0.55 * cz);
+            var cy2 = by + 6 + cz * coilH;
+            if (ci === 0) ctx.moveTo(cx2, cy2); else ctx.lineTo(cx2, cy2);
+          }
+          ctx.stroke();
+        }
+        // 板子：一块比跳板略宽的厚板
+        ctx.fillStyle = PAL.ground;
+        ctx.fillRect(p.x - 3, by, p.w + 6, 9);
+        ctx.fillStyle = PAL.groundTop;
+        ctx.fillRect(p.x - 3, by, p.w + 6, 3);
+        continue;
+      }
+      // 翻板：绕自己中心转
+      if (p.kind === 'flip' && game.flipT >= 0) {
+        ctx.save();
+        ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
+        ctx.rotate(Math.PI * Math.min(1, game.flipT));
+        ctx.fillStyle = PAL.ground;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.fillStyle = PAL.groundTop;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, 4);
+        ctx.restore();
+        continue;
+      }
+      // 实心块 + 一条亮橙顶边（假地板 / 消失板也走这条，外观不给任何提示）
+      ctx.fillStyle = p.kind === 'piston' ? PAL.piston
+                    : p.kind === 'appear' ? PAL.appear : PAL.ground;
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      if (!p.noTop) {
+        ctx.fillStyle = p.kind === 'piston' ? PAL.pistonTop : PAL.groundTop;
+        ctx.fillRect(p.x, p.y, p.w, 4);
+      }
+    }
+    ctx.restore();
+  }
+}
+
+function drawSpikes() {
+  for (var i = 0; i < game.spikes.length; i++) {
+    var sp = game.spikes[i];
+    if (!sp.shown) continue;
+    if (sp.onPop && !game.popFired) continue;      // 保险：没弹起来就不画
+    var box = spikeBox(sp);
+    // ★ 用 sp.anim 缩放高度：anim=1 全高，anim=0 缩回地面（收回动画）
+    var spA = (sp.anim === undefined || sp.anim === null) ? 1 : sp.anim;
+    if (spA <= 0.02) continue;
+    var baseY = box.y + box.h;                  // 刺的底部（地面）
+    var hh = box.h * spA;                       // 当前可见高度
+    box = { x: box.x, y: baseY - hh, w: box.w, h: hh };
+    var n = Math.max(1, Math.round(box.w / 16));   // 15px 的窄刺就画 1 根，49px 画 3 根
+    var step = box.w / n;
+    // 纯色三角，一次画完，没有描边也没有高光
+    ctx.fillStyle = PAL.spike;
+    ctx.beginPath();
+    for (var a = 0; a < n; a++) {
+      var x0 = sp.x + a * step;
+      // 尖不在正中，左右交替偏一点；再让高度轻微高低错落 —— 别像等边三角形
+      var lean = (a % 2 === 0) ? 0.34 : 0.66;   // 尖还是左右交替偏一点
+      var gapW = step * 0.15;                   // 间隙 15%，和门口那排一致
+      if (sp.dir === 'down') {
+        ctx.moveTo(x0 + gapW, box.y);
+        ctx.lineTo(x0 + step * lean, box.y + box.h);
+        ctx.lineTo(x0 + step - gapW, box.y);
+      } else {
+        ctx.moveTo(x0 + gapW, box.y + box.h);
+        ctx.lineTo(x0 + step * lean, box.y);          // 全部等高（整齐）
+        ctx.lineTo(x0 + step - gapW, box.y + box.h);
+      }
+      ctx.closePath();
+    }
+    ctx.fill();
+  }
+}
+
+/* 锯片：外圈三角尖齿 + 盘体 + 中心孔。会自转，也会沿路径来回滚 */
+function drawSaws() {
+  for (var i = 0; i < game.saws.length; i++) {
+    var s = game.saws[i], r = s.r;
+    if (!s.shown) continue;
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.rot);
+
+    // 外圈尖齿
+    ctx.fillStyle = PAL.saw;
+    ctx.beginPath();
+    var N = 12;
+    for (var k = 0; k < N; k++) {
+      var a0 = (k / N) * Math.PI * 2;
+      var a1 = ((k + 0.42) / N) * Math.PI * 2;
+      var a2 = ((k + 0.84) / N) * Math.PI * 2;
+      ctx.lineTo(Math.cos(a0) * r * 0.74, Math.sin(a0) * r * 0.74);
+      ctx.lineTo(Math.cos(a1) * r, Math.sin(a1) * r);
+      ctx.lineTo(Math.cos(a2) * r * 0.74, Math.sin(a2) * r * 0.74);
+    }
+    ctx.closePath(); ctx.fill();
+
+    // 盘体
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.74, 0, 7); ctx.fill();
+    // 画锯片：中心孔用背景色，看起来是"穿透"的
+    ctx.fillStyle = PAL.bgDeep;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.26, 0, 7); ctx.fill();
+    // 中心轴（小圆点），让转动更好辨认
+    ctx.fillStyle = PAL.ink;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.09, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+}
+
+/* 金币：真的金色发亮，假的……看起来一模一样（这就是坑） */
+function drawCoins() {
+  for (var i = 0; i < game.coins.length; i++) {
+    var c = game.coins[i];
+    if (c.got || c.gone || c.hidden) continue;      // 吃掉/消失/还没出现的都不画
+    // 注意：爆炸金币和普通金币长得一模一样，不给任何提示
+    var bob = Math.sin(c.t * 3) * 2.5;
+    ctx.fillStyle = '#ffd23f';
+    ctx.beginPath(); ctx.ellipse(c.x, c.y + bob, 9, 11, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#b8901f';
+    ctx.beginPath(); ctx.ellipse(c.x, c.y + bob, 5.5, 7, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.beginPath(); ctx.ellipse(c.x - 3, c.y + bob - 3.5, 2.2, 3, 0, 0, 7); ctx.fill();
+  }
+}
+
+/* 按钮 + 会旋转的墙（2-4 用） */
+// 墙的真实几何：上端贴天花板滑动、下端长度固定。返回 {upX,upY,ftX,ftY}
+function wallGeom() {
+  var L = LEVELS[game.li];
+  if (!L.wall) return null;
+  var w = L.wall;
+  var a = game.wallAngle * Math.PI / 180;
+  var ca = Math.cos(a), sa = Math.sin(a);
+  return {
+    upX: w.pivotX - w.len * ca, upY: w.pivotY - w.len * sa,
+    ftX: w.pivotX + w.len * ca, ftY: w.pivotY + w.len * sa,
+    w: w.w
+  };
+}
+
+// 把墙切成若干小方块（用于碰撞）：墙自己转，碰撞跟着转
+function wallBlocks() {
+  var g = wallGeom();
+  if (!g) return [];
+  var N = 12, out = [], hw = g.w / 2;
+  for (var i = 0; i < N; i++) {
+    var t0 = i / N, t1 = (i + 1) / N;
+    var x0 = g.upX + (g.ftX - g.upX) * t0, y0 = g.upY + (g.ftY - g.upY) * t0;
+    var x1 = g.upX + (g.ftX - g.upX) * t1, y1 = g.upY + (g.ftY - g.upY) * t1;
+    out.push({
+      x: Math.min(x0, x1) - hw, y: Math.min(y0, y1) - hw,
+      w: Math.abs(x1 - x0) + g.w, h: Math.abs(y1 - y0) + g.w
+    });
+  }
+  return out;
+}
+
+/* ---- 设置：左下角齿轮 + 滑入弹窗 ---- */
+var gearSpin = 0;
+function drawGear(cx, cy, r) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  gearSpin += 0.02;
+  ctx.rotate(gearSpin * 0.35);
+  ctx.fillStyle = 'rgba(255,210,63,0.75)';
+  for (var g = 0; g < 8; g++) {
+    ctx.save();
+    ctx.rotate((g / 8) * Math.PI * 2);
+    ctx.fillRect(-r * 0.22, -r - 6, r * 0.44, 10);   // 8 个齿
+    ctx.restore();
+  }
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(20,6,4,0.9)';
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.45, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawSettings(dt) {
+  // 齿轮只在菜单类界面出现（一级目录 / 二级选关 / 标题 / 通关），关卡里不显示
+  drawGear(70, VH - 60, 22);   // 所有界面都有齿轮（内移，避免全屏 cover 裁掉）
+
+  if (!game.settingsOpen && (game.settingsT || 0) <= 0) return;
+  game.settingsT = Math.min(1, (game.settingsT || 0) + dt * 5);
+  if (!game.settingsOpen) game.settingsT = Math.max(0, game.settingsT - dt * 12);   // 退场快一些   // 和重置弹窗同速退场
+
+  var t = game.settingsT;
+  var e = t * t * (3 - 2 * t);
+  var SW = 320, SH = 436, SX = (VW - SW) / 2, SY = (VH - SH) / 2 + (1 - e) * 280;
+
+  ctx.save();
+  ctx.globalAlpha = e;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, VW, VH);
+  // 弹窗本体
+  ctx.fillStyle = '#1a0a06';
+  ctx.fillRect(SX, SY, SW, SH);
+  ctx.strokeStyle = '#c9884a';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(SX, SY, SW, SH);
+
+  // 右上角小叉
+  var xx = SX + SW - 26, xy = SY + 26;
+  ctx.strokeStyle = '#e8b98a';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(xx - 8, xy - 8); ctx.lineTo(xx + 8, xy + 8);
+  ctx.moveTo(xx + 8, xy - 8); ctx.lineTo(xx - 8, xy + 8);
+  ctx.stroke();
+
+  // 两个按钮
+  var BW = 110, GAP = 26;
+  var bx1 = SX + SW / 2 - BW - GAP / 2, bx2 = SX + SW / 2 + GAP / 2;
+  var by = SY + 92;
+
+  var inGame = (game.state === 'play' || game.state === 'dead' || game.state === 'win');
+
+  if (inGame) {
+    // ===== 游戏内：重来 + 退出 =====
+    // ① 重来（回转箭头）
+    ctx.fillStyle = '#2a1410';
+    ctx.fillRect(bx1, by, BW, BW);
+    ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(bx1, by, BW, BW);
+    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    var rccx = bx1 + BW / 2, rccy = by + BW / 2, rcr = BW * 0.26;
+    ctx.beginPath(); ctx.arc(rccx, rccy, rcr, Math.PI * 0.35, Math.PI * 1.95); ctx.stroke();
+    // 箭头
+    var rax = rccx + Math.cos(Math.PI * 0.35) * rcr, ray = rccy + Math.sin(Math.PI * 0.35) * rcr;
+    ctx.beginPath();
+    ctx.moveTo(rax - 10, ray - 4); ctx.lineTo(rax + 4, ray + 2); ctx.lineTo(rax - 2, ray + 14);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // ② 退出（方框缺一边 + 箭头向外）
+    ctx.fillStyle = '#2a1410';
+    ctx.fillRect(bx2, by, BW, BW);
+    ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(bx2, by, BW, BW);
+    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 5;
+    var exx = bx2 + BW / 2 - 12, exy = by + BW / 2 - 12, esz = 26;
+    ctx.beginPath();
+    ctx.moveTo(exx + esz, exy);
+    ctx.lineTo(exx, exy); ctx.lineTo(exx, exy + esz); ctx.lineTo(exx + esz, exy + esz);
+    ctx.moveTo(exx + esz, exy + esz * 0.5);
+    ctx.lineTo(exx + esz + 14, exy + esz * 0.5);   // 往外指的箭头杆
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(exx + esz + 6, exy + esz * 0.5 - 8); ctx.lineTo(exx + esz + 16, exy + esz * 0.5); ctx.lineTo(exx + esz + 6, exy + esz * 0.5 + 8);
+    ctx.stroke();
+  } else {
+  // ① 静音按钮（图片）
+  ctx.fillStyle = '#2a1410';
+  ctx.fillRect(bx1, by, BW, BW);
+  ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(bx1, by, BW, BW);
+  var img = Sound.muted ? Sound.imgOff : Sound.imgOn;
+  if (img && img.complete) {
+    ctx.save();
+    ctx.filter = 'invert(1)';                    // 黑图标 → 白，白底 → 黑
+    ctx.globalCompositeOperation = 'screen';     // 黑（原白底）不显示，白（原图标）留下
+    ctx.drawImage(img, bx1 + 20, by + 20, BW - 40, BW - 40);
+    ctx.filter = 'none';
+    ctx.restore();
+  }
+
+  // ② 成就按钮（正方形 + 五角星）
+  game._achBtn = { x: bx2, y: by, w: BW, h: BW };   // 缓存命中区（点击直接用）
+  var _hov = game.mouse && game.mouse.x > bx2 && game.mouse.x < bx2 + BW && game.mouse.y > by && game.mouse.y < by + BW;
+  ctx.fillStyle = _hov ? '#3f1f16' : '#2a1410';
+  ctx.fillRect(bx2, by, BW, BW);
+  ctx.strokeStyle = _hov ? '#e8b98a' : '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(bx2, by, BW, BW);
+  ctx.fillStyle = '#ffd23f';
+  var scx = bx2 + BW / 2, scy = by + BW / 2, sr = 30;
+  ctx.beginPath();
+  for (var si = 0; si < 10; si++) {
+    var ang = -Math.PI / 2 + si * Math.PI / 5;
+    var rr = (si % 2 === 0) ? sr : sr * 0.42;
+    var px2 = scx + Math.cos(ang) * rr, py2 = scy + Math.sin(ang) * rr;
+    if (si === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+  }
+  ctx.closePath(); ctx.fill();
+  }
+  // ③ 重置按钮（只在菜单界面；游戏内不显示）
+  if (!inGame) {
+    var rw = BW * 2 + GAP, rx = SX + (SW - rw) / 2, ry = by + BW + 22;
+    ctx.fillStyle = game.resetOpen ? '#5a1410' : '#2a1410';
+    ctx.fillRect(rx, ry, rw, 42);
+    ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(rx, ry, rw, 42);
+    text('重置', SX + SW / 2, ry + 21, 19, '#e8b98a', 'center', true);
+    // ④ 退出程序（和重置一样大）
+    var qy = ry + 54;
+    ctx.fillStyle = '#2a1410';
+    ctx.fillRect(rx, qy, rw, 42);
+    ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(rx, qy, rw, 42);
+    text('退出游戏', SX + SW / 2, qy + 21, 19, '#e8b98a', 'center', true);
+  }
+  ctx.restore();
+
+  // ===== 重置确认弹窗（盖在设置弹窗上）=====
+  if (game.resetOpen) game.resetT = Math.min(1, (game.resetT || 0) + (1 / 60) * 5);
+  else game.resetT = Math.max(0, (game.resetT || 0) - (1 / 60) * 12);   // 和设置弹窗同速
+  if ((game.resetT || 0) > 0) {
+    var rt = game.resetT, re = rt * rt * (3 - 2 * rt);
+    var RW = 420, RH = 230, RX = (VW - RW) / 2, RY = (VH - RH) / 2 + (1 - re) * 280;
+    ctx.save();
+    ctx.globalAlpha = re;
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    ctx.fillRect(0, 0, VW, VH);
+    ctx.fillStyle = '#1a0a06';
+    ctx.fillRect(RX, RY, RW, RH);
+    ctx.strokeStyle = '#c9884a'; ctx.lineWidth = 3; ctx.strokeRect(RX, RY, RW, RH);
+    text('如果想重置游戏进程', VW / 2, RY + 42, 20, '#e8b98a', 'center', true);
+    text('请输入四位重置码：' + game.resetCode, VW / 2, RY + 78, 22, '#ffd23f', 'center', true);
+    // 输入框
+    var IX = RX + 60, IY = RY + 110, IW = RW - 120, IH = 46;
+    ctx.fillStyle = '#0d0409';
+    ctx.fillRect(IX, IY, IW, IH);
+    ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(IX, IY, IW, IH);
+    var shown = game.resetInput + '_'.repeat(Math.max(0, 4 - game.resetInput.length));
+    text(shown, VW / 2, IY + IH / 2, 26, '#ffffff', 'center', true);
+    text(game.resetMsg || '输入后按回车确认', VW / 2, RY + RH - 26, 15,
+         game.resetMsg ? '#ff6b52' : '#a08070', 'center');
+    // 右上角叉
+    var rxx = RX + RW - 26, rxy = RY + 26;
+    ctx.strokeStyle = '#e8b98a'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(rxx - 8, rxy - 8); ctx.lineTo(rxx + 8, rxy + 8);
+    ctx.moveTo(rxx + 8, rxy - 8); ctx.lineTo(rxx - 8, rxy + 8);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ===== 成就面板 =====
+  if (game.achOpen) game.achT = Math.min(1, (game.achT || 0) + (1 / 60) * 5);
+  else game.achT = Math.max(0, (game.achT || 0) - (1 / 60) * 12);
+  if ((game.achT || 0) > 0 && !game.resetOpen) {
+    var at = game.achT, ae = at * at * (3 - 2 * at);
+    var AW = 620, AH = 420, AX = (VW - AW) / 2, AY = (VH - AH) / 2 + (1 - ae) * 320;
+    ctx.save();
+    ctx.globalAlpha = ae;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, VW, VH);
+    ctx.fillStyle = '#1a0a06'; ctx.fillRect(AX, AY, AW, AH);
+    ctx.strokeStyle = '#c9884a'; ctx.lineWidth = 3; ctx.strokeRect(AX, AY, AW, AH);
+    // 关闭叉
+    var axx = AX + AW - 26, axy = AY + 26;
+    ctx.strokeStyle = '#e8b98a'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(axx - 8, axy - 8); ctx.lineTo(axx + 8, axy + 8);
+    ctx.moveTo(axx + 8, axy - 8); ctx.lineTo(axx - 8, axy + 8);
+    ctx.stroke();
+    // 8 个图标：4 列 × 2 行
+    var cellW = (AW - 80) / 4, cellH = (AH - 120) / 2, isz = Math.min(cellW, cellH) - 24;
+    for (var ai = 0; ai < 8; ai++) {
+      var col = ai % 4, row = (ai / 4) | 0;
+      var cx2 = AX + 40 + cellW * col + cellW / 2;
+      var cy2 = AY + 60 + cellH * row + cellH / 2;
+      var got = !!(save.achievements && save.achievements[ACH_META[ai].key]);
+      var im = ACH_IMG[ai] ? (got ? ACH_IMG[ai].on : ACH_IMG[ai].off) : null;
+      if (im && im.complete && im.naturalWidth) {
+        // 等比例缩放（取最大内接正方形，保持长宽比）
+        var iw = im.naturalWidth, ih = im.naturalHeight;
+        var sc = Math.min(isz / iw, isz / ih);
+        ctx.save();
+        ctx.beginPath(); ctx.arc(cx2, cy2, isz * 0.392, 0, 7); ctx.clip();   // 圆形裁剪：白底裁掉
+        ctx.drawImage(im, cx2 - iw * sc / 2, cy2 - ih * sc / 2, iw * sc, ih * sc);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = '#2a1410'; ctx.fillRect(cx2 - isz / 2, cy2 - isz / 2, isz, isz);
+      }
+      ACH_META[ai]._x = cx2; ACH_META[ai]._y = cy2; ACH_META[ai]._r = isz / 2;
+      text(ACH_META[ai].name, cx2, cy2 + isz / 2 + 16, 13, got ? '#ffd23f' : '#8a6050', 'center', true);
+    }
+    ctx.restore();
+  }
+
+  // ===== 成就详情（点某个图标）=====
+  if (game.achSel !== null && game.achSel !== undefined) {
+    var d = ACH_META[game.achSel];
+    var gotD = !!(save.achievements && save.achievements[d.key]);
+    var DW = 400, DH = 300, DX = (VW - DW) / 2, DY = (VH - DH) / 2;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(0, 0, VW, VH);
+    ctx.fillStyle = '#1a0a06'; ctx.fillRect(DX, DY, DW, DH);
+    ctx.strokeStyle = '#c9884a'; ctx.lineWidth = 3; ctx.strokeRect(DX, DY, DW, DH);
+    // 关闭叉
+    ctx.strokeStyle = '#e8b98a'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(DX + DW - 34, DY + 16); ctx.lineTo(DX + DW - 18, DY + 32);
+    ctx.moveTo(DX + DW - 18, DY + 16); ctx.lineTo(DX + DW - 34, DY + 32);
+    ctx.stroke();
+    // 大图标（等比例）
+    var dm = ACH_IMG[game.achSel] ? (gotD ? ACH_IMG[game.achSel].on : ACH_IMG[game.achSel].off) : null;
+    if (dm && dm.complete && dm.naturalWidth) {
+      var dsz = 150, sc2 = Math.min(dsz / dm.naturalWidth, dsz / dm.naturalHeight);
+      ctx.save();
+      ctx.beginPath(); ctx.arc(VW / 2, DY + 40 + dsz / 2, dsz * 0.392, 0, 7); ctx.clip();
+      ctx.drawImage(dm, VW / 2 - dm.naturalWidth * sc2 / 2, DY + 40, dm.naturalWidth * sc2, dm.naturalHeight * sc2);
+      ctx.restore();
+    }
+    text(d.name, VW / 2, DY + 220, 22, gotD ? '#ffd23f' : '#8a6050', 'center', true);
+    text(gotD ? d.on : d.off, VW / 2, DY + 256, 15, '#c9a888', 'center');
+    ctx.restore();
+  }
+}
+
+function drawButtonWall() {
+  var L = LEVELS[game.li];
+
+  // 按钮（2-5：等平台从空气里长出来才显示）
+  if (L.button && game.buttonVisible) {
+    var b = L.button;
+    var pressed = game.buttonPressed;
+    var riseK = (game.buttonRiseT === undefined ? 1 : game.buttonRiseT);   // 4-1 伸出动画
+    if (riseK <= 0.02) { /* 还没伸出来，不画 */ }
+    else {
+    var bh = (pressed ? 6 : 18) * riseK;           // 按下会扁下去 + 伸出动画
+    var isUp = !!b.upsideDown;
+    var by = isUp ? b.y : b.y + b.h - bh;   // 倒按钮贴着平台下沿
+    ctx.fillStyle = pressed ? '#8c2f22' : '#e0432f';
+    ctx.fillRect(b.x, by, b.w, bh);
+    ctx.fillStyle = pressed ? '#5a1c14' : '#ff6b52';
+    ctx.fillRect(b.x, isUp ? by + bh - 5 : by, b.w, 5);
+    ctx.fillStyle = '#ffd23f';
+    ctx.beginPath(); ctx.arc(b.x + b.w / 2, b.y + b.h - bh - 3, 3, 0, 7); ctx.fill();
+    }
+  }
+
+  // 3-5 四个黑球绕人（半径周期变化）
+  if (game.ring3) {
+    var R3d = game.ring3;
+    var baseR = 110 + Math.sin(R3d.t * 3.2) * 46;      // 半径来回伸缩
+    var crash = R3d.t > 3.85 ? (R3d.t - 3.85) / 0.15 : 0;   // 最后一瞬收向中心
+    var rr3 = baseR * (1 - crash);
+    for (var bj = 0; bj < 4; bj++) {
+      var ba = (bj / 4) * Math.PI * 2 - Math.PI / 2 + R3d.ang;
+      var bx3 = R3d.cx + Math.cos(ba) * rr3;
+      var by3 = R3d.cy + Math.sin(ba) * rr3;
+      ctx.fillStyle = '#120409';
+      ctx.beginPath(); ctx.arc(bx3, by3, 22, 0, 7); ctx.fill();
+      ctx.fillStyle = '#2a1a12';
+      ctx.beginPath(); ctx.arc(bx3 - 6, by3 - 6, 7, 0, 7); ctx.fill();
+    }
+  }
+
+  // 3-5 追踪导弹
+  for (var mj = 0; mj < game.missiles.length; mj++) {
+    var m2 = game.missiles[mj];
+    ctx.save(); ctx.translate(m2.x, m2.y);
+    var mang = Math.atan2((game.p.y + 14) - m2.y, (game.p.x + 13) - m2.x);
+    ctx.rotate(mang);
+    // 尾焰
+    for (var fl = 1; fl <= 3; fl++) {
+      ctx.globalAlpha = 0.5 / fl;
+      ctx.fillStyle = '#ffd23f';
+      ctx.beginPath(); ctx.arc(-14 - fl * 7, 0, 6 - fl, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // 弹体（放大）
+    ctx.fillStyle = '#e0432f';
+    ctx.beginPath(); ctx.moveTo(26, 0); ctx.lineTo(-18, 13); ctx.lineTo(-18, -13); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#8c2f22';
+    ctx.beginPath(); ctx.moveTo(26, 0); ctx.lineTo(8, 7); ctx.lineTo(8, -7); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // 3-5 博弈按钮：站上地板后才出现
+  if (L.gambleButtons && game.gBtns) {
+    var risY = 250, risGone = false;
+    for (var ryi = 0; ryi < game.plats.length; ryi++) if (game.plats[ryi].riser) {
+      risY = game.plats[ryi].y;
+      if (game.plats[ryi].state === 'gone') risGone = true;
+    }
+    if (!risGone) {
+      for (var gbi2 = 0; gbi2 < L.gambleButtons.length; gbi2++) {
+        var gb2 = L.gambleButtons[gbi2];
+        var grow = Math.max(0, Math.min(1, game.btnAnim));
+        if (grow <= 0.02) continue;
+        // 整体下沉：按钮不变形，只是慢慢陷进地板，被地板沿口裁掉
+        var drop = (1 - grow) * (gb2.h + 4);
+        var btnTop = risY - gb2.h - 2 + drop;
+        ctx.save();
+        ctx.beginPath(); ctx.rect(gb2.x - 2, 0, gb2.w + 4, risY); ctx.clip();
+        ctx.fillStyle = '#e0432f';
+        ctx.fillRect(gb2.x, btnTop, gb2.w, gb2.h);
+        ctx.fillStyle = '#ff6b52';
+        ctx.fillRect(gb2.x, btnTop, gb2.w, 5);
+        if (grow > 0.5) {
+          ctx.fillStyle = '#ffd23f';
+          ctx.beginPath(); ctx.arc(gb2.x + gb2.w / 2, btnTop - 5, 3, 0, 7); ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+  }
+
+  // 墙：一根从天花板斜下来的杆，它自己转（碰撞跟着转）
+  if (L.wall) {
+    var g = wallGeom();
+    var w = L.wall;
+    var px = w.pivotX, py = w.pivotY;
+    var upX = g.upX, upY = g.upY, ftX = g.ftX, ftY = g.ftY;
+    ctx.globalAlpha = 1;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = PAL.ground;
+    ctx.lineWidth = w.w;
+    ctx.beginPath(); ctx.moveTo(upX, upY); ctx.lineTo(ftX, ftY); ctx.stroke();
+    ctx.strokeStyle = PAL.groundTop;
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(upX, upY); ctx.lineTo(ftX, ftY); ctx.stroke();
+  }
+
+  // 新墙：从地面伸出来（把回头路堵死）
+  if (game.newWallRect) {
+    var nr = game.newWallRect;
+    ctx.fillStyle = PAL.ground;
+    ctx.fillRect(nr.x, nr.y, nr.w, nr.h);
+    ctx.fillStyle = PAL.groundTop;
+    ctx.fillRect(nr.x, nr.y, nr.w, 5);
+    // 升起时的尘土感
+    if (game.newWallT < 0.5) {
+      ctx.globalAlpha = Math.max(0, 1 - game.newWallT / 0.5);
+      ctx.fillStyle = PAL.ink;
+      for (var di = 0; di < 3; di++) {
+        var dx2 = nr.x + (di - 1) * 12;
+        ctx.fillRect(dx2, 470 - 6 - di * 4, 6, 6);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+/* 骷髅头钥匙：一个骷髅脑袋 + 下面一根钥匙杆 */
+function drawSkullKey(x, y, s, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y); ctx.scale(s, s);
+  // 钥匙杆
+  ctx.strokeStyle = '#d8d2c4'; ctx.lineWidth = 3.2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 8); ctx.lineTo(0, 22);
+  ctx.moveTo(0, 17); ctx.lineTo(6, 17); ctx.moveTo(0, 21); ctx.lineTo(5, 21); ctx.stroke();
+  // 骷髅头
+  ctx.fillStyle = '#e8e2d4';
+  ctx.beginPath();
+  ctx.arc(0, -2, 11, Math.PI, 0);
+  ctx.lineTo(11, 5);
+  ctx.quadraticCurveTo(8, 12, 4, 10);
+  ctx.lineTo(-4, 10);
+  ctx.quadraticCurveTo(-8, 12, -11, 5);
+  ctx.closePath(); ctx.fill();
+  // 眼窝（黑洞）
+  ctx.fillStyle = '#120303';
+  ctx.beginPath(); ctx.ellipse(-4.4, -2, 3.6, 4.2, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(4.4, -2, 3.6, 4.2, 0, 0, 7); ctx.fill();
+  // 鼻孔 + 牙缝
+  ctx.beginPath(); ctx.moveTo(0, 3); ctx.lineTo(-1.6, 7); ctx.lineTo(1.6, 7); ctx.closePath(); ctx.fill();
+  ctx.fillRect(-2.6, 8.6, 1.4, 3);
+  ctx.fillRect(1.2, 8.6, 1.4, 3);
+  ctx.restore();
+}
+
+function drawKeys() {
+  for (var i = 0; i < game.keys.length; i++) {
+    var k = game.keys[i];
+    if (k.got || k.gone || k.show <= 0) continue;
+    var e = k.show * k.show * (3 - 2 * k.show);         // smoothstep
+    var bob = Math.sin(k.t * 2.6) * 3 * e;
+    var kx = k.fx + (k.x - k.fx) * e;                   // 从"藏身处"滑到"该在的地方"
+    var ky = k.fy + (k.y - k.fy) * e;
+    drawSkullKey(kx, ky + bob, 1.25, e);
+  }
+}
+
+/* 落球：会反弹，弹够次数就朝你飞 */
+function drawBalls() {
+  for (var i = 0; i < game.balls.length; i++) {
+    var b = game.balls[i];
+    // 玩家进入球的范围（x 轴）→ 球重新开始上下移动
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.spin);
+    // 纯色大圆球（照参考：没有高光也没有中心点）
+    ctx.fillStyle = b.homing ? '#c0392b' : PAL.spike;
+    ctx.beginPath(); ctx.arc(0, 0, b.r, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawGoal() {
+  var L = LEVELS[game.li];
+  // 门的粒子传送（美术层）：旧门炸成碎片 → 飞到新位置 → 重组成门
+  var gxDraw = game.goalX, gDrawable = true;
+  if (game.goalFly) {
+    var GF = game.goalFly;
+    var fk = Math.min(1, GF.t / 0.55);
+    var fk2 = fk * fk * (3 - 2 * fk);
+    gDrawable = false;                       // 门本体先隐藏
+    for (var gpj = 0; gpj < GF.parts.length; gpj++) {
+      var gpp = GF.parts[gpj];
+      var gtx = GF.toX + gpp.ox * L.goal.w, gty = L.goal.y + gpp.oy * L.goal.h;
+      var gcx = GF.fromX + gpp.ox * L.goal.w, gcy = L.goal.y + gpp.oy * L.goal.h;
+      gpp.x = gcx + (gtx - gcx) * fk2 + Math.sin(GF.t * 22 + gpj) * 10 * (1 - fk2);
+      gpp.y = gcy + (gty - gcy) * fk2 + Math.cos(GF.t * 26 + gpj) * 12 * (1 - fk2);
+      ctx.fillStyle = PAL.door;
+      ctx.beginPath(); ctx.arc(gpp.x, gpp.y, 4, 0, 7); ctx.fill();
+    }
+    if (fk >= 1) gDrawable = true;
+  }
+  if (!gDrawable) return;
+
+  // 假终点关：先画那扇假的（长得和真门一样），真门按进度淡入
+  if (L.fakeGoal) {
+    if (game.fakeGoalShown) drawOneDoor(L.fakeGoal, 1);   // 假门走近才出现
+    if (game.state === 'win' && game.winDoor) {
+      drawOneDoor({ x: gxDraw, y: L.goal.y, w: L.goal.w, h: L.goal.h }, 1, game.winDoor.k);   // 通关：真门关门动画
+    } else {
+      drawOneDoor({ x: gxDraw, y: L.goal.y, w: L.goal.w, h: L.goal.h }, game.goalReveal, 1);
+    }
+    return;
+  }
+  if (!game.goalDead || game.sinkY > 0) {
+    if (game.state === 'win' && game.winDoor) drawOneDoor({ x: gxDraw, y: L.goal.y, w: L.goal.w, h: L.goal.h }, 1, game.winDoor.k);
+    else drawOneDoor({ x: gxDraw, y: L.goal.y, w: L.goal.w, h: L.goal.h }, L.goalHidden ? game.goalReveal : 1, 1);   // 用 gxDraw（含飞行动画）
+  }
+}
+
+function drawOneDoor(g, alpha, closeK) {
+  if (alpha <= 0.01) return;
+  g = { x: g.x, y: g.y + (game.sinkY || 0), w: g.w, h: g.h };   // 门跟着一起沉
+  var k = Math.max(0, Math.min(1, alpha));
+  var ck = (closeK === undefined ? 1 : Math.max(0, Math.min(1, closeK)));
+  var w = g.w * ck;                          // 关门：宽度收拢
+  if (w < 0.6) return;
+  var x = g.x + (g.w - w) / 2;
+  var y = g.y, h = g.h, r = w / 2;
+
+  // 门口透出来的光（noGlow 的关不画）
+  if (!(LEVELS[game.li] && LEVELS[game.li].noGlow)) {
+  ctx.save();
+  ctx.globalAlpha = 0.22 * k;
+  ctx.fillStyle = PAL.door;
+  ctx.beginPath(); ctx.ellipse(x + r, y + h * 0.55, w * 1.35, h * 0.85, 0, 0, 7); ctx.fill();
+  ctx.restore();
+  }
+
+  ctx.globalAlpha = k;                       // 整个门跟着 alpha 一起淡入
+  // 门框（比门洞大一圈）
+  ctx.beginPath();
+  ctx.moveTo(x - 4, y + h + 4); ctx.lineTo(x - 4, y + r);
+  ctx.arc(x + r, y + r, r + 4, Math.PI, 0);
+  ctx.lineTo(x + w + 4, y + h + 4);
+  ctx.closePath();
+  ctx.fillStyle = PAL.ink; ctx.fill();
+
+  // 门洞：拱形，上亮下暗
+  ctx.beginPath();
+  ctx.moveTo(x, y + h); ctx.lineTo(x, y + r);
+  ctx.arc(x + r, y + r, r, Math.PI, 0);
+  ctx.lineTo(x + w, y + h);
+  ctx.closePath();
+  var gd = ctx.createLinearGradient(0, y, 0, y + h);
+  gd.addColorStop(0, PAL.door);
+  gd.addColorStop(1, '#1d7a50');
+  ctx.fillStyle = gd; ctx.fill();
+
+  // 洞底压暗，看起来"通到别处去了"
+  ctx.save();
+  ctx.globalAlpha = 0.4;
+  var gd2 = ctx.createLinearGradient(0, y + h * 0.45, 0, y + h);
+  gd2.addColorStop(0, 'rgba(0,0,0,0)');
+  gd2.addColorStop(1, 'rgba(0,0,0,0.6)');
+  ctx.fillStyle = gd2;
+  ctx.beginPath();
+  ctx.moveTo(x, y + h); ctx.lineTo(x, y + r);
+  ctx.arc(x + r, y + r, r, Math.PI, 0);
+  ctx.lineTo(x + w, y + h);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.globalAlpha = 1;   // 恢复
+}
+
+function drawArrows() {
+  ctx.save();
+  for (var i = 0; i < game.arrows.length; i++) {
+    var a = game.arrows[i];
+    ctx.save();
+    ctx.translate(a.x, a.y);
+    if (a.dir === 'left') ctx.rotate(Math.PI);
+    if (a.dir === 'up') ctx.rotate(-Math.PI / 2);
+    if (a.dir === 'down') ctx.rotate(Math.PI / 2);
+    ctx.beginPath();
+    ctx.moveTo(34, 0);
+    ctx.lineTo(-6, -20);
+    ctx.lineTo(2, -9);
+    ctx.lineTo(-30, -9);
+    ctx.lineTo(-30, 9);
+    ctx.lineTo(2, 9);
+    ctx.lineTo(-6, 20);
+    ctx.closePath();
+    ctx.fillStyle = '#ffb020';
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/* 火柴人：头 + 一根身体 + 四肢，动作全靠关节摆动
+   走路 → 手脚交替摆；跳跃 → 蜷腿举臂；下落 → 张腿摊手；站着 → 轻微呼吸 */
+function drawPlayer() {
+  // 传送动画期间：只画粒子，人一帧都不能露（逐帧动画：首帧=粒子，末帧=人）
+  if (game.tp) return;
+  // 4-1：走在天花板里的隐藏通道上时，人也要藏起来
+  var hpY = LEVELS[game.li] && LEVELS[game.li].hiddenPathY;
+  if (hpY !== undefined && game.p.y < hpY) return;
+  if (game.state === 'dead') return;
+  var p = game.p;
+  var t = p.anim || 0;
+  var st = p.animState || 'idle';
+  var cx = p.x + p.w / 2;
+  var top = p.y, bottom = p.y + p.h;
+
+  var bob = 0, legA = 0, legB = 0, armA = 0, armB = 0;
+
+  if (st === 'walk') {
+    var sw = Math.sin(t * 13);
+    legA = sw * 6.5; legB = -sw * 6.5;
+    armA = -sw * 5.5; armB = sw * 5.5;
+    bob = -Math.abs(sw) * 1.6;
+  } else if (st === 'idle') {
+    bob = Math.sin(t * 2.6) * 1.2;
+    armA = 2; armB = -2;
+  } else if (st === 'jump') {
+    legA = -3; legB = 6; armA = -8; armB = 8;   // 蜷腿、举臂
+  } else {
+    legA = -7; legB = 7; armA = -6; armB = 6;   // 下落：张腿摊手
+  }
+
+  var headR = 5.2;
+  var headY = top + headR + 1 + bob;
+  var neckY = headY + headR + 0.5;
+  var hipY = neckY + 8.5;
+  var shoulderY = neckY + 2;
+
+  ctx.save();
+  ctx.strokeStyle = PAL.player;
+  ctx.lineWidth = 3.4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // 身体
+  ctx.beginPath();
+  ctx.moveTo(cx, neckY);
+  ctx.lineTo(cx, hipY);
+  ctx.stroke();
+  // 手臂
+  ctx.beginPath();
+  ctx.moveTo(cx, shoulderY); ctx.lineTo(cx + armA, shoulderY + 7.5);
+  ctx.moveTo(cx, shoulderY); ctx.lineTo(cx + armB, shoulderY + 7.5);
+  ctx.stroke();
+  // 腿
+  ctx.beginPath();
+  ctx.moveTo(cx, hipY); ctx.lineTo(cx + legA, bottom);
+  ctx.moveTo(cx, hipY); ctx.lineTo(cx + legB, bottom);
+  ctx.stroke();
+  // 头
+  ctx.beginPath();
+  ctx.arc(cx, headY, headR, 0, Math.PI * 2);
+  ctx.fillStyle = PAL.player;
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  // 两个小黑点当眼睛（不做五官）
+  var look = p.face * 0.9;
+  ctx.fillStyle = PAL.pupil;
+  ctx.beginPath(); ctx.arc(cx - 1.9 + look, headY - 0.6, 1.05, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 1.9 + look, headY - 0.6, 1.05, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawParticles() {
+  for (var i = 0; i < game.particles.length; i++) {
+    var q = game.particles[i];
+    ctx.globalAlpha = Math.max(0, q.life / q.max);
+    ctx.fillStyle = q.c;
+    ctx.fillRect(q.x - 3, q.y - 3, 6, 6);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function text(str, x, y, size, color, align, bold) {
+  ctx.font = (bold ? '700 ' : '500 ') + size + 'px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.fillStyle = color;
+  ctx.textAlign = align || 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(str, x, y);
+}
+
+function drawHUD() {
+  // 通知（成就播报 / 拿到钥匙）：关卡内也要能看到
+  if (game.flashT > 0 && game.flash) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, game.flashT / 0.4);
+    text(game.flash, VW / 2, 118, 22, PAL.player, 'center', true);
+    ctx.restore();
+  }
+  var L = LEVELS[game.li];
+  text(WORLDS[CUR.w].name, 26, 30, 18, PAL.text, 'left', true);
+  text((CUR.w + 1) + ' - ' + (CUR.i + 1), 26, 56, 14, PAL.dim, 'left');
+  text('死亡 ' + game.deaths, VW - 26, 30, 18, PAL.text, 'right', true);
+  text('总计 ' + save.deaths, VW - 26, 56, 14, PAL.dim, 'right');
+  var kg = keyCount();
+  if (kg > 0) {
+    for (var k2 = 0; k2 < 3; k2++) keyIcon(VW - 150 + k2 * 24, 30, 0.9, k2 < kg ? PAL.player : PAL.faint, k2 < kg);
+  }
+  // 死亡：嘲讽 + 按任意键继续（都跟着死亡时间淡入）
+  if (game.state === 'dead') {
+    var da = Math.min(1, game.timer * 4);
+    ctx.save();
+    ctx.globalAlpha = da;
+    ctx.translate(VW / 2, VH * 0.36);
+    ctx.rotate((Math.random() - 0.5) * 0.035);
+    text(game.taunt, 0, 0, 36, game.tauntColor || PAL.warn, 'center', true);
+    ctx.restore();
+    if (game.timer > 0.35) {
+      var pl = 0.55 + 0.45 * Math.sin(performance.now() / 260);
+      ctx.save();
+      ctx.globalAlpha = da * pl;
+      text('按任意键继续', VW / 2, VH * 0.36 + 48, 18, PAL.text, 'center', true);
+      ctx.restore();
+    }
+  } else if (game.tauntT > 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, game.tauntT / 0.4);
+    ctx.translate(VW / 2, 92);
+    ctx.rotate((Math.random() - 0.5) * 0.05);
+    text(game.taunt, 0, 0, 36, PAL.warn, 'center', true);
+    ctx.restore();
+  }
+  // 底部提示：先教操作，死两次给思路，死八次给台阶
+  if (game.state === 'play') {
+    if (game.deaths === 0) {
+      text('← → / A D 移动　　空格 跳跃　　R 重来　　M 音乐　　N 直接通关', VW / 2, VH - 26, 15, PAL.dim, 'center');
+    } else if (game.deaths >= 8) {
+      text('踩上会碎的板子别停，落地立刻按空格　　按 N 直接通关', VW / 2, VH - 26, 15, PAL.good, 'center', true);
+    } else if (game.deaths >= 2) {
+      text('提示：踩上会碎的板子别停留，落地立刻按空格跳走', VW / 2, VH - 26, 15, '#ffb347', 'center', true);
+    }
+  }
+}
+
+function drawTitle() {
+  drawBackground();
+  var t = performance.now() / 1000;
+
+  // 标题：TRAP RUNNER
+  ctx.save();
+  ctx.translate(VW / 2, VH / 2 - 104);
+  ctx.rotate(Math.sin(t * 1.3) * 0.009);
+  ctx.font = '700 78px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 11;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = PAL.ink;
+  ctx.strokeText('TRAP RUNNER', 0, 0);
+  ctx.fillStyle = PAL.player;
+  ctx.fillText('TRAP RUNNER', 0, 0);
+  ctx.restore();
+
+  // 下面一行小中文
+  text('走向那扇门', VW / 2, VH / 2 - 38, 20, PAL.text, 'center');
+
+  drawStartButton(t);
+
+}
+
+/* 播放按钮：正方形边框 + 里面一个三角形，鼠标悬停时变亮 */
+function drawStartButton(t) {
+  var b = START_BTN;
+  var hov = mouseOnStartButton();
+  var pulse = 0.5 + 0.5 * Math.sin(t * 3);
+  var col = hov ? PAL.good : PAL.door;
+
+  ctx.save();
+  // 悬停时外面加一层柔光
+  if (hov) {
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = PAL.good;
+    roundRect(b.x - 10, b.y - 10, b.w + 20, b.h + 20, 16);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  // 正方形边框
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 5;
+  ctx.globalAlpha = hov ? 1 : 0.7 + 0.3 * pulse;
+  roundRect(b.x, b.y, b.w, b.h, 12);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // 里面的三角形
+  ctx.fillStyle = col;
+  var cx = b.x + b.w / 2 + 5, cy = b.y + b.h / 2, s = 21;
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 0.52, cy - s);
+  ctx.lineTo(cx - s * 0.52, cy + s);
+  ctx.lineTo(cx + s * 0.78, cy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawComplete() {
+  drawBackground();
+  var t = performance.now() / 1000;
+  ctx.save();
+  ctx.translate(VW / 2, VH / 2 - 74);
+  ctx.rotate(Math.sin(t * 1.6) * 0.01);
+  ctx.font = '700 58px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 9;
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = PAL.ink;
+  ctx.strokeText('全 部 通 关', 0, 0);
+  ctx.fillStyle = PAL.door;
+  ctx.fillText('全 部 通 关', 0, 0);
+  ctx.restore();
+  text('总死亡次数：' + game.totalDeaths + ' 次', VW / 2, VH / 2 + 8, 26, PAL.text, 'center', true);
+  text(game.totalDeaths <= 15 ? '这身手，有点东西。' :
+       game.totalDeaths <= 40 ? '坑是踩出来的，路是走出来的。' :
+       '……你和这个游戏，都挺倔的。', VW / 2, VH / 2 + 56, 18, PAL.text, 'center');
+  // 成就：全通界面把本次新解锁的一次列出（只构建一次，固化下来）
+  if (!game.completeAchLines) {
+    game.completeAchLines = [];
+    if (game.newAch) {
+      for (var _ni = 0; _ni < game.newAch.length; _ni++) {
+        var _nk = game.newAch[_ni], _nm = null;
+        for (var _mi = 0; _mi < ACHIEVEMENTS.length; _mi++) {
+          if (ACHIEVEMENTS[_mi].id === _nk || ACHIEVEMENTS[_mi].w === _nk) _nm = ACHIEVEMENTS[_mi].name;
+        }
+        if (_nm) game.completeAchLines.push('🏆 获得成就：' + _nm);
+      }
+    }
+  }
+  var _achList = game.completeAchLines;
+  for (var _aj = 0; _aj < _achList.length && _aj < 4; _aj++) {
+    ctx.save();
+    ctx.globalAlpha = 1;
+    text(_achList[_aj], VW / 2, VH / 2 - 148 + _aj * 34, 22, PAL.player, 'center', true);
+    ctx.restore();
+  }
+  var a = 0.5 + 0.5 * Math.sin(t * 3);
+  ctx.globalAlpha = a;
+  text('按 空格 再玩一次', VW / 2, VH / 2 + 128, 23, PAL.good, 'center', true);
+  ctx.globalAlpha = 1;
+}
+
+/* ============================================================
+   两级选关界面
+   ============================================================ */
+
+/* 两色混合：t=0 取 a，t=1 取 b（用来把主题色压暗做"锁着"的门） */
+function mix(a, b, t) {
+  var x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16);
+  var r = Math.round(((x >> 16) & 255) * (1 - t) + ((y >> 16) & 255) * t);
+  var g = Math.round(((x >> 8) & 255) * (1 - t) + ((y >> 8) & 255) * t);
+  var bl = Math.round((x & 255) * (1 - t) + (y & 255) * t);
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
+}
+
+function keyIcon(x, y, s, color, filled) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(-6, -2, 5, 0, 7);
+  if (filled) ctx.fill(); else ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-1, -2); ctx.lineTo(11, -2);
+  ctx.moveTo(6, -2); ctx.lineTo(6, 4); ctx.moveTo(11, -2); ctx.lineTo(11, 5);
+  ctx.stroke(); ctx.restore();
+}
+
+function lockIcon(x, y, s, color) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.4;
+  ctx.beginPath(); ctx.arc(0, -4, 6, Math.PI, 0); ctx.stroke();
+  roundRect(-9, -4, 18, 14, 3); ctx.fill();
+  ctx.restore();
+}
+
+function ghostIcon(x, y, s, color) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(0, -1, 9.5, Math.PI, 0);
+  ctx.lineTo(9.5, 9);
+  ctx.quadraticCurveTo(7.1, 4.6, 4.75, 9);
+  ctx.quadraticCurveTo(2.4, 4.6, 0, 9);
+  ctx.quadraticCurveTo(-2.4, 4.6, -4.75, 9);
+  ctx.quadraticCurveTo(-7.1, 4.6, -9.5, 9);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = PAL.ink;
+  ctx.beginPath(); ctx.arc(-3.4, -3.4, 1.85, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(3.4, -3.4, 1.85, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function menuSpike(x, y, w, h, color) {
+  ctx.fillStyle = color; ctx.beginPath();
+  ctx.moveTo(x, y); ctx.lineTo(x + w / 2, y - h); ctx.lineTo(x + w, y); ctx.closePath(); ctx.fill();
+}
+
+/* 顶栏：标题 / 大关名（左） + 幽灵·总死亡数（正中） + 钥匙计数器·返回（右）
+   钥匙计数器在拿到第一把之前完全不画 —— 不让玩家知道有"钥匙"这回事 */
+function menuHeader(world, showBack) {
+  text('TRAP RUNNER', 40, 38, 24, world ? world.color : PAL.player, 'left', true);
+  if (world) {
+    text(world.name, 40, 66, 15, PAL.text, 'left', true);
+    var nw = ctx.measureText(world.name).width;
+    text(world.sub, 40 + nw + 22, 66, 12, PAL.dim, 'left');
+  } else {
+    text('选择你的路', 42, 66, 13, PAL.dim, 'left');
+  }
+
+  ghostIcon(VW / 2, 40, 1.2, '#cdb8aa');
+  text('死亡 ' + save.deaths + ' 次', VW / 2, 70, 12, PAL.dim, 'center');
+
+  var got = keyCount();
+  if (got > 0) {
+    var kx = showBack ? VW - 268 : VW - 186;
+    for (var i = 0; i < 3; i++) keyIcon(kx + i * 27, 44, 1.0, i < got ? PAL.player : PAL.faint, i < got);
+    text(got + ' / 3', kx + 3 * 27 + 8, 44, 14, PAL.dim, 'left');
+  }
+
+  if (showBack) {
+    roundRect(VW - 134, 26, 94, 38, 10);
+    ctx.fillStyle = 'rgba(125,90,68,0.16)'; ctx.fill();
+    ctx.strokeStyle = PAL.lockedEdge; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = PAL.text; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(VW - 112, 37); ctx.lineTo(VW - 121, 45); ctx.lineTo(VW - 112, 53); ctx.stroke();
+    text('返回', VW - 100, 46, 14, PAL.text, 'left');
+  }
+
+  ctx.strokeStyle = world ? world.terrEdge : PAL.lockedEdge;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(40, 92); ctx.lineTo(VW - 40, 92); ctx.stroke();
+}
+
+/* 蹄子一样的一对恶魔角：牛角式内弯 */
+function demonHorn(x, y, len, th, dir, fill, edge) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(dir, 1);
+  function P(t) {
+    var a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
+    return [b * th * 1.55 + c * th * 0.16, -(b * len * 0.56 + c * len)];
+  }
+  var N = 26, L = [], R = [];
+  for (var i = 0; i <= N; i++) {
+    var t = i / N, p = P(t), q = P(Math.min(1, t + 0.02));
+    var dx = q[0] - p[0], dy = q[1] - p[1], d = Math.hypot(dx, dy) || 1;
+    var nx = -dy / d, ny = dx / d, w = th * Math.pow(1 - t, 0.62);
+    L.push([p[0] + nx * w, p[1] + ny * w]);
+    R.push([p[0] - nx * w, p[1] - ny * w]);
+  }
+  ctx.beginPath();
+  ctx.moveTo(L[0][0], L[0][1]);
+  L.forEach(function (p) { ctx.lineTo(p[0], p[1]); });
+  for (var k = R.length - 1; k >= 0; k--) ctx.lineTo(R[k][0], R[k][1]);
+  ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill();
+  ctx.strokeStyle = edge; ctx.lineWidth = 1.8; ctx.lineJoin = 'round'; ctx.stroke();
+  ctx.restore();
+}
+
+/* 险路尽头的门：血色光晕 + 一对牛角 + 门里一对眼睛 + 底部熔岩 + 门槛短牙 */
+function hellDoor(cx, cy, w, h, color, opt) {
+  var locked = !!opt.locked;
+  var x = cx - w / 2, y = cy - h / 2, r = w / 2;
+  var t = performance.now() / 1000;
+  var pulse = 0.5 + 0.5 * Math.sin(t * 2.4);
+  var k = locked ? 0.55 : 1;
+
+  var rg = ctx.createRadialGradient(cx, cy, 4, cx, cy, w * 2.1);
+  rg.addColorStop(0, 'rgba(255,59,47,' + ((0.20 + 0.12 * pulse) * k).toFixed(3) + ')');
+  rg.addColorStop(1, 'rgba(255,59,47,0)');
+  ctx.fillStyle = rg;
+  ctx.beginPath(); ctx.ellipse(cx, cy + 8, w * 2.1, h * 1.7, 0, 0, 7); ctx.fill();
+
+  var hFill = locked ? mix(color, '#1a0707', 0.52) : mix(color, '#1a0707', 0.14);
+  var hEdge = locked ? mix(color, '#100202', 0.80) : '#2a0806';
+  demonHorn(cx - r * 0.60, y + 18, 46, 13, -1, hFill, hEdge);
+  demonHorn(cx + r * 0.60, y + 18, 46, 13, 1, hFill, hEdge);
+
+  ctx.beginPath();
+  ctx.moveTo(x - 9, y + h + 9); ctx.lineTo(x - 9, y + r);
+  ctx.arc(cx, y + r, r + 9, Math.PI, 0);
+  ctx.lineTo(x + w + 9, y + h + 9); ctx.closePath();
+  ctx.fillStyle = '#1a0503'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,90,60,' + (0.5 * k + 0.3 * k * pulse).toFixed(3) + ')';
+  ctx.lineWidth = 2.5; ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(x, y + h); ctx.lineTo(x, y + r);
+  ctx.arc(cx, y + r, r, Math.PI, 0);
+  ctx.lineTo(x + w, y + h); ctx.closePath();
+  var g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, locked ? mix(color, '#1a0707', 0.42) : '#ff6b48');
+  g.addColorStop(0.55, locked ? mix(color, '#1a0707', 0.62) : mix(color, '#1a0707', 0.15));
+  g.addColorStop(1, locked ? mix(color, '#1a0707', 0.78) : mix(color, '#1a0707', 0.62));
+  ctx.fillStyle = g; ctx.fill();
+
+  if (!locked) {
+    ctx.save();
+    ctx.globalAlpha = 0.55 + 0.45 * pulse;
+    ctx.fillStyle = '#ffe08a';
+    ctx.beginPath(); ctx.ellipse(cx - 11, y + h * 0.44, 4.2, 6.6, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + 11, y + h * 0.44, 4.2, 6.6, 0, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+
+  var nT = 5, tw = (w * 0.88) / nT;
+  for (var i = 0; i < nT; i++) {
+    var tx = cx - w * 0.44 + tw * (i + 0.5);
+    ctx.beginPath();
+    ctx.moveTo(tx - tw * 0.36, y + h);
+    ctx.lineTo(tx, y + h - 10);
+    ctx.lineTo(tx + tw * 0.36, y + h);
+    ctx.closePath();
+    ctx.fillStyle = hFill; ctx.fill();
+    ctx.strokeStyle = hEdge; ctx.lineWidth = 1.3; ctx.lineJoin = 'round'; ctx.stroke();
+  }
+
+  ctx.save();
+  ctx.globalAlpha = k;
+  var lg = ctx.createLinearGradient(0, y + h - 18, 0, y + h + 16);
+  lg.addColorStop(0, 'rgba(255,138,74,0)');
+  lg.addColorStop(1, 'rgba(255,90,40,' + (0.45 + 0.3 * pulse).toFixed(3) + ')');
+  ctx.fillStyle = lg;
+  ctx.beginPath(); ctx.ellipse(cx, y + h + 7, w * 1.0, 17, 0, 0, 7); ctx.fill();
+  ctx.restore();
+
+  if (locked) {
+    ctx.save(); ctx.globalAlpha = 0.26; ctx.fillStyle = '#120303';
+    ctx.beginPath(); ctx.moveTo(x, y + h); ctx.lineTo(x, y + r);
+    ctx.arc(cx, y + r, r, Math.PI, 0); ctx.lineTo(x + w, y + h); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,110,70,0.95)'; ctx.shadowBlur = 16;
+    lockIcon(cx, cy + 7, 1.75, '#ef8663');
+    ctx.restore();
+  }
+}
+
+/* 普通门：拱形门洞 */
+function doorShape(cx, cy, w, h, color, opt) {
+  opt = opt || {};
+  if (opt.demon) { hellDoor(cx, cy, w, h, color, opt); return; }
+  var x = cx - w / 2, y = cy - h / 2, r = w / 2;
+  ctx.save(); ctx.globalAlpha = opt.locked ? 0.07 : 0.20;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.ellipse(cx, cy + 4, w * 1.15, h * 0.82, 0, 0, 7); ctx.fill(); ctx.restore();
+
+  ctx.beginPath();
+  ctx.moveTo(x - 5, y + h + 5); ctx.lineTo(x - 5, y + r);
+  ctx.arc(cx, y + r, r + 5, Math.PI, 0); ctx.lineTo(x + w + 5, y + h + 5); ctx.closePath();
+  ctx.fillStyle = '#170607'; ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(x, y + h); ctx.lineTo(x, y + r);
+  ctx.arc(cx, y + r, r, Math.PI, 0); ctx.lineTo(x + w, y + h); ctx.closePath();
+  var g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, opt.locked ? mix(color, '#1a0707', 0.48) : color);
+  g.addColorStop(1, opt.locked ? mix(color, '#1a0707', 0.66) : color + '99');
+  ctx.fillStyle = g; ctx.fill();
+
+  if (!opt.locked) {
+    ctx.save(); ctx.globalAlpha = 0.5; ctx.strokeStyle = color; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx, y + r + 8); ctx.lineTo(cx, y + h - 6); ctx.stroke(); ctx.restore();
+  }
+  if (opt.locked) {
+    ctx.fillStyle = 'rgba(10,3,5,0.42)';
+    ctx.beginPath(); ctx.moveTo(x, y + h); ctx.lineTo(x, y + r);
+    ctx.arc(cx, y + r, r, Math.PI, 0); ctx.lineTo(x + w, y + h); ctx.closePath(); ctx.fill();
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,180,140,0.55)'; ctx.shadowBlur = 10;
+    lockIcon(cx, cy + 6, 1.5, PAL.faint);
+    ctx.restore();
+  }
+  if (opt.done) {
+    ctx.fillStyle = PAL.player;
+    ctx.beginPath(); ctx.arc(cx + w * 0.62, cy - h * 0.40, 13, 0, 7); ctx.fill();
+    ctx.strokeStyle = PAL.ink; ctx.lineWidth = 3.2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx + w * 0.62 - 6, cy - h * 0.40);
+    ctx.lineTo(cx + w * 0.62 - 2, cy - h * 0.40 + 5);
+    ctx.lineTo(cx + w * 0.62 + 6, cy - h * 0.40 - 5);
+    ctx.stroke();
+  }
+}
+
+/* 光标指示：选中元素上方一个上下浮动的小三角 */
+function cursorMark(x, y) {
+  var bob = Math.sin(performance.now() / 220) * 4;
+  ctx.fillStyle = PAL.player;
+  ctx.beginPath();
+  ctx.moveTo(x - 11, y + bob); ctx.lineTo(x + 11, y + bob); ctx.lineTo(x, y + 18 + bob);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = PAL.ink; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.stroke();
+}
+
+/* ---------------- 第一级：选大关 ---------------- */
+function drawWorldSelect() {
+  var g = ctx.createLinearGradient(0, 0, 0, VH);
+  g.addColorStop(0, '#24060c'); g.addColorStop(1, '#140305');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+  ctx.fillStyle = '#1a0810'; ctx.globalAlpha = 0.6;
+  roundRect(-40, 452, 420, 140, 18); ctx.fill();
+  roundRect(560, 486, 480, 120, 18); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  menuHeader(null, false);
+  drawMenuHelp('← →  选路      空格 / 点击  进入      R 返回');
+
+  // 曲折路径
+  var pts = DOOR_POS.map(function (d) { return { x: d.x, y: d.y + 34 }; });
+  ctx.strokeStyle = '#4a3428'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.setLineDash([2, 16]);
+  ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  for (var i = 1; i < pts.length; i++) {
+    var a = pts[i - 1], b = pts[i];
+    var mx = (a.x + b.x) / 2 + (i === 2 ? -40 : 30);
+    var my = (a.y + b.y) / 2 + (i === 2 ? 110 : (i === 1 ? 92 : -40));
+    ctx.quadraticCurveTo(mx, my, b.x, b.y);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+
+  for (var d2 = 0; d2 < 4; d2++) {
+    var W = WORLDS[d2], p = DOOR_POS[d2];
+    var unlocked = worldUnlocked(d2);
+    var opt = { locked: !unlocked, demon: !!W.demon, done: worldCleared(d2) };
+    doorShape(p.x, p.y, 62, 78, W.color, opt);
+    text(W.name, p.x, p.y + 74, 15, unlocked ? PAL.text : PAL.dim, 'center', true);
+  }
+  cursorMark(DOOR_POS[game.cursorW].x, DOOR_POS[game.cursorW].y - 62);
+
+  if (game.tauntT > 0) {
+    ctx.save(); ctx.globalAlpha = Math.min(1, game.tauntT / 0.4);
+    text(game.flash, VW / 2, 132, 22, PAL.player, 'center', true);
+    ctx.restore();
+  }
+}
+
+/* ---------------- 第二级：选小关 ---------------- */
+
+/* ---- 第四大关：地狱门二级目录 ---- */
+function drawHellGate(cx, cy, w, h, active) {
+  // 拱门
+  ctx.fillStyle = '#1c0705';
+  roundRect(cx - w / 2, cy, w, h, 10); ctx.fill();
+  ctx.strokeStyle = active ? '#a03322' : '#4a1a14'; ctx.lineWidth = 3; ctx.stroke();
+  // 拱形门洞
+  ctx.fillStyle = active ? '#3e0c07' : '#24100d';
+  ctx.beginPath();
+  ctx.moveTo(cx - w / 2 + 12, cy + h);
+  ctx.lineTo(cx - w / 2 + 12, cy + 14);
+  ctx.arc(cx, cy + 14, w / 2 - 12, Math.PI, 0);
+  ctx.lineTo(cx + w / 2 - 12, cy + h);
+  ctx.closePath(); ctx.fill();
+  // 门里透出的光 / 黑暗
+  if (active) {
+    var gg = ctx.createLinearGradient(0, cy, 0, cy + h);
+    gg.addColorStop(0, '#8c2418'); gg.addColorStop(1, '#160404');
+    ctx.fillStyle = gg;
+  } else {
+    ctx.fillStyle = '#0a0303';
+  }
+  ctx.beginPath();
+  ctx.moveTo(cx - w / 2 + 18, cy + h);
+  ctx.lineTo(cx - w / 2 + 18, cy + 14);
+  ctx.arc(cx, cy + 14, w / 2 - 18, Math.PI, 0);
+  ctx.lineTo(cx + w / 2 - 18, cy + h);
+  ctx.closePath(); ctx.fill();
+  // 门楣尖刺
+  ctx.fillStyle = active ? '#a03322' : '#3a120e';
+  for (var hk = 0; hk < 5; hk++) {
+    var hx = cx - w / 2 + 10 + hk * (w - 20) / 4;
+    ctx.beginPath();
+    ctx.moveTo(hx - 9, cy); ctx.lineTo(hx, cy - 18); ctx.lineTo(hx + 9, cy);
+    ctx.closePath(); ctx.fill();
+  }
+  // 门内一只眼睛（看鼠标）
+  watchingEye(cx, cy + h * 0.46, active ? 12 : 10);
+}
+
+function drawDemonSelect(W) {
+  menuHeader(W, true);
+  drawMenuHelp('← →  选择      空格 / 点击  进入      R 返回');
+
+  // 表魔王地狱门（上方，缩小）
+  var upY = 120;
+  var inner = save.demonInner;
+  drawHellGate(VW / 2, upY, 96, 68, true);
+
+  // 向下的线：未解锁=红线渐淡，解锁=黑线
+  var ly = upY + 100, ly2 = upY + 200;
+  var lg = ctx.createLinearGradient(0, ly, 0, ly2);
+  if (inner) {
+    lg.addColorStop(0, '#0a0305'); lg.addColorStop(1, 'rgba(10,3,5,0)');
+  } else {
+    lg.addColorStop(0, '#cc3322'); lg.addColorStop(1, 'rgba(204,51,34,0)');
+  }
+  ctx.strokeStyle = lg; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  ctx.setLineDash([1, 0]);
+  ctx.beginPath(); ctx.moveTo(VW / 2, ly); ctx.lineTo(VW / 2, ly2); ctx.stroke();
+
+  var dnY = ly2;
+
+  // 里魔王已取消：下方只保留装饰眼睛
+  watchingEye(VW / 2, dnY + 120, 30);
+
+  // 光标只停在表魔王那扇门
+  cursorMark(VW / 2, upY - 26);
+}
+
+
+function drawLevelSelect() {
+  var W = WORLDS[game.levelsWorld];
+  applyWorldPalette(game.levelsWorld);   // 界面里的平台色也跟着这个主题
+  var g = ctx.createLinearGradient(0, 0, 0, VH);
+  g.addColorStop(0, W.bg); g.addColorStop(1, W.bgDeep);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+
+  // 第四大关：完全独立的界面（不画底部配图，避免多出一只眼睛）
+  if (game.levelsWorld === 3) { drawDemonSelect(W); return; }
+
+  menuHeader(W, true);
+  drawMenuHelp('← →  选关      空格 / 点击  进入      R 返回');
+
+  // 底部配图：每个大关讲自己那关的故事
+  if (game.levelsWorld === 0) decorGround(W);
+  else if (game.levelsWorld === 1) decorIllusion(W);
+  else decorMachine(W);
+
+  // 关卡之间的虚线小路
+  ctx.strokeStyle = W.terrEdge; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.setLineDash([2, 13]);
+  for (var i = 0; i < LEVEL_POS.length - 1; i++) {
+    var a = LEVEL_POS[i], b = LEVEL_POS[i + 1];
+    ctx.beginPath(); ctx.moveTo(a.x, a.y);
+    ctx.quadraticCurveTo((a.x + b.x) / 2, (a.y + b.y) / 2 + (i % 2 ? 42 : -42), b.x, b.y);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  for (var k = 0; k < LEVELS_PER_WORLD; k++) {
+    var n = LEVEL_POS[k];
+    var cleared = isCleared(game.levelsWorld, k);
+    var open = levelUnlocked(game.levelsWorld, k);
+    var keyIdx = (game.levelsWorld < 3) ? KEY_LEVEL[game.levelsWorld] : -1;
+    var isKey = (k === keyIdx);              // 每个大关只有一个小关藏钥匙
+
+    if (cleared) {
+      ctx.fillStyle = PAL.ground; ctx.beginPath(); ctx.arc(n.x, n.y, 26, 0, 7); ctx.fill();
+      ctx.strokeStyle = PAL.groundTop; ctx.lineWidth = 3; ctx.stroke();
+      ctx.strokeStyle = PAL.player; ctx.lineWidth = 3.6; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(n.x - 9, n.y + 1); ctx.lineTo(n.x - 3, n.y + 8); ctx.lineTo(n.x + 10, n.y - 7);
+      ctx.stroke();
+    } else if (open) {
+      var pu = 0.5 + 0.5 * Math.sin(performance.now() / 260);
+      ctx.globalAlpha = 0.20 + 0.28 * pu; ctx.fillStyle = W.color;
+      ctx.beginPath(); ctx.arc(n.x, n.y, 39, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+      ctx.fillStyle = W.color; ctx.beginPath(); ctx.arc(n.x, n.y, 26, 0, 7); ctx.fill();
+      ctx.fillStyle = PAL.ink;
+      ctx.beginPath();
+      ctx.moveTo(n.x - 8, n.y - 13); ctx.lineTo(n.x - 8, n.y + 13); ctx.lineTo(n.x + 14, n.y);
+      ctx.closePath(); ctx.fill();
+    } else {
+      ctx.fillStyle = PAL.locked; ctx.beginPath(); ctx.arc(n.x, n.y, 26, 0, 7); ctx.fill();
+      ctx.strokeStyle = PAL.lockedEdge; ctx.lineWidth = 3; ctx.stroke();
+      lockIcon(n.x, n.y, 0.85, PAL.faint);
+    }
+
+    // 钥匙标志：只有拿到手的那一关才显示，否则和普通关长得一模一样
+    if (isKey && save.keys[game.levelsWorld]) keyIcon(n.x + 28, n.y - 28, 0.95, PAL.player, true);
+
+    text(String(k + 1), n.x, n.y + 44, 14, open ? PAL.text : PAL.faint, 'center', true);
+  }
+  cursorMark(LEVEL_POS[game.cursorL].x, LEVEL_POS[game.cursorL].y - 52);
+
+  if (game.tauntT > 0) {
+    ctx.save(); ctx.globalAlpha = Math.min(1, game.tauntT / 0.4);
+    text(game.flash, VW / 2, 128, 22, PAL.player, 'center', true);
+    ctx.restore();
+  }
+}
+
+function drawMenuHelp(str) {
+  ctx.fillStyle = '#160409'; ctx.fillRect(0, VH - 60, VW, 60);
+  ctx.strokeStyle = PAL.lockedEdge; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(40, VH - 60); ctx.lineTo(VW - 40, VH - 60); ctx.stroke();
+  text(str, VW / 2, VH - 30, 14, PAL.dim, 'center');
+}
+
+/* ---------------- 第二级底部配图 ---------------- */
+function gearShape(cx, cy, r, teeth, body, hole) {
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.fillStyle = body; ctx.beginPath();
+  var step = Math.PI * 2 / teeth;
+  for (var i = 0; i < teeth; i++) {
+    var a = i * step - Math.PI / 2, w = step * 0.30;
+    ctx.lineTo(Math.cos(a - w) * r * 0.78, Math.sin(a - w) * r * 0.78);
+    ctx.lineTo(Math.cos(a - w * 0.60) * r, Math.sin(a - w * 0.60) * r);
+    ctx.lineTo(Math.cos(a + w * 0.60) * r, Math.sin(a + w * 0.60) * r);
+    ctx.lineTo(Math.cos(a + w) * r * 0.78, Math.sin(a + w) * r * 0.78);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = hole;
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.34, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function sawShape(cx, cy, r, body, hole) {
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.fillStyle = body; ctx.beginPath();
+  var N = 9, step = Math.PI * 2 / N;
+  for (var i = 0; i < N; i++) {
+    var a = i * step - Math.PI / 2;
+    ctx.lineTo(Math.cos(a) * r * 0.58, Math.sin(a) * r * 0.58);
+    ctx.lineTo(Math.cos(a + step * 0.60) * r * 1.02, Math.sin(a + step * 0.60) * r * 1.02);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = hole;
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.17, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function menuArrow(x, y, ang, color, s) {
+  s = s || 1;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.scale(s, s);
+  ctx.fillStyle = color; ctx.beginPath();
+  ctx.moveTo(-15, -6); ctx.lineTo(5, -6); ctx.lineTo(5, -13);
+  ctx.lineTo(21, 0); ctx.lineTo(5, 13); ctx.lineTo(5, 6); ctx.lineTo(-15, 6);
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function dashedSpike(x, y, w, h, color) {
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = 2.2; ctx.setLineDash([5, 4]); ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x, y); ctx.lineTo(x + w / 2, y - h); ctx.lineTo(x + w, y);
+  ctx.closePath(); ctx.stroke();
+  ctx.setLineDash([]); ctx.restore();
+}
+function pistonColumn(x, top, w, body, head) {
+  ctx.fillStyle = body; ctx.fillRect(x, top, w, 470 - top);
+  ctx.fillStyle = head; ctx.fillRect(x, top, w, 5);
+}
+/* 一只盯着鼠标看的眼睛 */
+function watchingEye(cx, cy, r) {
+  var mx = game.mouse ? game.mouse.x : VW * 0.24;
+  var my = game.mouse ? game.mouse.y : VH * 0.26;
+  var dx = mx - cx, dy = my - cy, d = Math.hypot(dx, dy) || 1;
+  var off = Math.min(r * 0.30, d * 0.09);
+  var ix = cx + dx / d * off, iy = cy + dy / d * off;
+  var irisR = r * 0.46;
+
+  ctx.fillStyle = '#e6d2c4';
+  ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.64, 0, 0, 7); ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.64, 0, 0, 7); ctx.clip();
+  ctx.strokeStyle = 'rgba(170,50,38,0.42)'; ctx.lineWidth = 1.3; ctx.lineCap = 'round';
+  [[-0.86, -0.30, -0.30, -0.10], [-0.72, 0.34, -0.20, 0.16],
+   [0.55, -0.42, 0.92, -0.18], [0.30, 0.40, 0.80, 0.22]].forEach(function (s) {
+    ctx.beginPath();
+    ctx.moveTo(cx + s[0] * r, cy + s[1] * r * 0.64);
+    ctx.quadraticCurveTo(cx + (s[0] + s[2]) / 2 * r, cy + (s[1] + s[3]) / 2 * r * 0.64,
+                         cx + s[2] * r, cy + s[3] * r * 0.64);
+    ctx.stroke();
+  });
+  ctx.restore();
+  ctx.fillStyle = '#8a2418';
+  ctx.beginPath(); ctx.arc(ix, iy, irisR, 0, 7); ctx.fill();
+  ctx.fillStyle = '#0a0305';
+  ctx.beginPath(); ctx.arc(ix, iy, irisR * 0.44, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.82)';
+  ctx.beginPath(); ctx.arc(ix - irisR * 0.34, iy - irisR * 0.38, irisR * 0.20, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#5a1810'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.64, 0, 0, 7); ctx.stroke();
+}
+
+function decorGround(w) {
+  ctx.fillStyle = w.terr;
+  roundRect(60, 398, 300, 66, 12); ctx.fill();
+  roundRect(400, 416, 240, 48, 12); ctx.fill();
+  roundRect(680, 388, 250, 76, 12); ctx.fill();
+  ctx.fillStyle = w.terrTop;
+  roundRect(60, 398, 300, 8, 4); ctx.fill();
+  roundRect(400, 416, 240, 8, 4); ctx.fill();
+  roundRect(680, 388, 250, 8, 4); ctx.fill();
+  [[214, 398], [242, 398], [524, 416], [740, 388], [766, 388], [792, 388]]
+    .forEach(function (s) { menuSpike(s[0], s[1], 24, 19, w.terrEdge); });
+}
+function decorIllusion(w) {
+  ctx.fillStyle = w.terr;
+  roundRect(60, 412, 300, 52, 12); ctx.fill();
+  roundRect(420, 396, 230, 68, 12); ctx.fill();
+  roundRect(720, 424, 210, 40, 12); ctx.fill();
+  ctx.fillStyle = w.terrTop;
+  roundRect(60, 412, 300, 8, 4); ctx.fill();
+  roundRect(420, 396, 230, 8, 4); ctx.fill();
+  roundRect(720, 424, 210, 8, 4); ctx.fill();
+  [196, 232, 268, 452, 500].forEach(function (x) { dashedSpike(x, 412, 30, 27, '#c9906f'); });
+  menuArrow(352, 434, Math.PI, '#c07a5a', 0.9);
+  menuArrow(700, 434, Math.PI, '#c07a5a', 0.9);
+  menuArrow(600, 372, -Math.PI / 2, '#c07a5a', 0.9);
+}
+function decorMachine(w) {
+  ctx.fillStyle = w.terr;
+  roundRect(60, 424, 240, 40, 12); ctx.fill();
+  roundRect(700, 412, 230, 52, 12); ctx.fill();
+  ctx.fillStyle = w.terrTop;
+  roundRect(60, 424, 240, 8, 4); ctx.fill();
+  roundRect(700, 412, 230, 8, 4); ctx.fill();
+  gearShape(430, 434, 30, 9, w.terr, w.bgDeep);
+  gearShape(506, 422, 20, 8, w.terrEdge, w.bgDeep);
+  sawShape(608, 438, 24, w.terrEdge, w.bgDeep);
+  pistonColumn(318, 404, 16, w.terr, w.terrTop);
+  pistonColumn(352, 426, 16, w.terr, w.terrTop);
+  pistonColumn(386, 392, 16, w.terr, w.terrTop);
+}
+function decorDemon(w) {
+  ctx.fillStyle = w.terr;
+  roundRect(60, 418, 290, 46, 12); ctx.fill();
+  roundRect(690, 408, 240, 56, 12); ctx.fill();
+  ctx.fillStyle = w.terrTop;
+  roundRect(60, 418, 290, 8, 4); ctx.fill();
+  roundRect(690, 408, 240, 8, 4); ctx.fill();
+  var sc = '#a03322';
+  [[146, 418], [174, 418], [202, 418]].forEach(function (s) { menuSpike(s[0], s[1], 26, 22, sc); });
+  [[742, 408], [770, 408], [798, 408], [826, 408]].forEach(function (s) { menuSpike(s[0], s[1], 26, 22, sc); });
+  watchingEye(508, 428, 30);
+}
+
+/* 过关时：门一边收窄，一边用「背景色」从两侧把人的像素擦掉。
+   只裁剪在人的包围盒里画，所以只有人会被擦掉，场景不受影响 ——
+   效果就是"人被背景吃进去了"，不是把人压扁。 */
+function drawWinCover() {
+  var d = game.winDoor, p = game.p;
+  if (!d || d.k >= 1) return;
+  var g = LEVELS[game.li].goal;
+  var halfFull = (g.w + 9) / 2;                 // 门全开时的半宽（含门框）
+  var k = Math.max(0, d.k);                     // 门完全收掉后 k=0
+  var halfNow = halfFull * k;                   // 现在洞口的半宽
+  var cover = halfFull - halfNow;               // 两侧各被吃掉多少（k=0 时正好盖满）
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(p.x - 4, p.y - 4, p.w + 8, p.h + 8);   // 只在人身上动刀
+  ctx.clip();
+  ctx.fillStyle = PAL.bgDeep;                     // 用背景色把人的像素擦掉
+  ctx.fillRect(d.cx - halfFull, g.y - 8, cover, g.h + 16);
+  ctx.fillRect(d.cx + halfNow, g.y - 8, cover, g.h + 16);
+  ctx.restore();
+}
+
+/* ============================================================
+   过场动画：两扇红门从两侧合上 → 停顿 → 打开
+   进关卡和出关卡都放一次，节奏统一。
+   ============================================================ */
+var TRANS = { on: false, t: 0, mid: null, midDone: false };
+var TRANS_CLOSE = 0.30, TRANS_HOLD = 0.26, TRANS_OPEN = 0.30;
+
+function startTransition(midCb) {
+  TRANS.on = true; TRANS.t = 0;
+  TRANS.mid = midCb || null; TRANS.midDone = false;
+}
+function updateTransition(dt) {
+  TRANS.t += dt;
+  // 门合上的那一刻执行回调（换场景），这样开门时露出的已经是新画面
+  if (!TRANS.midDone && TRANS.t >= TRANS_CLOSE) {
+    TRANS.midDone = true;
+    if (TRANS.mid) TRANS.mid();
+  }
+  if (TRANS.t >= TRANS_CLOSE + TRANS_HOLD + TRANS_OPEN) {
+    TRANS.on = false; TRANS.mid = null;
+  }
+}
+/* 门的开合进度：0 = 完全打开，1 = 完全合上 */
+function transK() {
+  var t = TRANS.t;
+  if (t < TRANS_CLOSE) {
+    var a = t / TRANS_CLOSE; return a * a * (3 - 2 * a);
+  }
+  if (t < TRANS_CLOSE + TRANS_HOLD) return 1;
+  var b = (t - TRANS_CLOSE - TRANS_HOLD) / TRANS_OPEN;
+  b = Math.min(1, b); b = b * b * (3 - 2 * b);
+  return 1 - b;
+}
+
+/* 关门那条边的锯齿轮廓：整局只生成一次，左右两扇共用同一条缝线。
+   共用是关键 —— 合上时严丝合缝，不会"各画各的对不上"。
+   形状是折线（尖刺）而不是台阶：相邻点一凸一凹，每个齿都是尖的。
+   参考 Level Devil 平台下沿那种齿：**小而密**，一屏几十个。 */
+var JAG = null;
+function jagProfile() {
+  if (JAG) return JAG;
+  JAG = [];
+  var seed = 20261016;
+  function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+  var y = -30, sign = 1;                     // 从屏幕外开始，上下各多留一截
+  while (y < VH + 30) {
+    var d = sign * (5 + rnd() * 8);          // 尖刺幅度 5~13（小）
+    JAG.push({ y: y, d: d });
+    sign = -sign;                            // 一凸一凹交替 → 每个齿都是尖的
+    y += 7 + rnd() * 9;                      // 段高 7~16（密，一屏约 45 个齿）
+  }
+  JAG.push({ y: VH + 30, d: 0 });
+  return JAG;
+}
+
+/* 一扇红门板：外侧贴屏幕边，内侧（关门那一边）走尖刺锯齿。
+   k 是合门进度，用来在完全合上后把缝上的高光淡掉。 */
+function redDoorPanel(half, fromLeft, k) {
+  if (half <= 0.5) return;
+  var J = jagProfile();
+  var seam = fromLeft ? half : (VW - half);      // 这一扇的缝线基准位置
+  var bx0 = fromLeft ? 0 : VW - half, bx1 = fromLeft ? half : VW;
+  var yTop = J[0].y, yBot = J[J.length - 1].y;
+
+  // 1) 门板形状：内侧是折线尖刺
+  ctx.beginPath();
+  ctx.moveTo(fromLeft ? 0 : VW, yTop);
+  for (var i = 0; i < J.length; i++) ctx.lineTo(seam + J[i].d, J[i].y);
+  ctx.lineTo(fromLeft ? 0 : VW, yBot);
+  ctx.closePath();
+
+  // 2) 在门板形状里铺质感
+  ctx.save();
+  ctx.clip();
+  var g = ctx.createLinearGradient(bx0, 0, bx1, 0);
+  if (fromLeft) { g.addColorStop(0, '#4e0c07'); g.addColorStop(0.72, '#96201a'); g.addColorStop(1, '#b32a20'); }
+  else          { g.addColorStop(0, '#b32a20'); g.addColorStop(0.28, '#96201a'); g.addColorStop(1, '#4e0c07'); }
+  ctx.fillStyle = g;
+  ctx.fillRect(bx0 - 70, 0, (bx1 - bx0) + 140, VH);
+
+  // 竖向木纹
+  ctx.strokeStyle = 'rgba(0,0,0,0.20)'; ctx.lineWidth = 3;
+  for (var m = 1; m * 52 < half + 70; m++) {
+    var lx = fromLeft ? m * 52 : VW - m * 52;
+    ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, VH); ctx.stroke();
+  }
+  // 横向压条
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  [VH * 0.20, VH * 0.80].forEach(function (yy) { ctx.fillRect(bx0 - 70, yy - 4, (bx1 - bx0) + 140, 8); });
+  ctx.restore();
+
+  // 3) 沿尖刺描一条亮边。完全合上后就不要这条线了（合上了不该还亮着一条缝）
+  var fade = Math.max(0, 1 - Math.max(0, (k - 0.72) / 0.28));
+  if (fade > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = fade;
+    ctx.beginPath();
+    for (var n = 0; n < J.length; n++) {
+      var xx = seam + J[n].d;
+      if (n === 0) ctx.moveTo(xx, J[n].y); else ctx.lineTo(xx, J[n].y);
+    }
+    ctx.strokeStyle = '#ff6b48'; ctx.lineWidth = 3; ctx.lineJoin = 'miter'; ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawTransition() {
+  if (!TRANS.on) return;
+  var k = transK();
+  var half = (VW / 2) * k;
+  if (half <= 0.5) return;
+  redDoorPanel(half, true, k);
+  redDoorPanel(half, false, k);
+}
+
+function render() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, VW, VH);
+
+  drawScene();
+  drawSettings(game.dtLast || 1 / 60);   // 设置齿轮 + 弹窗（所有界面统一画在最上层）
+  if (typeof location !== 'undefined' && location.search.indexOf('dbg=1') >= 0) {
+    var _b = game._achBtn, _p = game._dbgPt;
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    ctx.fillRect(VW / 2 - 230, VH / 2 - 78, 460, 200);
+    ctx.font = '700 26px monospace'; ctx.fillStyle = '#00ff88';
+    ctx.fillText('点: ' + (_p ? _p.x + ',' + _p.y : '未点击'), VW / 2, VH / 2 - 46);
+    if (_b) {
+      ctx.fillStyle = '#ffd23f';
+      ctx.fillText('星: x ' + _b.x + '~' + (_b.x + _b.w), VW / 2, VH / 2 - 10);
+      ctx.fillText('    y ' + _b.y + '~' + (_b.y + _b.h), VW / 2, VH / 2 + 24);
+      var _hit = _p && _p.x > _b.x && _p.x < _b.x + _b.w && _p.y > _b.y && _p.y < _b.y + _b.h;
+      ctx.font = '700 46px monospace';
+      ctx.fillStyle = _hit ? '#00ff88' : '#ff5555';
+      ctx.fillText(_hit ? 'HIT' : 'MISS', VW / 2, VH / 2 + 60);
+      ctx.font = '700 16px monospace'; ctx.fillStyle = '#ffffff';
+      ctx.fillText('state=' + game.state + ' achOpen=' + game.achOpen + ' achT=' + (game.achT || 0).toFixed(2), VW / 2, VH / 2 + 96);
+    }
+    ctx.restore();
+  }
+  if (TRANS.on) drawTransition();     // 过场门永远盖在最上面
+}
+
+function drawScene() {
+  if (game.state === 'title') { drawTitle(); return; }
+  if (game.state === 'complete') { drawComplete(); return; }
+  if (game.state === 'world') { drawWorldSelect(); return; }
+  if (game.state === 'levels') { drawLevelSelect(); return; }
+
+  var sx = 0, sy = 0;
+  if (game.shake > 0) {
+    sx = (Math.random() - 0.5) * game.shake;
+    sy = (Math.random() - 0.5) * game.shake;
+  }
+  drawBackground();
+  ctx.save();
+  ctx.translate(-Math.round(game.cam) + sx, sy);
+  drawPlatforms();
+  drawArrows();
+  drawSpikes();
+  drawSaws();
+  drawCoins();
+  drawButtonWall();
+  drawKeys();
+  drawBalls();
+  drawGoal();
+  drawPlayer();
+  if (game.state === 'win') drawWinCover();
+  drawParticles();
+  ctx.restore();
+  drawHUD();
+}
+
+/* ---------------- 主循环 ---------------- */
+var last = 0;
+function loop(ts) {
+  if (!last) last = ts;
+  var dt = Math.min(0.033, (ts - last) / 1000);
+  last = ts;
+  game.dtLast = dt;
+  update(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+
+// 供测试与调试使用
+window.__TRAP__ = {
+  game: game, LEVELS: LEVELS, loadLevel: loadLevel,
+  update: update, render: render, Sound: Sound,
+  key: function (k, v) { keys[k] = v; },
+  keyAction: keyAction,
+  jump: function () { jumpPressed = true; },
+  // 正式版新增：大关数据 / 存档 / 两级界面
+  WORLDS: WORLDS, save: save, CUR: CUR, applyWorldPalette: applyWorldPalette,
+  KEY_LEVEL: KEY_LEVEL, LEVELS_PER_WORLD: LEVELS_PER_WORLD,
+  loadSlot: loadSlot, loadSave: loadSave, writeSave: writeSave, resetSave: resetSave,
+  worldUnlocked: worldUnlocked, levelUnlocked: levelUnlocked, isCleared: isCleared,
+  keyCount: keyCount, giveKey: giveKey, markCleared: markCleared,
+  enterWorld: enterWorld, enterLevel: enterLevel, debugClearCurrent: debugClearCurrent,
+  TRANS: TRANS, startTransition: startTransition, transK: transK,
+  winLevel: winLevel, die: die, loadLevelAt: loadLevel,
+  drawWorldSelect: drawWorldSelect, drawLevelSelect: drawLevelSelect
+};
+
+loadSave();
+loadLevel(0);
+game.state = 'title';
+if (typeof location !== 'undefined' && location.search.indexOf('lv=') >= 0) { var _lv = parseInt(location.search.split('lv=')[1]) || 0; loadLevel(_lv); game.state = 'play'; applyWorldPalette(Math.floor(_lv / 5)); Sound.startBgm(); }
+if (typeof location !== 'undefined' && location.search.indexOf('settings=1') >= 0) { game.settingsOpen = true; game.settingsT = 1; }
+if (typeof location !== 'undefined' && location.search.indexOf('ach=1') >= 0) { game.achOpen = true; game.achT = 1; }
+if (typeof location !== 'undefined' && location.search.indexOf('reset=1') >= 0) { game.settingsOpen = true; game.settingsT = 1; game.resetOpen = true; game.resetT = 1; game.resetCode = '4271'; game.resetInput = '42'; }
+
+/* 调试：?screen=world|levels|demon|play|win  可以直接跳到某个界面看效果
+         ?w=0..3   指定大关（play / win 用）
+         ?p=0.30   win 时把过关动画冻结在指定进度 */
+(function () {
+  if (typeof location === 'undefined' || !location.search) return;
+  var m = location.search.match(/screen=(\w+)/);
+  if (!m) return;
+  var wq = parseInt((location.search.match(/w=(\d)/) || [])[1] || '0', 10);
+  var lvq = (location.search.match(/lv=(\d+)/) || [])[1];
+  if (m[1] === 'world') game.state = 'world';
+  else if (m[1] === 'levels') { game.levelsWorld = wq; game.state = 'levels'; }
+  else if (m[1] === 'demon') { game.levelsWorld = 3; game.state = 'levels'; }
+  else if (m[1] === 'play') {
+    if (lvq !== undefined) { applyWorldPalette(wq); loadLevel(parseInt(lvq, 10)); } else loadSlot(wq, 0);
+    var pq = parseFloat((location.search.match(/p=([\d.]+)/) || [])[1] || '0');
+    for (var q = 0; q < Math.round(pq / (1 / 60)); q++) update(1 / 60);
+  }
+  else if (m[1] === 'win') {                  // 冻结在过关动画的某个进度看效果
+    loadSlot(wq, 0);
+    winLevel();
+    var wp = parseFloat((location.search.match(/p=([\d.]+)/) || [])[1] || '0');
+    for (var i = 0; i < Math.round(wp / (1 / 60)); i++) update(1 / 60);
+  }
+  else if (m[1] === 'die') {                  // 直接把玩家放到锯片上撞死，看死亡表现
+    if (lvq !== undefined) { applyWorldPalette(wq); loadLevel(parseInt(lvq, 10)); } else loadSlot(wq, 0);
+    var sw0 = game.saws[0];
+    if (sw0) { game.p.x = sw0.x - game.p.w / 2; game.p.y = sw0.y - game.p.h / 2; }
+    var dp = parseFloat((location.search.match(/p=([\d.]+)/) || [])[1] || '0.2');
+    for (var d2 = 0; d2 < Math.round(dp / (1 / 60)); d2++) update(1 / 60);
+  }
+  else if (m[1] === 'vanish') {               // 让小人踩上消失板，看往左缩的动画
+    if (lvq !== undefined) { applyWorldPalette(wq); loadLevel(parseInt(lvq, 10)); } else loadSlot(wq, 0);
+    var vp0 = game.plats.filter(function (x) { return x.kind === 'vanish' || x.kind === 'fake'; })[0];
+    if (vp0) { game.p.x = vp0.x + 20; game.p.y = vp0.y - game.p.h - 4; game.p.vy = 0; }
+    var vq = parseFloat((location.search.match(/p=([\d.]+)/) || [])[1] || '0');
+    for (var v2 = 0; v2 < Math.round(vq / (1 / 60)); v2++) update(1 / 60);
+  }
+  else if (m[1] === 'trans') {                // 冻结在过场红门的某个进度
+    loadSlot(wq, 0);
+    startTransition(function () {});
+    var tp = parseFloat((location.search.match(/p=([\d.]+)/) || [])[1] || '0');
+    for (var k = 0; k < Math.round(tp / (1 / 60)); k++) update(1 / 60);
+  }
+})();
+
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
