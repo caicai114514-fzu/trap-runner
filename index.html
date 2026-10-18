@@ -864,6 +864,8 @@ function unlockAchievement(key) {
   if (save.achievements[key]) return false;   // 只播报第一次
   save.achievements[key] = 1;
   writeSave();
+  if (!game.newAch) game.newAch = [];
+  game.newAch.push(key);
   var a = null;
   for (var ai = 0; ai < ACHIEVEMENTS.length; ai++) {
     if (ACHIEVEMENTS[ai].id === key || ACHIEVEMENTS[ai].w === key) a = ACHIEVEMENTS[ai];
@@ -1217,6 +1219,7 @@ function die(kind) {
 
 function winLevel() {
   if (game.state !== 'play') return;
+  game.newAch = [];
   Sound.sfxWin();
   markCleared(CUR.w, CUR.i);       // 记进存档
   // 隐藏成就：走保送路线通关 4-1
@@ -3907,20 +3910,22 @@ function drawComplete() {
   text(game.totalDeaths <= 15 ? '这身手，有点东西。' :
        game.totalDeaths <= 40 ? '坑是踩出来的，路是走出来的。' :
        '……你和这个游戏，都挺倔的。', VW / 2, VH / 2 + 56, 18, PAL.text, 'center');
-  // 成就：全通界面把所有刚解锁的一次列出（逃出生天 + 小蔡的巧思 都要看得到）
+  // 成就：全通界面把本次新解锁的一次列出（每个只出现一次）
   var _achList = [];
-  if (game.flash && (game.flashT || 0) > 0) _achList.push(game.flash);
-  if (game.achQueue) for (var _qi = 0; _qi < game.achQueue.length; _qi++) {
-    if (_achList.indexOf(game.achQueue[_qi]) < 0) _achList.push(game.achQueue[_qi]);   // 去重
+  if (game.newAch) {
+    for (var _ni = 0; _ni < game.newAch.length; _ni++) {
+      var _nk = game.newAch[_ni], _nm = null;
+      for (var _mi = 0; _mi < ACHIEVEMENTS.length; _mi++) {
+        if (ACHIEVEMENTS[_mi].id === _nk || ACHIEVEMENTS[_mi].w === _nk) _nm = ACHIEVEMENTS[_mi].name;
+      }
+      if (_nm) _achList.push('🏆 获得成就：' + _nm);
+    }
   }
   for (var _aj = 0; _aj < _achList.length && _aj < 4; _aj++) {
     ctx.save();
     ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 300 + _aj);
     text(_achList[_aj], VW / 2, VH / 2 - 148 + _aj * 34, 22, PAL.player, 'center', true);
     ctx.restore();
-  }
-  if (game.achQueue && game.achQueue.length && (game.flashT || 0) <= 0) {
-    flashMsg(game.achQueue.shift());
   }
   var a = 0.5 + 0.5 * Math.sin(t * 3);
   ctx.globalAlpha = a;
