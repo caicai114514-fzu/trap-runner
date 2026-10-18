@@ -1945,7 +1945,6 @@ function update(dt) {
         if (correct) {
           game.gBtnLock = true;
           game.gRound++;
-          Sound.sfxCoin();
           // 地板上升一段
           var riser = null;
           for (var rri = 0; rri < game.plats.length; rri++) if (game.plats[rri].riser) riser = game.plats[rri];
