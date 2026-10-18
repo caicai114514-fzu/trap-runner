@@ -102,16 +102,16 @@ var Sound = {
     this.noise(t, 0.3, 0.18);
   },
 
-  sfxBounce: function () {          // 跳板弹起：一声低沉的"噗"，不刺耳
+  sfxBounce: function () {          // 球落地：低沉的"咚"
     if (!this.ac) return;
     var t = this.ac.currentTime, o = this.ac.createOscillator(), g = this.ac.createGain();
     o.type = 'triangle';
-    o.frequency.setValueAtTime(180, t);
-    o.frequency.exponentialRampToValueAtTime(620, t + 0.13);
-    g.gain.setValueAtTime(0.16, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.20);
-    this.noise(t, 0.06, 0.07);
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(560, t + 0.13);
+    g.gain.setValueAtTime(0.52, t);                    // 音量 0.16 → 0.52
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.20);
+    o.connect(g); g.connect(this.sfxGain); o.start(t); o.stop(t + 0.22);
+    this.noise(t, 0.07, 0.24);                         // 撞击噪声也放大
   },
 
   sfxChainsaw: function () {       // 链锯：照参考音频——中低频锯齿，4 次间歇"嗡——嗡——嗡"
