@@ -1147,10 +1147,25 @@ function update(dt) {
   // ===== 3-4 传送动画：人炸成碎片 → 碎片飞到屏幕正中 → 重组成人 =====
   if (game.tp) {
     game.tp.t += dt;
-    if (game.tp.t > 0.55) {
+    var tcx = VW / 2, tcy = VH / 2;
+    // 碎片刻散 0.12s 后，全部被吸向屏幕正中
+    if (game.tp.t > 0.12) {
+      for (var pj = 0; pj < game.particles.length; pj++) {
+        var qp = game.particles[pj];
+        if (!qp.debris || !qp.pulled) continue;
+        qp.vx += (tcx - qp.x) * 26 * dt - qp.vx * 6 * dt;
+        qp.vy += (tcy - qp.y) * 26 * dt - qp.vy * 6 * dt;
+      }
+    }
+    for (var pj2 = 0; pj2 < game.particles.length; pj2++) {
+      if (game.particles[pj2].debris) game.particles[pj2].pulled = true;
+    }
+    // 0.62 秒后重组成人，出现在正中
+    if (game.tp.t > 0.62) {
       p.x = game.tp.tx; p.y = game.tp.ty; p.vx = 0; p.vy = 0;
-      if (!game.tp.done) { game.tp.done = true; Sound.sfxWin && Sound.sfxWin(); }
-      if (game.tp.t > 0.85) game.tp = null;
+      for (var pk = game.particles.length - 1; pk >= 0; pk--) if (game.particles[pk].debris) game.particles.splice(pk, 1);
+      Sound.sfxWin && Sound.sfxWin();
+      game.tp = null;
     }
     return;    // 动画期间玩家完全不能动
   }
@@ -1740,19 +1755,21 @@ function update(dt) {
       game.fakeGoalDead = true;           // 假门失效（碰了没反应）
       game.reversed = true;               // ★ 2-5：世界规则反转
       if (L6.teleportOnButton && !game.tp) {
-        game.tp = { t: 0, fx: p.x, fy: p.y, tx: VW / 2 - p.w / 2, ty: VH / 2 - p.h / 2 };
-        // 炸成一堆碎片
-        for (var tpj = 0; tpj < 18; tpj++) {
-          var ta = Math.random() * Math.PI * 2, tsv = 120 + Math.random() * 200;
+        game.tp = { t: 0, tx: VW / 2 - p.w / 2, ty: VH / 2 - p.h / 2 };
+        // 用和死亡完全一样的尸块粒子
+        var DEBRIS2 = ['#9c7a1e', '#b8901f', '#c9a02b', '#d8b02f', '#e8bb35', '#ffd23f', '#fff0a8'];
+        for (var tpj = 0; tpj < 32; tpj++) {
+          var ta = Math.random() * Math.PI * 2, tsv = 60 + Math.random() * 220;
           game.particles.push({
             x: p.x + p.w / 2, y: p.y + p.h / 2,
-            vx: Math.cos(ta) * tsv, vy: Math.sin(ta) * tsv - 80,
-            life: 0.55 + Math.random() * 0.2, max: 0.7, size: 3 + Math.random() * 4,
-            col: PAL.player
+            vx: Math.cos(ta) * tsv, vy: Math.sin(ta) * tsv - 120,
+            life: 1.6, max: 1.6,
+            c: DEBRIS2[(Math.random() * DEBRIS2.length) | 0],
+            debris: true, pulled: false
           });
         }
-        Sound.sfxDeath && Sound.sfxDeath();
-        game.shake = 10;
+        Sound.sfxDeath();
+        game.shake = 14;
       }
       game.shake = 8;
       Sound.sfxTrap();
