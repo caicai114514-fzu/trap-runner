@@ -1707,6 +1707,14 @@ function update(dt) {
   // 计时长度是按"玩家从触发点走到假门的时间"配的，所以真门几乎在他撞上假门那刻才出现。
   var L6 = LEVELS[game.li];
 
+  // 人走到（已下沉的）球上方 → 球重新开始弹（放在球逻辑之后，确保不会被覆盖）
+  for (var rb = 0; rb < game.balls.length; rb++) {
+    var rball = game.balls[rb];
+    if (rball.asPlatform && rball.sunkDone && Math.abs((p.x + p.w / 2) - rball.x) < rball.r) {
+      if (rball.frozen) { rball.frozen = false; rball.vy = -520; }
+    }
+  }
+
   // ===== 3-4：穿过最后一个球 → 二楼按钮出现 + 那个球变成可站的半圆平台 =====
   if (L6.button && L6.button.revealAfterBall && !game.buttonVisible) {
     var lastBall = null;
