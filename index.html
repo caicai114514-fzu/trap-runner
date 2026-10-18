@@ -736,6 +736,7 @@ function worldUnlocked(w) {
 }
 function levelUnlocked(w, i) {
   if (!worldUnlocked(w)) return false;
+  if (w === 3 && i === 1) return !!save.demonInner;   // 里魔王：走捷径才解锁
   if (i === 0) return true;
   return isCleared(w, i - 1);
 }
