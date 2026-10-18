@@ -1183,7 +1183,7 @@ function update(dt) {
       }
       if (pl.risePhase === 'rising') {
         pl.riseT += dt;
-        pl.riseY = Math.min(1, pl.riseT / 0.3);          // 0.3 秒升起来
+        pl.riseY = Math.min(1, pl.riseT / 0.15);         // 0.15 秒升起来（快得来不及站墙头）
         if (pl.riseY >= 1) { pl.risePhase = 'holding'; pl.riseT = 0; }
       } else if (pl.risePhase === 'holding') {
         pl.riseT += dt;
@@ -1309,8 +1309,7 @@ function update(dt) {
       if (aabb(p, rwb)) {
         if (p.vy > 0 && prevBottom <= rwb.y + 8) { p.y = rwb.y - p.h; p.onGround = true; p.ground = b; p.vy = 0; }
         else if (p.vy < 0) { p.y = rwb.y + rwb.h; p.vy = 0; }
-        else if (p.x + p.w / 2 < rwb.x + rwb.w / 2) { p.x = rwb.x - p.w; }   // 从左边撞 → 推出左边
-        else { p.x = rwb.x + rwb.w; }                                        // 从右边撞 → 推出右边
+        // 侧面撞上不掉血也不瞬移：让它自然被弹开（去掉"传送"）
       }
       continue;
     }
