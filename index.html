@@ -2345,6 +2345,9 @@ function update(dt) {
     }
   }
 
+  // 4-1：玩家走进天花板里的隐藏通道 → 标记（之后碰门直接通关）
+  if (LEVELS[game.li].hiddenPathY && p.y < LEVELS[game.li].hiddenPathY && p.y + p.h > 200) game.fromHiddenPath = true;
+
   // ===== 4-1：走到距金币终点一定位置，左2阶梯下的地板往左收，2秒后伸出 =====
   if (LEVELS[game.li].coins) {
     var lastC = null;
@@ -2600,8 +2603,8 @@ function update(dt) {
   if (canWin) {
     var g = { x: game.goalX, y: g0.y + (game.sinkY || 0), w: g0.w, h: g0.h };
     if (aabb(p, g)) {
-      // 4-1：从隐藏通道顶上掉下来的（下落状态）→ 直接进门，不触发传送陷阱
-      if (p.vy > 80) { winLevel(); return; }
+      // 4-1：走过隐藏通道的人 → 碰到门直接进门，不触发传送陷阱
+      if (game.fromHiddenPath) { winLevel(); return; }
       // 4-1 第三层陷阱：第一次碰到门 → 门炸成粒子飞走，传送到最左边
       if (LEVELS[game.li].goalTeleportOnTouch && !game.goalTpedOnce) {
         game.goalTpedOnce = true;
