@@ -579,6 +579,7 @@ var LEVELS = [
     name: '4-1 · 表魔王', hint: '先铺好地，再放东西。',
     width: 960, spawn: [147, 220],
     goal: { x: 804, y: 200, w: 46, h: 70 },   // 门卡在右边第二级阶梯下，下边缘贴地板(270)
+    hiddenCorridorY: 230,                    // 人在这条高度以上就是走隐藏通道（碰到门直接通关）
     goalTeleportOnTouch: true,               // 第三层陷阱：第一次碰门 → 门自己传送到最左边
     missileAfterGoalTp: true,                // 门传送完，身后飞来一枚导弹追你
     platforms: [
@@ -2345,7 +2346,7 @@ function update(dt) {
   }
 
   // 4-1：玩家走进天花板里的隐藏通道 → 标记（之后碰门直接通关）
-  if (LEVELS[game.li].hiddenPathY && p.y < LEVELS[game.li].hiddenPathY && p.y + p.h > 200) game.fromHiddenPath = true;
+  if (L6.hiddenCorridorY !== undefined && p.y < L6.hiddenCorridorY) game.fromHiddenPath = true;
 
   // ===== 4-1：走到距金币终点一定位置，左2阶梯下的地板往左收，2秒后伸出 =====
   if (LEVELS[game.li].coins) {
