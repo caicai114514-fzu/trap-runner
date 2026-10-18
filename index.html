@@ -536,16 +536,26 @@ var LEVELS = [
     spikes: [], arrows: []
   },
   {
-    name: '3-5 · 绞肉机', hint: '上面扫，后面推。两条命一起算。',
-    width: 960, spawn: [70, 380], jump: 900,
-    goal: { x: 880, y: 400, w: 46, h: 70 },
+    name: '3-5 · 过山车', hint: '这一关，什么都有一点。',
+    width: 960, spawn: [40, 380],
+    goal: { x: 890, y: 300, w: 46, h: 70 },
     platforms: [
-      { x: 0, y: 470, w: 420, h: 70, kind: 'solid' },
-      { x: 540, y: 470, w: 420, h: 70, kind: 'solid' },
-      { x: 200, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 300, moveV: 560, moveTo: 420 }
+      { x: 0,   y: 470, w: 280, h: 70, kind: 'solid' },
+      { x: 380, y: 470, w: 130, h: 70, kind: 'solid' },
+      { x: 600, y: 470, w: 110, h: 70, kind: 'solid' },
+      { x: 790, y: 470, w: 170, h: 70, kind: 'solid' },
+      { x: 380, y: 396, w: 90,  h: 16, kind: 'vanish' },
+      { x: 700, y: 470, w: 70,  h: 18, kind: 'bounce', power: 1520, popTime: 0.10 },
+      { x: 830, y: 370, w: 130, h: 22, kind: 'solid', oneWay: true }
     ],
-    saws: [{ x: 620, y: 442, r: 24, tx: 860, ty: 442, speed: 200 }],
-    spikes: [], arrows: []
+    saws: [
+      { x: 300, y: 442, r: 24, tx: 560, ty: 442, speed: 210 }
+    ],
+    spikes: [
+      { x: 610, y: 444, w: 90,  h: 26 },
+      { x: 800, y: 344, w: 100, h: 26, hidden: true, triggerX: 760 }
+    ],
+    arrows: []
   },
 
   /* ================= 大关四 · 险路尽头（全部叠起来）================= */
