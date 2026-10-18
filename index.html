@@ -599,7 +599,7 @@ var LEVELS = [
     ],
     spikes: [
       // ② 窄通道天花板的刺：走一段距离(atX 300)后出现，追人，速度略快——停下来就被扎
-      { x: 400, y: 100, w: 34, h: 46, dir: 'down', hidden: true, atX: 300, follow: true, followDist: 44, moveSpeed: 5.6 }
+      { x: 400, y: 100, w: 34, h: 46, dir: 'down', hidden: true, atX: 300, follow: true, followDist: 44, moveSpeed: 5.6, holdTime: 1.5 }
     ],
     // ② 距离触发的按钮：离门一定距离就伸出，按了传回出生点
     button: { x: 700, y: 250, w: 40, h: 20, hidden: true, revealDist: 120, tpOnPress: true },
@@ -879,6 +879,8 @@ function loadLevel(i) {
       triggerX: s.triggerX || 0, dir: s.dir || 'up',
       fake: !!s.fake,           // 假刺：长得一模一样，但不致命
       keepSafe: !!s.keepSafe,   // 反转后仍安全（2-5 的第二个刺）
+      holdTime: (s.holdTime === undefined ? 0 : s.holdTime),   // 伸出后持续这么久再收回（0=不收回）
+      holdT: 0, retracted: false
       onPop: !!s.onPop,         // 等跳板把人弹起来之后才长出来
       moveTo: s.moveTo || null, // 触发后瞬移到这里（判定立刻过去，视觉上快速平移）
       atX: (s.atX === undefined ? null : s.atX),     // 横坐标触发
@@ -1560,6 +1562,11 @@ function update(dt) {
       else if (sp.atYlt !== null) reveal = (p.y < sp.atYlt);      // 只有上到高处才露头
       else reveal = (p.x + p.w > sp.triggerX);
       if (reveal) { sp.shown = true; Sound.sfxTrap(); game.shake = 5; }
+      // 4-1：伸出后持续 holdTime 秒，然后整体收进去
+      if (sp.shown && sp.holdTime > 0 && !sp.retracted) {
+        sp.holdT += dt;
+        if (sp.holdT >= sp.holdTime) { sp.retracted = true; sp.shown = false; }
+      }
     }
     if (sp.shown && sp.anim < 1) sp.anim = Math.min(1, sp.anim + dt * 7);
 
