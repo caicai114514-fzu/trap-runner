@@ -1138,10 +1138,14 @@ window.addEventListener('keydown', function (e) {
     return;
   }
   if (game.state === 'levels') {
-    if (a === 'left' || a === 'up')    { game.cursorL = (game.cursorL + 4) % 5; return; }
-    if (a === 'right' || a === 'down') { game.cursorL = (game.cursorL + 1) % 5; return; }
+    var maxSlot = (game.levelsWorld === 3) ? 2 : 5;      // 第四大关只有 2 个入口
+    if (a === 'left' || a === 'up')    { game.cursorL = (game.cursorL + maxSlot - 1) % maxSlot; return; }
+    if (a === 'right' || a === 'down') { game.cursorL = (game.cursorL + 1) % maxSlot; return; }
     if (a === 'restart') { game.state = 'world'; return; }          // R 回第一级
-    if (a === 'jump' || a === 'enter') { enterLevel(game.levelsWorld, game.cursorL); return; }
+    if (a === 'jump' || a === 'enter') {
+      if (game.levelsWorld === 3 && game.cursorL === 1 && !save.demonInner) { Sound.sfxTrap && Sound.sfxTrap(); return; }   // 里魔王没解锁
+      enterLevel(game.levelsWorld, game.cursorL); return;
+    }
     return;
   }
 
