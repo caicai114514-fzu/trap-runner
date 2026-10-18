@@ -460,7 +460,8 @@ var LEVELS = [
     name: '3-3 · 回溯', hint: '门不会等你。',
     width: 960, spawn: [300, 40],                // 4 楼（最上层）
     goal: { x: 120, y: 400, w: 46, h: 70 },      // 门在最底层左边
-    goalMoveVX: 42,                              // ★ 门自己缓缓往右（往刺的方向）走
+    goalMoveVX: 50,                              // ★ 玩家到底层才触发，门缓缓往右（往刺的方向）走
+    goalMoveTriggerY: 400,                       // 玩家 y 超过这个值（下到底层）门才开始移动
     goalStopX: 700,                              // 走到刺前面停住
     // 之字形四层塔：交替开口，一层一层往下掉
     platforms: [
@@ -792,7 +793,7 @@ function loadLevel(i) {
   game.wasOnGround = false;
   game.goalReveal = (L.fakeGoal || L.goalHidden) ? 0 : 1;   // 真门的显现进度
   game.goalX = L.goal.x;                                    // 会走的门：当前 x
-  game.goalDone = false;
+  game.goalDone = false; game.goalMoving = false;
   game.buttonPressed = false;                // 按钮是否按下
   game.wallAngle = 90;                       // 墙初始【竖直】(90°)；按按钮后匀速转起来
   game.wallOn = false;                       // 墙是否开始旋转
@@ -1839,8 +1840,11 @@ function update(dt) {
     }
   }
 
-  // 会走的门：自己缓缓往右移动（3-3）
-  if (LEVELS[game.li].goalMoveVX && !game.goalDone) {
+  // 会走的门（3-3）：玩家下到底层(位置触发)后，门才开始往右走
+  if (LEVELS[game.li].goalMoveVX && !game.goalDone && !game.goalMoving) {
+    if (p.y > (LEVELS[game.li].goalMoveTriggerY || 400)) game.goalMoving = true;
+  }
+  if (LEVELS[game.li].goalMoveVX && game.goalMoving && !game.goalDone) {
     game.goalX += LEVELS[game.li].goalMoveVX * dt;
     if (LEVELS[game.li].goalStopX !== undefined && game.goalX >= LEVELS[game.li].goalStopX) {
       game.goalX = LEVELS[game.li].goalStopX; game.goalDone = true;
