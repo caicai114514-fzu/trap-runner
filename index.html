@@ -2620,6 +2620,8 @@ function drawArrows() {
 /* 火柴人：头 + 一根身体 + 四肢，动作全靠关节摆动
    走路 → 手脚交替摆；跳跃 → 蜷腿举臂；下落 → 张腿摊手；站着 → 轻微呼吸 */
 function drawPlayer() {
+  // 传送动画期间：只画粒子，人一帧都不能露（逐帧动画：首帧=粒子，末帧=人）
+  if (game.tp) return;
   if (game.state === 'dead') return;
   var p = game.p;
   var t = p.anim || 0;
