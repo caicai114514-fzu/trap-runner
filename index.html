@@ -1447,7 +1447,7 @@ canvas.addEventListener('mousedown', function (e) {
 
   // ===== 左下角齿轮：开关设置弹窗（只在菜单界面有效）=====
   // 齿轮在所有界面都能点（包括游戏内）
-  if (pt.x < 64 && pt.y > VH - 64) {
+  if (pt.x < 110 && pt.y > VH - 100) {
     game.settingsOpen = !game.settingsOpen;
     if (game.settingsOpen) game.settingsT = 0;   // 打开才归零，关闭走退场
     return;
@@ -3182,7 +3182,7 @@ function drawGear(cx, cy, r) {
 }
 function drawSettings(dt) {
   // 齿轮只在菜单类界面出现（一级目录 / 二级选关 / 标题 / 通关），关卡里不显示
-  drawGear(34, VH - 34, 20);   // 所有界面都有齿轮
+  drawGear(70, VH - 60, 22);   // 所有界面都有齿轮（内移，避免全屏 cover 裁掉）
 
   if (!game.settingsOpen && (game.settingsT || 0) <= 0) return;
   game.settingsT = Math.min(1, (game.settingsT || 0) + dt * 5);
