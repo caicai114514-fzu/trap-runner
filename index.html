@@ -2431,7 +2431,10 @@ function update(dt) {
     if (co.got || co.gone || co.hidden) continue;   // 隐藏/消失的假金币：看不见、也碰不到
     if (co.chasing) {
       co.x -= MOVE * dt;                                   // 和玩家同速地向左压过来
-      // 追满 150px 就消失（期间撞到玩家照样炸死）
+      // ★ 先判碰撞（撞到了就炸），再判"追满距离消失"——否则会在同一帧先消失
+      if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22 && co.fake) {
+        Sound.sfxBoom(); die(); return;
+      }
       if (co.chaseFrom - co.x > 150) { co.gone = true; co.hidden = true; }
       if (co.gone) continue;
     }
