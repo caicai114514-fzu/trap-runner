@@ -1957,11 +1957,28 @@ function update(dt) {
             game.gRiseTo = Math.max(250, riser.y - GM.riseStep);   // 记下要升到哪
           }
         } else {
-          // 按错：直接死（不同的惊喜死法）
-          game.gWrong = game.gRound;
+          // ===== 按错：不同的惊喜（都是直接死） =====
           game.gBtnLock = true;
-          die();
-          return;
+          game.gWrong = game.gRound;
+          if (game.gRound === 0) {
+            // 惊喜一：地板瞬间没了，人直直掉下去
+            if (ris0) { ris0.noCollide = true; ris0.state = 'gone'; }
+            Sound.sfxTrap(); game.shake = 16;
+            game.gFall = true;
+            return;                    // 不立刻 die，让他掉出屏幕
+          } else if (game.gRound === 1) {
+            // 惊喜二：脚下的地板变成刺，瞬间扎穿
+            if (ris0) { ris0.state = 'gone'; }
+            game.spikes.push({ x: ris0.x, y: ris0.y - 26, w: ris0.w, h: 26, dir: 'up' });
+            Sound.sfxTrap(); game.shake = 18;
+            die();
+            return;
+          } else {
+            // 惊喜三/四：直接死
+            Sound.sfxTrap(); game.shake = 18;
+            die();
+            return;
+          }
         }
         break;
       }
