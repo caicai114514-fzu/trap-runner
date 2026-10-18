@@ -1672,7 +1672,7 @@ function update(dt) {
       var bd = Math.sqrt(bx * bx + by * by) || 1;
       bl.x += bx / bd * bl.speed * dt;
       bl.y += by / bd * bl.speed * dt;
-    } else {
+    } else if (!bl.frozen) {
       bl.vy = Math.min(900, bl.vy + GRAVITY * 0.32 * dt);   // 球的重力更小：掉得慢、弹得高
       bl.y += bl.vy * dt;
       // 落地反弹
@@ -1688,7 +1688,7 @@ function update(dt) {
         if (bl.delay <= 0) bl.homing = true;
       }
     }
-    if (Math.abs((p.x + p.w / 2) - bl.x) < bl.r + 9 && Math.abs((p.y + p.h / 2) - bl.y) < bl.r + 11) {
+    if (!bl.asPlatform && Math.abs((p.x + p.w / 2) - bl.x) < bl.r + 9 && Math.abs((p.y + p.h / 2) - bl.y) < bl.r + 11) {
       die(); return;
     }
   }
@@ -1705,6 +1705,17 @@ function update(dt) {
       game.buttonVisible = true;
       lastBall.asPlatform = true;
       Sound.sfxTrap(); game.shake = 8;
+    }
+  }
+
+  // 按钮按下后：最后一个球脱离控制，自己往下沉到地板以下，变成能站的平台
+  if (game.buttonPressed && L6.balls && L6.balls.length) {
+    var lb3 = null;
+    for (var lb4 = 0; lb4 < game.balls.length; lb4++) if (game.balls[lb4].toPlatform) lb3 = game.balls[lb4];
+    if (lb3) {
+      lb3.asPlatform = true;
+      lb3.frozen = true;                                  // 不再弹跳
+      if (lb3.y < 470 + lb3.r + 8) lb3.y = Math.min(470 + lb3.r + 8, lb3.y + dt * 260);   // 往下沉
     }
   }
 
