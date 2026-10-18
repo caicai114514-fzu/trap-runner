@@ -4614,6 +4614,25 @@ function render() {
 
   drawScene();
   drawSettings(game.dtLast || 1 / 60);   // 设置齿轮 + 弹窗（所有界面统一画在最上层）
+  if (typeof location !== 'undefined' && location.search.indexOf('dbg=1') >= 0) {
+    var _b = game._achBtn, _p = game._dbgPt;
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    ctx.fillRect(VW / 2 - 230, VH / 2 - 78, 460, 168);
+    ctx.font = '700 26px monospace'; ctx.fillStyle = '#00ff88';
+    ctx.fillText('点: ' + (_p ? _p.x + ',' + _p.y : '未点击'), VW / 2, VH / 2 - 46);
+    if (_b) {
+      ctx.fillStyle = '#ffd23f';
+      ctx.fillText('星: x ' + _b.x + '~' + (_b.x + _b.w), VW / 2, VH / 2 - 10);
+      ctx.fillText('    y ' + _b.y + '~' + (_b.y + _b.h), VW / 2, VH / 2 + 24);
+      var _hit = _p && _p.x > _b.x && _p.x < _b.x + _b.w && _p.y > _b.y && _p.y < _b.y + _b.h;
+      ctx.font = '700 46px monospace';
+      ctx.fillStyle = _hit ? '#00ff88' : '#ff5555';
+      ctx.fillText(_hit ? 'HIT' : 'MISS', VW / 2, VH / 2 + 60);
+    }
+    ctx.restore();
+  }
   if (TRANS.on) drawTransition();     // 过场门永远盖在最上面
 }
 
