@@ -3070,7 +3070,7 @@ function drawSettings(dt) {
 
   if (!game.settingsOpen && (game.settingsT || 0) <= 0) return;
   game.settingsT = Math.min(1, (game.settingsT || 0) + dt * 5);
-  if (!game.settingsOpen) game.settingsT = Math.max(0, game.settingsT - dt * 6);   // 和重置弹窗同速退场
+  if (!game.settingsOpen) game.settingsT = Math.max(0, game.settingsT - dt * 12);   // 退场快一些   // 和重置弹窗同速退场
 
   var t = game.settingsT;
   var e = t * t * (3 - 2 * t);
@@ -3176,7 +3176,7 @@ function drawSettings(dt) {
 
   // ===== 重置确认弹窗（盖在设置弹窗上）=====
   if (game.resetOpen) game.resetT = Math.min(1, (game.resetT || 0) + (1 / 60) * 5);
-  else game.resetT = Math.max(0, (game.resetT || 0) - (1 / 60) * 6);
+  else game.resetT = Math.max(0, (game.resetT || 0) - (1 / 60) * 12);   // 和设置弹窗同速
   if ((game.resetT || 0) > 0) {
     var rt = game.resetT, re = rt * rt * (3 - 2 * rt);
     var RW = 420, RH = 230, RX = (VW - RW) / 2, RY = (VH - RH) / 2 + (1 - re) * 280;
