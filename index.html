@@ -927,6 +927,7 @@ function loadLevel(i) {
   game.goalFly = null;     // 3-4 门的粒子传送（美术层）
   game.gotCoins = 0;       // 4-1 金币计数（重开要清零）
   game.floorRetract = false;  // 4-1 左2地板是否在收
+  game.floorDone = false;     // 4-1 地板收伸只发生一次
   game.floorT = 0;
   game.gRound = 0;         // 3-5 博弈：当前第几轮
   game.gBtns = false;      // 3-5 按钮：站到中间地板上才出现
@@ -2249,7 +2250,7 @@ function update(dt) {
     var lastC = null;
     for (var _lc = 0; _lc < game.coins.length; _lc++) if (game.coins[_lc].fake) lastC = game.coins[_lc];
     // 三个条件齐了才收地板：吃完两枚 + 假金币正在追 + 人走到坑口
-    if (lastC && lastC.chasing && game.gotCoins >= 2 && p.x < 200 && p.x > 60 && !game.floorRetract) {
+    if (lastC && lastC.chasing && game.gotCoins >= 2 && p.x < 200 && p.x > 60 && !game.floorRetract && !game.floorDone) {
       game.floorRetract = true; game.floorT = 0; Sound.sfxTrap();
     }
   }
@@ -2258,8 +2259,10 @@ function update(dt) {
     for (var rfi = 0; rfi < game.plats.length; rfi++) if (game.plats[rfi].retractFloor) rf = game.plats[rfi];
     if (rf) {
       game.floorT += dt;
-      if (game.floorT < 0.15) { rf.x = 90 - (game.floorT / 0.15) * 90; }       // 0.15s 快速收进去
-      if (game.floorT >= 0.15) { rf.x = 0; }                                   // 收到底就保持，不再伸回
+      if (game.floorT < 0.15) { rf.x = 90 - (game.floorT / 0.15) * 90; }                    // 0.15s 收进去
+      else if (game.floorT < 2.0) { rf.x = 0; }                                             // 保持收着，等 2 秒
+      else if (game.floorT < 2.3) { rf.x = ((game.floorT - 2.0) / 0.3) * 90; }              // 0.3s 伸回来
+      else { rf.x = 90; game.floorRetract = false; game.floorDone = true; game.floorT = 0; } // 伸回完成，之后不再触发
     }
   }
 
