@@ -3910,7 +3910,9 @@ function drawComplete() {
   // 成就：全通界面把所有刚解锁的一次列出（逃出生天 + 小蔡的巧思 都要看得到）
   var _achList = [];
   if (game.flash && (game.flashT || 0) > 0) _achList.push(game.flash);
-  if (game.achQueue) for (var _qi = 0; _qi < game.achQueue.length; _qi++) _achList.push(game.achQueue[_qi]);
+  if (game.achQueue) for (var _qi = 0; _qi < game.achQueue.length; _qi++) {
+    if (_achList.indexOf(game.achQueue[_qi]) < 0) _achList.push(game.achQueue[_qi]);   // 去重
+  }
   for (var _aj = 0; _aj < _achList.length && _aj < 4; _aj++) {
     ctx.save();
     ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 300 + _aj);
