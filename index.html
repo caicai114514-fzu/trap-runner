@@ -483,20 +483,23 @@ var LEVELS = [
   {
     name: '3-4 · 弹雨', hint: '它们会追人。',
     width: 960, spawn: [70, 380],
-    goal: { x: 880, y: 400, w: 46, h: 70 },
+    noGlow: true,                              // 门不要那层光
+    goal: { x: 910, y: 400, w: 46, h: 70 },    // 门再往右
+    goalHidden: false,
     platforms: [
-      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' }        // 一整块平地板，没坑
+      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid' },      // 平地板
+      { x: 880, y: 250, w: 80, h: 22, kind: 'solid' }        // 门上方二楼平台
     ],
+    // 按钮在二楼平台上，初始不显示：穿过最后一个球后才出现
+    button: { x: 900, y: 230, w: 40, h: 20, hidden: true, revealAfterBall: true },
     balls: [
-      // 四个从天上往下掉
-      { x: 120, bounces: 2, speed: 320, noHoming: true },
-      { x: 300, bounces: 2, speed: 330, noHoming: true },
-      { x: 560, bounces: 2, speed: 345, noHoming: true },
-      { x: 820, bounces: 3, speed: 365, noHoming: true },
-      // 三个从地下往上顶
-      { x: 200, bounces: 2, speed: 350, fromBottom: true, noHoming: true },
-      { x: 460, bounces: 2, speed: 360, fromBottom: true, noHoming: true },
-      { x: 700, bounces: 3, speed: 385, fromBottom: true, noHoming: true }
+      { x: 120, bounces: 2, speed: 230, noHoming: true },
+      { x: 300, bounces: 2, speed: 240, noHoming: true },
+      { x: 560, bounces: 2, speed: 250, noHoming: true },
+      { x: 820, bounces: 3, speed: 260, noHoming: true, toPlatform: true },   // 最后一个球：可变成平台
+      { x: 200, bounces: 2, speed: 245, fromBottom: true, noHoming: true },
+      { x: 460, bounces: 2, speed: 255, fromBottom: true, noHoming: true },
+      { x: 700, bounces: 3, speed: 265, fromBottom: true, noHoming: true }
     ],
     spikes: [], arrows: []
   },
@@ -824,6 +827,8 @@ function loadLevel(i) {
     return {
       x: b.x, y: (b.y === undefined ? -50 : b.y), r: b.r || 18,
       noHoming: !!b.noHoming,               // 永不追踪（只做普通弹跳）
+      toPlatform: !!b.toPlatform,           // 触发后变成可站立的半圆平台
+      asPlatform: false,
       vy: (b.vy !== undefined) ? b.vy : (b.fromBottom ? -700 : 0),   // fromBottom：从下往上飞
       vx: 0, bounce: 0, maxBounce: b.bounces || 3,
       speed: b.speed || 300, homing: false, spin: 0,
@@ -1331,7 +1336,7 @@ function update(dt) {
     }
   }
 
-  // 垂直移动 + 碰撞
+  // 垂直移动 + 碰撞（变平台的球：球顶当半圆平台站）
   var prevBottom = p.y + p.h;               // 移动前的脚底位置
   p.vy = Math.min(MAX_FALL, p.vy + GRAVITY * dt);
   p.y += p.vy * dt;
@@ -1340,6 +1345,7 @@ function update(dt) {
     var b = game.plats[n];
     if (b.state !== 'active' || b.noCollide) continue;       // noCollide = 已经"变成坑"了
     if (b.kind === 'flip' && game.flipT >= 0) continue;      // 翻板过程中站不住
+    // 变成平台的球：球顶当半圆平台站
     if (b.kind === 'riseWall') {
       // 升起的墙：实体碰撞盒随 riseY 变高（从地面往上顶，跳不过去）
       var rwH = b.h * b.riseY;
@@ -1361,6 +1367,17 @@ function update(dt) {
         // 实心平台的底面可以顶头（墙就是靠这个挡住你的）
         p.y = b.y + b.h; p.vy = 0;
       }
+    }
+  }
+
+  // 变平台的球：球顶当半圆平台站（3-4）
+  for (var bp2 = 0; bp2 < game.balls.length; bp2++) {
+    var blp = game.balls[bp2];
+    if (!blp.asPlatform) continue;
+    var capY = blp.y - blp.r;
+    if (p.x + p.w > blp.x - blp.r && p.x < blp.x + blp.r &&
+        p.vy >= 0 && prevBottom <= capY + 10 && p.y + p.h >= capY && p.y + p.h <= capY + 26) {
+      p.y = capY - p.h; p.vy = 0; p.onGround = true; p.ground = null;
     }
   }
 
@@ -1676,6 +1693,17 @@ function update(dt) {
   // 假终点：走到触发点开始计时，真门缓缓显形。
   // 计时长度是按"玩家从触发点走到假门的时间"配的，所以真门几乎在他撞上假门那刻才出现。
   var L6 = LEVELS[game.li];
+
+  // ===== 3-4：穿过最后一个球 → 二楼按钮出现 + 那个球变成可站的半圆平台 =====
+  if (L6.button && L6.button.revealAfterBall && !game.buttonVisible) {
+    var lastBall = null;
+    for (var lb = 0; lb < game.balls.length; lb++) if (game.balls[lb].toPlatform) lastBall = game.balls[lb];
+    if (lastBall && p.x + p.w / 2 > lastBall.x) {
+      game.buttonVisible = true;
+      lastBall.asPlatform = true;
+      Sound.sfxTrap(); game.shake = 8;
+    }
+  }
 
   // ===== 按钮：碰一下触发整条连锁 =====
   if (L6.button && !game.buttonPressed) {
@@ -2278,6 +2306,17 @@ function drawBalls() {
     ctx.save();
     ctx.translate(b.x, b.y);
     ctx.rotate(b.spin);
+    // 变成平台的球：画成半圆平台
+    if (b.asPlatform) {
+      ctx.fillStyle = PAL.ground;
+      ctx.beginPath(); ctx.arc(0, 0, b.r, Math.PI, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = PAL.groundTop;
+      ctx.beginPath(); ctx.arc(0, 0, b.r, Math.PI * 1.05, -0.05); ctx.lineWidth = 4; ctx.strokeStyle = PAL.groundTop; ctx.stroke();
+      ctx.fillStyle = PAL.ink;
+      ctx.beginPath(); ctx.arc(0, 0, b.r * 0.16, 0, 7); ctx.fill();
+      ctx.restore();
+      continue;
+    }
     // 圆的球（追人时变红）
     ctx.fillStyle = b.homing ? '#ff6b48' : '#3a2a22';
     ctx.beginPath(); ctx.arc(0, 0, b.r, 0, 7); ctx.fill();
@@ -2317,12 +2356,14 @@ function drawOneDoor(g, alpha, closeK) {
   var x = g.x + (g.w - w) / 2;
   var y = g.y, h = g.h, r = w / 2;
 
-  // 门口透出来的光
+  // 门口透出来的光（noGlow 的关不画）
+  if (!(LEVELS[game.li] && LEVELS[game.li].noGlow)) {
   ctx.save();
   ctx.globalAlpha = 0.22 * k;
   ctx.fillStyle = PAL.door;
   ctx.beginPath(); ctx.ellipse(x + r, y + h * 0.55, w * 1.35, h * 0.85, 0, 0, 7); ctx.fill();
   ctx.restore();
+  }
 
   ctx.globalAlpha = k;                       // 整个门跟着 alpha 一起淡入
   // 门框（比门洞大一圈）
