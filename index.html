@@ -1379,7 +1379,7 @@ canvas.addEventListener('mousedown', function (e) {
   } else if (game.state === 'dead') {
     if (game.timer > 0.35) { game.deaths = 0; loadSlot(CUR.w, CUR.i); }
   } else {
-    jumpPressed = true;
+    // 游戏内点鼠标：什么也不做（避免点设置齿轮/弹窗按钮时误触发跳跃）
   }
 });
 canvas.addEventListener('mousemove', function (e) { game.mouse = canvasPoint(e); });
