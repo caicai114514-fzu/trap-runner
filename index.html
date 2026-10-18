@@ -566,13 +566,18 @@ var LEVELS = [
     name: '4-1 · 表魔王', hint: '有条近路，也有代价。',
     width: 960, spawn: [60, 380], jump: 900,
     goal: { x: 880, y: 400, w: 46, h: 70 },
-    shortcutCheck: { x: 380, y: 215, w: 120, h: 32 },   // 藏在顶上的路径（正常路线碰不到）
+    // 正常路线：地面跳过中间那个坑（会经过检查点）
+    // 后门：踩左下隐藏跳板弹上顶层，沿"藏在墙里"的横线一路滑到右边跳下来
+    shortcutCheck: { x: 340, y: 430, w: 90, h: 40 },
     platforms: [
-      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid' },          // 地面
-      { x: 0,   y: 240, w: 830, h: 22, kind: 'solid', oneWay: true },   // 顶上那条横线（隐藏路径，从下能穿）
+      { x: 0,   y: 470, w: 300, h: 70, kind: 'solid' },
+      { x: 300, y: 470, w: 200, h: 70, kind: 'fake' },                // 中间的坑
+      { x: 500, y: 470, w: 460, h: 70, kind: 'solid' },
+      { x: 0,   y: 240, w: 840, h: 22, kind: 'solid', oneWay: true }, // 顶层"藏在墙里"的横线
       { x: 15,  y: 470, w: 230, h: 10, kind: 'bounce', power: 1210, popTime: 0.10 }   // 左下隐藏跳板
     ],
-    spikes: [], arrows: []
+    spikes: [{ x: 310, y: 444, w: 180, h: 26 }],
+    arrows: []
   },
   {
     name: '4-2 · 里魔王', hint: '没有近路了。',
