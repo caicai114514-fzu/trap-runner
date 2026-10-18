@@ -2346,7 +2346,7 @@ function update(dt) {
   }
 
   // 4-1：玩家走进天花板里的隐藏通道 → 标记（之后碰门直接通关）
-  if (L6.hiddenCorridorY !== undefined && p.y < L6.hiddenCorridorY) game.fromHiddenPath = true;
+  if (p.ground && p.ground.hiddenPath) game.fromHiddenPath = true;   // 4-1：脚踩在隐藏通道上才算
 
   // ===== 4-1：走到距金币终点一定位置，左2阶梯下的地板往左收，2秒后伸出 =====
   if (LEVELS[game.li].coins) {
