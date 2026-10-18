@@ -493,13 +493,14 @@ var LEVELS = [
     // 按钮在二楼平台上，初始不显示：穿过最后一个球后才出现
     button: { x: 900, y: 230, w: 40, h: 20, hidden: true, revealAfterBall: true },
     balls: [
+      // 按 x 交替：顶、底、顶、底、顶、底、顶（每个球都夹在前后两个球中间）
       { x: 120, bounces: 2, speed: 230, noHoming: true },
+      { x: 200, bounces: 2, speed: 235, fromBottom: true, noHoming: true },
       { x: 300, bounces: 2, speed: 240, noHoming: true },
+      { x: 460, bounces: 2, speed: 245, fromBottom: true, noHoming: true },
       { x: 560, bounces: 2, speed: 250, noHoming: true },
-      { x: 820, bounces: 3, speed: 260, noHoming: true, toPlatform: true },   // 最后一个球：可变成平台
-      { x: 200, bounces: 2, speed: 245, fromBottom: true, noHoming: true },
-      { x: 460, bounces: 2, speed: 255, fromBottom: true, noHoming: true },
-      { x: 700, bounces: 3, speed: 265, fromBottom: true, noHoming: true }
+      { x: 700, bounces: 3, speed: 255, fromBottom: true, noHoming: true },
+      { x: 820, bounces: 3, speed: 260, noHoming: true, toPlatform: true }    // 最后一个：能变成平台
     ],
     spikes: [], arrows: []
   },
