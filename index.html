@@ -3294,7 +3294,6 @@ function drawSettings(dt) {
     ctx.stroke();
     ctx.restore();
   }
-}
 
   // ===== 成就面板 =====
   if (game.achOpen) game.achT = Math.min(1, (game.achT || 0) + (1 / 60) * 5);
@@ -3361,6 +3360,7 @@ function drawSettings(dt) {
     text(gotD ? d.on : d.off, VW / 2, DY + 256, 15, '#c9a888', 'center');
     ctx.restore();
   }
+}
 
 function drawButtonWall() {
   var L = LEVELS[game.li];
