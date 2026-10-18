@@ -825,7 +825,7 @@ function loadLevel(i) {
   game.revealStarted = false;
   game.balls = (L.balls || []).map(function (b) {
     return {
-      x: b.x, y: (b.y === undefined ? (b.fromBottom ? 470 : -50) : b.y), r: b.r || 32,
+      x: b.x, y: (b.y === undefined ? (b.fromBottom ? 470 : -50) : b.y), r: b.r || 34,
       bounceH: (b.bounceH === undefined ? 110 : b.bounceH),
       noHoming: !!b.noHoming,               // 永不追踪（只做普通弹跳）
       toPlatform: !!b.toPlatform,           // 触发后变成可站立的半圆平台
@@ -2307,13 +2307,9 @@ function drawBalls() {
     ctx.save();
     ctx.translate(b.x, b.y);
     ctx.rotate(b.spin);
-    // 圆的球（追人时变红）
-    ctx.fillStyle = b.homing ? '#ff6b48' : '#3a2a22';
+    // 纯色大圆球（照参考：没有高光也没有中心点）
+    ctx.fillStyle = b.homing ? '#c0392b' : PAL.spike;
     ctx.beginPath(); ctx.arc(0, 0, b.r, 0, 7); ctx.fill();
-    ctx.fillStyle = b.homing ? '#ffb59f' : '#5c4638';
-    ctx.beginPath(); ctx.arc(-b.r * 0.28, -b.r * 0.28, b.r * 0.38, 0, 7); ctx.fill();
-    ctx.fillStyle = PAL.ink;
-    ctx.beginPath(); ctx.arc(0, 0, b.r * 0.18, 0, 7); ctx.fill();
     ctx.restore();
   }
 }
