@@ -2529,22 +2529,29 @@ function drawButtonWall() {
 
   // 3-5 博弈按钮：站上地板后才出现
   if (L.gambleButtons && game.gBtns) {
-    var risY = 250, risH = 70;
-    for (var ryi = 0; ryi < game.plats.length; ryi++) if (game.plats[ryi].riser) { risY = game.plats[ryi].y; risH = game.plats[ryi].h; }
-    for (var gbi2 = 0; gbi2 < L.gambleButtons.length; gbi2++) {
-      var gb2 = L.gambleButtons[gbi2];
-      var grow = Math.max(0, Math.min(1, game.btnAnim));
-      if (grow <= 0) continue;
-      var gh2 = gb2.h * grow;
-      var byy = risY - gh2 - 2;                   // 从地板表面往上长出来
-      ctx.fillStyle = '#e0432f';
-      ctx.fillRect(gb2.x, byy, gb2.w, gh2);
-      if (grow > 0.6) {
-        ctx.fillStyle = '#ff6b52';
-        ctx.fillRect(gb2.x, byy, gb2.w, 5);
+    var risY = 250, risGone = false;
+    for (var ryi = 0; ryi < game.plats.length; ryi++) if (game.plats[ryi].riser) {
+      risY = game.plats[ryi].y;
+      if (game.plats[ryi].state === 'gone') risGone = true;
+    }
+    if (!risGone) {
+      for (var gbi2 = 0; gbi2 < L.gambleButtons.length; gbi2++) {
+        var gb2 = L.gambleButtons[gbi2];
+        var grow = Math.max(0, Math.min(1, game.btnAnim));
+        if (grow <= 0.02) continue;                 // 收回去了就别画
+        var gh2 = gb2.h * grow;
+        var byy = risY - gh2 - 2;                   // 从地板表面往上长
+        ctx.fillStyle = '#e0432f';
+        ctx.fillRect(gb2.x, byy, gb2.w, gh2);
+        if (grow > 0.6) {
+          ctx.fillStyle = '#ff6b52';
+          ctx.fillRect(gb2.x, byy, gb2.w, 5);
+        }
+        if (grow > 0.5) {                           // 黄点只在按钮基本成型时才画
+          ctx.fillStyle = '#ffd23f';
+          ctx.beginPath(); ctx.arc(gb2.x + gb2.w / 2, byy + gh2 + 5, 3, 0, 7); ctx.fill();
+        }
       }
-      ctx.fillStyle = '#ffd23f';
-      ctx.beginPath(); ctx.arc(gb2.x + gb2.w / 2, byy + gb2.h + 5, 3, 0, 7); ctx.fill();
     }
   }
 
