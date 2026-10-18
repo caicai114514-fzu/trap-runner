@@ -922,6 +922,7 @@ function loadLevel(i) {
   game.tp = null;          // 3-4 传送动画状态
   game.ring = null;        // 3-4 七球绕人一圈 → 加速旋转 → 贯穿
   game.goalFly = null;     // 3-4 门的粒子传送（美术层）
+  game.gotCoins = 0;       // 4-1 金币计数（重开要清零）
   game.gRound = 0;         // 3-5 博弈：当前第几轮
   game.gBtns = false;      // 3-5 按钮：站到中间地板上才出现
   game.riserSank = false;  // 3-5 地板是否已经开始下降
