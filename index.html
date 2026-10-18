@@ -879,6 +879,7 @@ function loadLevel(i) {
   game.gShrink = false;    // 3-5 按错：地板从两边往中间收
   game.gWrongPending = null; // 3-5 按错了，等按钮收完+0.5s 再执行惩罚
   game.gFinal = false;     // 3-5 第四轮：按钮收完就撤地板，玩家必须立刻跳
+  game.passedShortcut = false;  // 表魔王：是否经过了正常路线的检查点
   game.gFinalDelay = undefined;  // 第四轮的反应时间
   game.missiles = [];      // 3-5 四个黑球绕人（半径周期变化）
   if (game.ring3) {
@@ -1021,6 +1022,16 @@ function winLevel() {
   if (game.state !== 'play') return;
   Sound.sfxWin();
   markCleared(CUR.w, CUR.i);       // 记进存档
+  // 表魔王：没经过检查点 = 走了捷径 → 弹死人话 + 解锁里魔王
+  var SC = LEVELS[game.li].shortcutCheck;
+  if (SC && !game.passedShortcut) {
+    save.demonInner = true;        // 解锁里魔王
+    writeSave();
+    game.taunt = '你个不劳而获的家伙';
+    game.tauntColor = '#c0392b';
+    game.tauntT = 1.8;
+    game.shake = 12;
+  }
   // 记下过关门动画的起点：门中心 + 玩家当前位置
   var g = LEVELS[game.li].goal;
   var gx = (game.goalX !== undefined) ? game.goalX : g.x;   // 会走的门：用当前真实位置
@@ -2147,6 +2158,14 @@ function update(dt) {
       }
       game.shake = 8;
       Sound.sfxTrap();
+    }
+  }
+
+  // ===== 表魔王捷径检查点：经过它才算"老实打" =====
+  if (LEVELS[game.li].shortcutCheck && !game.passedShortcut) {
+    var sc2 = LEVELS[game.li].shortcutCheck;
+    if (p.x + p.w > sc2.x && p.x < sc2.x + sc2.w && p.y + p.h > sc2.y && p.y < sc2.y + sc2.h) {
+      game.passedShortcut = true;
     }
   }
 
