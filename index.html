@@ -457,15 +457,16 @@ var LEVELS = [
     spikes: [], arrows: []
   },
   {
-    name: '3-3 · 双簧', hint: '左边一堵，右边一堵。',
-    width: 960, spawn: [70, 380], jump: 950,
+    name: '3-3 · 落球', hint: '球落地后，会追着你跑。',
+    width: 960, spawn: [70, 380],
     goal: { x: 880, y: 400, w: 46, h: 70 },
-    keys: [{ x: 660, y: 425 }],                  // 钥匙在被推回坑的必经之路上
+    keys: [{ x: 500, y: 425 }],                  // 钥匙在中间：拿它要冒着被球追的风险
     platforms: [
-      { x: 0, y: 470, w: 620, h: 70, kind: 'solid' },
-      { x: 720, y: 470, w: 240, h: 70, kind: 'solid' },
-      { x: 300, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 430, moveV: 600, moveTo: 620 },
-      { x: 900, y: 350, w: 36, h: 120, kind: 'piston', triggerX: 780, moveV: -700, moveTo: 720 }
+      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' }
+    ],
+    balls: [
+      { x: 320, bounces: 2, speed: 330 },        // 弹两下就追你
+      { x: 640, bounces: 3, speed: 370 }         // 弹三下才追，但追得更快
     ],
     spikes: [], arrows: []
   },
