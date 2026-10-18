@@ -851,7 +851,8 @@ function loadLevel(i) {
   game.keyReveal = false;  // 3-3：左墙缩进后，隐藏的钥匙才显现
   game.tp = null;          // 3-4 传送动画状态
   game.ring = null;        // 3-4 七球绕人一圈 → 加速旋转 → 贯穿
-  game.goalFly = null;     // 3-4 门传送的绘制动画
+  game.goalFly = null;     // 3-4 门的粒子传送（美术层）
+  game.goalDead2 = false;  // 3-4 旧门已删除（代码层，碰不到）
   game.buttonVisible = !(L.button && L.button.hidden);  // 默认显示；hidden 的按钮(2-5)等平台出现才显示
   game.wallSweep = 0;
   if (typeof location !== 'undefined' && location.search.indexOf('wa=') >= 0) {
@@ -1834,9 +1835,22 @@ function update(dt) {
       game.buttonVisible = true;
       game.airJumpUnlocked = true;      // ★ 获得浮空跳
       game.airJumped = false;
+      // ===== 代码层：删掉右边那扇门，在玩家脚下新建一扇 =====
       var oldGX = game.goalX;
-      game.goalX = p.x + p.w / 2 - LEVELS[game.li].goal.w / 2;     // ★ 代码上瞬间挪过去
-      game.goalFly = { t: 0, fromX: oldGX, toX: game.goalX };      // ★ 美术上让它飞过去
+      game.goalDead2 = true;                                        // 旧门删除（立刻不可碰）
+      game.goalX = p.x + p.w / 2 - LEVELS[game.li].goal.w / 2;      // 新门建在玩家位置
+      game.goalDead2 = false;
+      // ===== 美术层：门炸成粒子，飞到新位置再重组成门 =====
+      game.goalFly = { t: 0, fromX: oldGX, toX: game.goalX, parts: [] };
+      for (var gpi = 0; gpi < 26; gpi++) {
+        game.goalFly.parts.push({
+          x: oldGX + Math.random() * LEVELS[game.li].goal.w,
+          y: LEVELS[game.li].goal.y + Math.random() * LEVELS[game.li].goal.h,
+          vx: (Math.random() - 0.5) * 220,
+          vy: (Math.random() - 0.5) * 220 - 60,
+          ox: Math.random(), oy: Math.random()
+        });
+      }
       Sound.sfxTeleport();
       Sound.sfxTrap(); game.shake = 8;
     }
@@ -2471,22 +2485,27 @@ function drawBalls() {
 
 function drawGoal() {
   var L = LEVELS[game.li];
-  // 门的传送飞行动画：画一条残影 + 插值位置
-  var gxDraw = game.goalX;
+  // 门的粒子传送（美术层）：旧门炸成碎片 → 飞到新位置 → 重组成门
+  var gxDraw = game.goalX, gDrawable = true;
   if (game.goalFly) {
-    game.goalFly.t += 1 / 60;
-    var fk = Math.min(1, game.goalFly.t / 0.42);
+    var GF = game.goalFly;
+    GF.t += 1 / 60;
+    var fk = Math.min(1, GF.t / 0.55);
     var fk2 = fk * fk * (3 - 2 * fk);
-    gxDraw = game.goalFly.fromX + (game.goalFly.toX - game.goalFly.fromX) * fk2;
-    // 残影
-    for (var gh = 1; gh <= 3; gh++) {
-      var gxp = game.goalFly.fromX + (game.goalFly.toX - game.goalFly.fromX) * Math.max(0, fk2 - gh * 0.06);
-      ctx.save(); ctx.globalAlpha = 0.18 / gh;
-      drawOneDoor({ x: gxp, y: L.goal.y, w: L.goal.w, h: L.goal.h }, 1, 1);
-      ctx.restore();
+    gDrawable = false;                       // 门本体先隐藏
+    for (var gpj = 0; gpj < GF.parts.length; gpj++) {
+      var gpp = GF.parts[gpj];
+      var gtx = GF.toX + gpp.ox * L.goal.w, gty = L.goal.y + gpp.oy * L.goal.h;
+      var gcx = GF.fromX + gpp.ox * L.goal.w, gcy = L.goal.y + gpp.oy * L.goal.h;
+      gpp.x = gcx + (gtx - gcx) * fk2 + Math.sin(GF.t * 22 + gpj) * 10 * (1 - fk2);
+      gpp.y = gcy + (gty - gcy) * fk2 + Math.cos(GF.t * 26 + gpj) * 12 * (1 - fk2);
+      ctx.fillStyle = PAL.door;
+      ctx.beginPath(); ctx.arc(gpp.x, gpp.y, 4, 0, 7); ctx.fill();
     }
-    if (fk >= 1) game.goalFly = null;
+    if (fk >= 1) { game.goalFly = null; gDrawable = true; }
   }
+  if (!gDrawable) return;
+
   // 假终点关：先画那扇假的（长得和真门一样），真门按进度淡入
   if (L.fakeGoal) {
     if (game.fakeGoalShown) drawOneDoor(L.fakeGoal, 1);   // 假门走近才出现
