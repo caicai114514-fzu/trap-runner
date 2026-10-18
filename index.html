@@ -812,12 +812,14 @@ function loadSave() {
   save.cleared = (o && typeof o.cleared === 'object' && o.cleared) || {};
   save.keys    = (o && typeof o.keys    === 'object' && o.keys)    || {};
   save.deaths  = (o && typeof o.deaths  === 'number') ? o.deaths : 0;
+  save.achievements = (o && typeof o.achievements === 'object' && o.achievements) || {};
+  save.demonInner = !!(o && o.demonInner);
 }
 function writeSave() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {}
 }
 function resetSave() {
-  save.cleared = {}; save.keys = {}; save.deaths = 0;
+  save.cleared = {}; save.keys = {}; save.deaths = 0; save.achievements = {};
   writeSave();
 }
 
