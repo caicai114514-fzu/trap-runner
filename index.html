@@ -878,6 +878,7 @@ function loadLevel(i) {
   game.gShrink = false;    // 3-5 按错：地板从两边往中间收
   game.gWrongPending = null; // 3-5 按错了，等按钮收完+0.5s 再执行惩罚
   game.gFinal = false;     // 3-5 第四轮：按钮收完就撤地板，玩家必须立刻跳
+  game.gFinalDelay = undefined;  // 第四轮的反应时间
   game.missiles = [];      // 3-5 四个黑球绕人（半径周期变化）
   if (game.ring3) {
     var R3d = game.ring3;
@@ -1992,9 +1993,17 @@ function update(dt) {
       if (p.x + p.w > ris0.x && p.x < ris0.x + ris0.w && Math.abs((p.y + p.h) - ris0.y) < 80 && p.vy >= 0) {
         p.y = ris0.y - p.h; p.vy = 0; p.onGround = true; p.ground = ris0;   // 人贴在地板上，像电梯
       }
+      // 第四轮：反应时间到 → 撤地板
+      if (game.gFinalDelay > 0) {
+        game.gFinalDelay -= dt;
+        if (game.gFinalDelay <= 0) {
+          game.gShrink = true; game.gShrinkX = ris0.x; game.gShrinkW = ris0.w;
+          Sound.sfxTrap(); game.shake = 14;
+        }
+      }
       // 按错：地板从两边往中间快速收，最后完全消失
       if (game.gShrink) {
-        ris0.w = Math.max(0, ris0.w - dt * 2200);      // 两边同时往中间收（快）
+        ris0.w = Math.max(0, ris0.w - dt * (game.gFinalDelay !== undefined ? 1100 : 2200));   // 第四轮慢一点给反应
         ris0.x = game.gShrinkX + (game.gShrinkW - ris0.w) / 2;
         if (ris0.w <= 0.5) { ris0.state = 'gone'; ris0.noCollide = true; game.gShrink = false; }
       }
@@ -2036,9 +2045,8 @@ function update(dt) {
             }
           } else if (game.gFinal) {
             game.gFinal = false;
-            game.jumpLocked = false;                       // ★ 跳跃恢复
-            game.gShrink = true; game.gShrinkX = ris0.x; game.gShrinkW = ris0.w;   // 地板像第一轮那样消失
-            Sound.sfxTrap(); game.shake = 14;
+            game.jumpLocked = false;                       // ★ 跳跃先恢复
+            game.gFinalDelay = 0.45;                       // 给你 0.45 秒反应时间
           } else if (game.gRiseTo !== null) {
             game.gRiseFrom = ris0.y; game.gRiseT = 0;
           }
