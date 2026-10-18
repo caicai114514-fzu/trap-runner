@@ -966,7 +966,8 @@ function loadLevel(i) {
   game.goalHide = false;
   game.gotCoins = 0;       // 4-1 金币计数（重开要清零）
   game.floorRetract = false;  // 4-1 左2地板是否在收
-  game.floorDone = false;     // 4-1 地板收伸只发生一次
+  game.floorDone = false;     // 4-1 地板收伸（两轮都做完了）
+  game.floorPhase = 0;        // 4-1 地板收缩阶段：0=没做 1=金币那轮做完 2=导弹那轮也做完
   game.spikeWaveT = undefined;   // 4-1 刺波浪计时（第一排触发后开始走）
   game.spikeWaveDone = false;    // 4-1 整波刺只触发一次
   game.floorT = 0;
@@ -2341,7 +2342,10 @@ function update(dt) {
     var lastC = null;
     for (var _lc = 0; _lc < game.coins.length; _lc++) if (game.coins[_lc].fake) lastC = game.coins[_lc];
     // 三个条件齐了才收地板：吃完两枚 + 假金币正在追 + 人走到坑口
-    if (lastC && lastC.chasing && game.gotCoins >= 2 && p.x < 200 && p.x > 60 && !game.floorRetract && !game.floorDone) {
+    var canRetract = false;
+    if (game.floorPhase === 0 && lastC && lastC.chasing && game.gotCoins >= 2) canRetract = true;   // 第一次：金币追你
+    if (game.floorPhase === 1 && game.missiles.length > 0) canRetract = true;                       // 第二次：导弹追你
+    if (canRetract && p.x < 200 && p.x > 60 && !game.floorRetract) {
       game.floorRetract = true; game.floorT = 0; Sound.sfxTrap();
     }
   }
@@ -2353,7 +2357,7 @@ function update(dt) {
       if (game.floorT < 0.15) { rf.x = 90 - (game.floorT / 0.15) * 90; }                    // 0.15s 收进去
       else if (game.floorT < 2.0) { rf.x = 0; }                                             // 保持收着，等 2 秒
       else if (game.floorT < 2.3) { rf.x = ((game.floorT - 2.0) / 0.3) * 90; }              // 0.3s 伸回来
-      else { rf.x = 90; game.floorRetract = false; game.floorDone = true; game.floorT = 0; } // 伸回完成，之后不再触发
+      else { rf.x = 90; game.floorRetract = false; game.floorT = 0; game.floorPhase = (game.floorPhase || 0) + 1; game.floorDone = (game.floorPhase >= 2); }
     }
   }
 
