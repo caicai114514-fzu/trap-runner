@@ -1103,7 +1103,7 @@ function debugClearCurrent() {
   markCleared(CUR.w, CUR.i);
   game.state = 'levels';
   game.levelsWorld = CUR.w;
-  game.cursorL = Math.min(LEVELS_PER_WORLD - 1, CUR.i + 1);
+  game.cursorL = Math.min((CUR.w === 3 ? 2 : LEVELS_PER_WORLD) - 1, CUR.i + 1);
   Sound.sfxWin();
   game.flash = '通关 ' + (CUR.w + 1) + '-' + (CUR.i + 1);
   game.tauntT = 1.4;
@@ -1113,7 +1113,7 @@ function skipLevel() {
   game.deaths = 0;
   game.state = 'levels';
   game.levelsWorld = CUR.w;
-  game.cursorL = Math.min(LEVELS_PER_WORLD - 1, CUR.i + 1);
+  game.cursorL = Math.min((CUR.w === 3 ? 2 : LEVELS_PER_WORLD) - 1, CUR.i + 1);
 }
 function flashMsg(s) { game.flash = s; game.tauntT = 1.4; }
 
@@ -1402,7 +1402,7 @@ function update(dt) {
       startTransition(function () {
         game.state = 'levels';
         game.levelsWorld = CUR.w;
-        game.cursorL = Math.min(LEVELS_PER_WORLD - 1, CUR.i + 1);
+        game.cursorL = Math.min((CUR.w === 3 ? 2 : LEVELS_PER_WORLD) - 1, CUR.i + 1);
       });
     }
     return;
