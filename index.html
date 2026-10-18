@@ -865,6 +865,7 @@ function loadLevel(i) {
   game.gRetract = false;   // 按钮正在收回去
   game.gDelay = 0;         // 收回去之后等多久才升
   game.gRiseTo = null;     // 地板要升到的目标 y
+  game.jumpLocked = false; // 地板在动的期间禁止跳跃（也不响音效）
   game.btnAnim = -1;       // 3-5 按钮弹出动画（-1=未开始, 0~1=进度）
   game.gambleDone = false;  // 3-5 博弈结束
   game.goalDead2 = false;  // 3-4 旧门已删除（代码层，碰不到）
@@ -1455,6 +1456,8 @@ function update(dt) {
   // 这本身就是一种关卡设计手段 —— 跳得矮 = 容错小 = 能初见杀；
   // 反过来调高还能做"跳太高反而撞上天花板尖刺"的坑。
   var jumpV = LEVELS[game.li].jump || JUMP_V;
+  // 地板正在沉下去/升上来的过程中：跳跃完全禁用（连音效都不响）
+  if (game.jumpLocked) { jumpPressed = false; game.jumpBuf = 0; keys['jump'] = false; }
   var wantJump = keys['jump'];
   if (p.onGround) { game.coyote = 0.1; game.airJumped = false; } else game.coyote = Math.max(0, game.coyote - dt);
   if (jumpPressed) game.jumpBuf = 0.12; else game.jumpBuf = Math.max(0, game.jumpBuf - dt);
@@ -1893,7 +1896,7 @@ function update(dt) {
     var ris0 = null;
     for (var rj = 0; rj < game.plats.length; rj++) if (game.plats[rj].riser) ris0 = game.plats[rj];
     if (ris0) {
-      if (!game.riserSank && p.ground === ris0) { game.riserSank = true; game.gBtns = true; Sound.sfxTrap(); game.shake = 6; }
+      if (!game.riserSank && p.ground === ris0) { game.riserSank = true; game.gBtns = true; game.jumpLocked = true; Sound.sfxTrap(); game.shake = 6; }
       if (game.riserSank && !game.riserSunk) {
         ris0.y = Math.min(470, ris0.y + dt * 190);
         if (ris0.y >= 470 - 0.5) game.riserSunk = true;   // 沉到底就停，之后按钮才能把它升上去
@@ -1922,7 +1925,7 @@ function update(dt) {
         if (p.ground === ris0 || Math.abs((p.y + p.h) - ris0.y) < 90) { p.y = ris0.y - p.h; p.vy = 0; p.onGround = true; p.ground = ris0; }
         if (game.gRiseT >= 1 || Math.abs(ris0.y - game.gRiseTo) < 0.8) {
           ris0.y = game.gRiseTo;
-          if (game.gRiseTo <= 250.5) game.gBtns = false;   // 升到顶：按钮不再出现
+          if (game.gRiseTo <= 250.5) { game.gBtns = false; game.jumpLocked = false; }   // 升到顶：按钮消失、跳跃解锁
           game.gRiseTo = null; game.gRiseFrom = undefined; game.gRiseT = 0;
           if (game.gRound >= GM.answers.length) { game.gambleDone = true; Sound.sfxWin(); }
         }
@@ -1945,6 +1948,7 @@ function update(dt) {
         if (correct) {
           game.gBtnLock = true;
           game.gRound++;
+          Sound.sfxCoin();
           // 地板上升一段
           var riser = null;
           for (var rri = 0; rri < game.plats.length; rri++) if (game.plats[rri].riser) riser = game.plats[rri];
