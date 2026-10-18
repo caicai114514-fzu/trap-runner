@@ -3020,7 +3020,12 @@ function drawSettings(dt) {
   ctx.fillRect(bx1, by, BW, BW);
   ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(bx1, by, BW, BW);
   var img = Sound.muted ? Sound.imgOff : Sound.imgOn;
-  if (img && img.complete) ctx.drawImage(img, bx1 + 18, by + 18, BW - 36, BW - 36);
+  if (img && img.complete) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';   // 白底 → 融进弹窗底色，只留黑色图标
+    ctx.drawImage(img, bx1 + 20, by + 20, BW - 40, BW - 40);
+    ctx.restore();
+  }
 
   // ② 成就按钮（正方形 + 五角星）
   ctx.fillStyle = '#2a1410';
@@ -4360,6 +4365,7 @@ loadSave();
 loadLevel(0);
 game.state = 'title';
 if (typeof location !== 'undefined' && location.search.indexOf('lv=') >= 0) { var _lv = parseInt(location.search.split('lv=')[1]) || 0; loadLevel(_lv); game.state = 'play'; applyWorldPalette(Math.floor(_lv / 5)); Sound.startBgm(); }
+if (typeof location !== 'undefined' && location.search.indexOf('settings=1') >= 0) { game.settingsOpen = true; game.settingsT = 1; }
 
 /* 调试：?screen=world|levels|demon|play|win  可以直接跳到某个界面看效果
          ?w=0..3   指定大关（play / win 用）
