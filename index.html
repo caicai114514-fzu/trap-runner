@@ -2705,7 +2705,8 @@ function drawSaws() {
 function drawCoins() {
   for (var i = 0; i < game.coins.length; i++) {
     var c = game.coins[i];
-    if (c.got) continue;
+    if (c.got || c.gone) continue;      // 吃掉/消失的都不画
+    // 注意：爆炸金币和普通金币长得一模一样，不给任何提示
     var bob = Math.sin(c.t * 3) * 2.5;
     ctx.fillStyle = '#ffd23f';
     ctx.beginPath(); ctx.ellipse(c.x, c.y + bob, 9, 11, 0, 0, 7); ctx.fill();
