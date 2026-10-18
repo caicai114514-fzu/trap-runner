@@ -566,15 +566,15 @@ var LEVELS = [
     name: '4-1 · 表魔王', hint: '有近路，也有代价。',
     width: 960, spawn: [70, 380], jump: 900,
     goal: { x: 880, y: 400, w: 46, h: 70 },
-    shortcutCheck: { x: 480, y: 430, w: 70, h: 40 },      // 老实打要经过这里（中间地面）
+    shortcutCheck: { x: 445, y: 430, w: 70, h: 40 },      // 老实打要经过这里（坑右边的地面）
     platforms: [
       { x: 0,   y: 470, w: 320, h: 70, kind: 'solid' },
-      { x: 320, y: 470, w: 160, h: 70, kind: 'fake' },      // 中间的坑
-      { x: 480, y: 470, w: 480, h: 70, kind: 'solid' },
+      { x: 320, y: 470, w: 120, h: 70, kind: 'fake' },      // 中间的坑（120px，跳得过）
+      { x: 440, y: 470, w: 520, h: 70, kind: 'solid' },
       { x: 150, y: 350, w: 130, h: 22, kind: 'solid' },     // 捷径高台（左）
       { x: 400, y: 350, w: 130, h: 22, kind: 'solid' }      // 捷径高台（右）
     ],
-    spikes: [{ x: 330, y: 414, w: 140, h: 56 }],
+    spikes: [{ x: 325, y: 414, w: 110, h: 56 }],
     arrows: []
   },
   {
