@@ -1305,7 +1305,7 @@ function update(dt) {
   }
 
   // 传送+绕环期间：人死死钉在屏幕正中，不受重力也不受按键
-  if (game.ring || game.tp) {
+  if (game.ring || game.tp || game.ring3) {
     if (game.ring3) {
       game.p.x = game.ring3.cx - game.p.w / 2;      // 3-5：钉在右高台上
       game.p.y = game.ring3.cy - game.p.h / 2;
