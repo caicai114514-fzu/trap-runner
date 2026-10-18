@@ -2276,8 +2276,8 @@ function drawGoal() {
     return;
   }
   if (!game.goalDead || game.sinkY > 0) {
-    if (game.state === 'win' && game.winDoor) drawOneDoor(L.goal, 1, game.winDoor.k);
-    else drawOneDoor(L.goal, L.goalHidden ? game.goalReveal : 1, 1);   // goalHidden 的门跟着显现进度淡入
+    if (game.state === 'win' && game.winDoor) drawOneDoor({ x: game.goalX, y: L.goal.y, w: L.goal.w, h: L.goal.h }, 1, game.winDoor.k);
+    else drawOneDoor({ x: game.goalX, y: L.goal.y, w: L.goal.w, h: L.goal.h }, L.goalHidden ? game.goalReveal : 1, 1);   // 用 game.goalX（会走的门）
   }
 }
 
