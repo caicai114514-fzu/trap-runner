@@ -2431,14 +2431,12 @@ function update(dt) {
     if (co.got || co.gone || co.hidden) continue;   // 隐藏/消失的假金币：看不见、也碰不到
     if (co.chasing) {
       co.x -= MOVE * dt;                                   // 和玩家同速地向左压过来
-      // 追到玩家身边（或追满 150px）就彻底消失 —— 不会炸死人
-      if (Math.abs(co.x - (p.x + p.w / 2)) < 40 || co.chaseFrom - co.x > 150) {
-        co.gone = true; co.hidden = true;
-      }
+      // 追满 150px 就消失（期间撞到玩家照样炸死）
+      if (co.chaseFrom - co.x > 150) { co.gone = true; co.hidden = true; }
       if (co.gone) continue;
     }
     if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22) {
-      if (co.fake) { continue; }   // 4-1：假金币只做视觉/追击，碰到不炸死
+      if (co.fake) { Sound.sfxBoom(); die(); return; }   // 爆炸金币：碰到就炸死
       co.got = true; Sound.sfxCoin();
       if (co.flip) { game.flipT = 0; Sound.sfxTrap(); }     // 吃到"翻板金币"→整块地板开始翻
       // 4-1：吃掉第一枚 → 隐藏跳板失效（后门被堵）
