@@ -1480,9 +1480,7 @@ canvas.addEventListener('mousedown', function (e) {
       else Sound.toggle();                                                                  // 静音 / 非静音
       return;
     }
-    var _ab = game._achBtn || { x: bx2, y: by2, w: BW2, h: BW2 };
-    var _PAD = 24;   // 热区容差
-    if (pt.x > _ab.x - _PAD && pt.x < _ab.x + _ab.w + _PAD && pt.y > _ab.y - _PAD && pt.y < _ab.y + _ab.h + _PAD) {
+    if (pt.x > bx2 && pt.x < bx2 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
       if (inG) { game.settingsOpen = false; game.state = 'levels'; game.levelsWorld = CUR.w; game.cursorL = CUR.i; }  // 退出
       else { game.achOpen = !game.achOpen; if (game.achOpen) game.achT = 0; game.achSel = null; }   // 成就
       return;
@@ -3235,9 +3233,10 @@ function drawSettings(dt) {
 
   // ② 成就按钮（正方形 + 五角星）
   game._achBtn = { x: bx2, y: by, w: BW, h: BW };   // 缓存命中区（点击直接用）
-  ctx.fillStyle = '#2a1410';
+  var _hov = game.mouse && game.mouse.x > bx2 && game.mouse.x < bx2 + BW && game.mouse.y > by && game.mouse.y < by + BW;
+  ctx.fillStyle = _hov ? '#3f1f16' : '#2a1410';
   ctx.fillRect(bx2, by, BW, BW);
-  ctx.strokeStyle = '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(bx2, by, BW, BW);
+  ctx.strokeStyle = _hov ? '#e8b98a' : '#7a4a2a'; ctx.lineWidth = 2; ctx.strokeRect(bx2, by, BW, BW);
   ctx.fillStyle = '#ffd23f';
   var scx = bx2 + BW / 2, scy = by + BW / 2, sr = 30;
   ctx.beginPath();
