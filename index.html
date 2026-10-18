@@ -4301,6 +4301,7 @@ function render() {
   ctx.clearRect(0, 0, VW, VH);
 
   drawScene();
+  drawSettings(game.dtLast || 1 / 60);   // 设置齿轮 + 弹窗（所有界面统一画在最上层）
   if (TRANS.on) drawTransition();     // 过场门永远盖在最上面
 }
 
@@ -4332,7 +4333,6 @@ function drawScene() {
   drawParticles();
   ctx.restore();
   drawHUD();
-  drawSettings(game.dtLast || 1 / 60);   // 设置齿轮 + 弹窗（最上层，所有界面都有）
 }
 
 /* ---------------- 主循环 ---------------- */
