@@ -476,7 +476,7 @@ var LEVELS = [
     spikes: [
       { x: 690, y: 444, w: 270, h: 26 }
     ],
-    keys: [{ x: 18, y: 420, hidden: true }],   // 钥匙初始隐藏（藏在左墙后面）
+    keys: [{ x: 18, y: 420, hidden: true, revealOnly: true }],   // 钥匙初始隐藏（左墙缩进后才浮现）
     arrows: []
   },
   {
@@ -839,6 +839,7 @@ function loadLevel(i) {
       x: k.x, y: k.y, got: false, t: 0,
       show: k.show || 0,                   // 出场动画进度 0~1
       hidden: !!k.hidden,                  // 一开始收着
+      revealOnly: !!k.revealOnly,          // 只靠 keyReveal 显现（3-3）
       triggerX: k.triggerX || 0,           // 玩家走过这里才开始浮现
       outT: k.outT || 1.1,                 // 浮现用多久
       fx: (k.from === undefined ? k.x : k.from[0]),   // 从哪浮现（默认原地）
@@ -1813,6 +1814,7 @@ function update(dt) {
     }
     if (kk.show < 1) {
       if (!kk.hidden) kk.show = 1;
+      else if (kk.revealOnly) { if (!game.keyReveal) continue; kk.show = Math.min(1, kk.show + dt / kk.outT); }
       else if (kk.armX !== null || p.x + p.w / 2 > kk.triggerX) kk.show = Math.min(1, kk.show + dt / kk.outT);
       else continue;                     // 还没浮现，碰不到
     }
