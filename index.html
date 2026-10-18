@@ -1314,8 +1314,9 @@ canvas.addEventListener('mousedown', function (e) {
   if (Sound.ac && Sound.ac.state === 'suspended') Sound.ac.resume();
   var pt = canvasPoint(e);
 
-  // ===== 左下角齿轮：开关设置弹窗 =====
-  if (pt.x < 64 && pt.y > VH - 64) { game.settingsOpen = !game.settingsOpen; game.settingsT = 0; return; }
+  // ===== 左下角齿轮：开关设置弹窗（只在菜单界面有效）=====
+  var inMenu2 = (game.state === 'title' || game.state === 'world' || game.state === 'levels' || game.state === 'complete');
+  if (inMenu2 && pt.x < 64 && pt.y > VH - 64) { game.settingsOpen = !game.settingsOpen; game.settingsT = 0; return; }
 
   // ===== 设置弹窗内的点击 =====
   if (game.settingsOpen) {
@@ -2980,7 +2981,9 @@ function drawGear(cx, cy, r) {
   ctx.restore();
 }
 function drawSettings(dt) {
-  drawGear(34, VH - 34, 20);
+  // 齿轮只在菜单类界面出现（一级目录 / 二级选关 / 标题 / 通关），关卡里不显示
+  var inMenu = (game.state === 'title' || game.state === 'world' || game.state === 'levels' || game.state === 'complete');
+  if (inMenu) drawGear(34, VH - 34, 20);
 
   if (!game.settingsOpen && (game.settingsT || 0) <= 0) return;
   game.settingsT = Math.min(1, (game.settingsT || 0) + dt * 5);
