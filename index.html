@@ -458,23 +458,25 @@ var LEVELS = [
   },
   {
     name: '3-3 · 回溯', hint: '门不会等你。',
-    width: 960, spawn: [760, 40],                // 4 楼【右边】出生
-    goal: { x: 120, y: 400, w: 46, h: 70 },      // 门在最底层左边
-    goalMoveVX: 50,                              // 门缓缓往右（往刺的方向）走
+    width: 960, spawn: [760, 40],
+    goal: { x: 120, y: 400, w: 46, h: 70 },
+    goalMoveVX: 50,
     goalStopX: 700,
-    goalMoveTriggerX: 600,                       // ★ 玩家往左走到 x<600 时，门才开始移动
-    // 之字形塔（平台从右往左延伸 → 缺口在左；交替开口）
+    goalMoveTriggerX: 600,
+    // 平台：4楼缺口左 / 3楼缺口右 / 2楼缺口在【中间且更大】
     platforms: [
-      { x: 105, y: 110, w: 855, h: 22, kind: 'solid' },     // 4 楼：缺口在【左】(105)
-      { x: 0,   y: 230, w: 855, h: 22, kind: 'solid' },     // 3 楼：缺口在【右】(855~960)
-      { x: 105, y: 350, w: 855, h: 22, kind: 'solid' },     // 2 楼：缺口在【左】(105)
-      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid' },     // 1 楼
-      { x: 0,   y: 400, w: 56, h: 70, kind: 'solid', vanishWall: true }   // 左墙：到底层收进露出钥匙
+      { x: 105, y: 110, w: 855, h: 22, kind: 'solid' },      // 4 楼：缺口左(0~105)
+      { x: 0,   y: 230, w: 855, h: 22, kind: 'solid' },      // 3 楼：缺口右(855~960)
+      { x: 0,   y: 350, w: 300, h: 22, kind: 'solid' },      // 2 楼左段
+      { x: 500, y: 350, w: 460, h: 22, kind: 'solid' },      // 2 楼右段（中间缺口 300~500，宽200）
+      { x: 0,   y: 470, w: 960, h: 70, kind: 'solid' },      // 1 楼
+      { x: 0,   y: 0,   w: 30,  h: 350, kind: 'solid' },     // 左边那堵顶天立地的墙（上半，不动）
+      { x: 0,   y: 350, w: 30,  h: 120, kind: 'solid', slideWall: true }   // 下半：玩家到底层往左走时向左缩进
     ],
     spikes: [
-      { x: 690, y: 444, w: 270, h: 26 }                    // 1 楼右边一长串刺
+      { x: 690, y: 444, w: 270, h: 26 }
     ],
-    keys: [{ x: 30, y: 420 }],
+    keys: [{ x: 18, y: 420, hidden: true }],   // 钥匙初始隐藏（藏在左墙后面）
     arrows: []
   },
   {
@@ -1785,6 +1787,8 @@ function update(dt) {
     var kk = game.keys[ki];
     kk.t += dt;
     if (kk.got) continue;
+    // 3-3：墙缩进后 keyReveal=true，隐藏的钥匙才浮现
+    if (kk.hidden && game.keyReveal && kk.show < 1) kk.show = Math.min(1, kk.show + dt * 2.5);
     // 出场：一开始收着，玩家走过触发点之后慢慢浮现
     if (kk.gone) continue;
     // 检查点一：人得先跑到 armX 那边去
@@ -1831,7 +1835,17 @@ function update(dt) {
     }
   }
 
-  // 左墙收进（3-3）：人下到底层后，左边那堵墙缓缓缩进去，露出藏在后面的钥匙
+  // 左墙下半段缩进（3-3）：人在底层往左走到一定距离，墙下半截往左缩进，露出钥匙
+  if (LEVELS[game.li].platforms.some(function (q) { return q.slideWall; })) {
+    var swp = null;
+    for (var si2 = 0; si2 < game.plats.length; si2++) if (game.plats[si2].slideWall) swp = game.plats[si2];
+    if (swp && p.y > 400 && p.x + p.w / 2 < 190) {
+      swp.x = Math.max(-40, swp.x - dt * 220);          // 往左缩进
+      if (swp.x <= -39) { swp.noCollide = true; }
+      game.keyReveal = true;
+    }
+  }
+  // 左墙收进（旧逻辑，2-5/其它关）
   if (LEVELS[game.li].platforms.some(function (q) { return q.vanishWall; })) {
     var vw = null;
     for (var vi = 0; vi < game.plats.length; vi++) if (game.plats[vi].vanishWall) vw = game.plats[vi];
