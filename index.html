@@ -485,14 +485,18 @@ var LEVELS = [
     width: 960, spawn: [70, 380],
     goal: { x: 880, y: 400, w: 46, h: 70 },
     platforms: [
-      { x: 0,   y: 470, w: 400, h: 70, kind: 'solid' },     // 左地面
-      { x: 520, y: 470, w: 440, h: 70, kind: 'solid' },     // 右地面（中间 400~520 是坑）
-      { x: 620, y: 372, w: 130, h: 18, kind: 'bounce', power: 1480, popTime: 0.10 }   // 跳板：能把你弹更高
+      { x: 0, y: 470, w: 960, h: 70, kind: 'solid' }        // 一整块平地板，没坑
     ],
     balls: [
-      { x: 200, bounces: 2, speed: 320 },     // 弹两下就追
-      { x: 460, bounces: 2, speed: 345 },     // 弹两下，更快
-      { x: 800, bounces: 3, speed: 385 }      // 弹三下，最快
+      // 四个从天上往下掉
+      { x: 120, bounces: 2, speed: 320 },
+      { x: 300, bounces: 2, speed: 330 },
+      { x: 560, bounces: 2, speed: 345 },
+      { x: 820, bounces: 3, speed: 365 },
+      // 三个从地下往上顶
+      { x: 200, bounces: 2, speed: 350, fromBottom: true },
+      { x: 460, bounces: 2, speed: 360, fromBottom: true },
+      { x: 700, bounces: 3, speed: 385, fromBottom: true }
     ],
     spikes: [], arrows: []
   },
@@ -819,7 +823,8 @@ function loadLevel(i) {
   game.balls = (L.balls || []).map(function (b) {
     return {
       x: b.x, y: (b.y === undefined ? -50 : b.y), r: b.r || 18,
-      vy: b.vy || 0, vx: 0, bounce: 0, maxBounce: b.bounces || 3,
+      vy: (b.vy !== undefined) ? b.vy : (b.fromBottom ? -700 : 0),   // fromBottom：从下往上飞
+      vx: 0, bounce: 0, maxBounce: b.bounces || 3,
       speed: b.speed || 300, homing: false, spin: 0,
       delay: b.chaseDelay === undefined ? 1.4 : b.chaseDelay    // 弹够之后还要等这么久才追
 
@@ -1652,7 +1657,7 @@ function update(dt) {
       // 落地反弹
       if (bl.y + bl.r > 470) {
         bl.y = 470 - bl.r;
-        bl.vy = -bl.vy * 0.62;
+        bl.vy = -bl.vy * 0.95;
         bl.bounce++;
         if (bl.bounce === 1) Sound.sfxTrap();
         if (bl.bounce >= bl.maxBounce && !bl.armed) { bl.armed = true; bl.delay = (bl.delay === undefined ? 1.4 : bl.delay); }
@@ -2272,18 +2277,13 @@ function drawBalls() {
     ctx.save();
     ctx.translate(b.x, b.y);
     ctx.rotate(b.spin);
-    ctx.fillStyle = b.homing ? '#ff6b48' : PAL.spike;
-    // 带刺的球，看起来就不好惹
-    ctx.beginPath();
-    for (var k = 0; k < 10; k++) {
-      var a0 = (k / 10) * Math.PI * 2;
-      var a1 = ((k + 0.5) / 10) * Math.PI * 2;
-      ctx.lineTo(Math.cos(a0) * b.r, Math.sin(a0) * b.r);
-      ctx.lineTo(Math.cos(a1) * b.r * 0.72, Math.sin(a1) * b.r * 0.72);
-    }
-    ctx.closePath(); ctx.fill();
+    // 圆的球（追人时变红）
+    ctx.fillStyle = b.homing ? '#ff6b48' : '#3a2a22';
+    ctx.beginPath(); ctx.arc(0, 0, b.r, 0, 7); ctx.fill();
+    ctx.fillStyle = b.homing ? '#ffb59f' : '#5c4638';
+    ctx.beginPath(); ctx.arc(-b.r * 0.28, -b.r * 0.28, b.r * 0.38, 0, 7); ctx.fill();
     ctx.fillStyle = PAL.ink;
-    ctx.beginPath(); ctx.arc(0, 0, b.r * 0.30, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, b.r * 0.18, 0, 7); ctx.fill();
     ctx.restore();
   }
 }
