@@ -820,6 +820,12 @@ var game = {
 function loadLevel(i) {
   var L = LEVELS[i];
   game.li = i;
+  // 反转关：把「路」和「墙」的配色互换（背景=墙色，平台=路色）
+  applyWorldPalette(Math.floor(i / LEVELS_PER_WORLD));
+  if (L.invertColors) {
+    var _t = PAL.ground; PAL.ground = PAL.bg; PAL.bg = _t;
+    var _t2 = PAL.groundTop; PAL.groundTop = '#2a0a06'; PAL.bgDeep = _t; 
+  }
   game.p = {
     x: L.spawn[0], y: L.spawn[1], vx: 0, vy: 0, w: 26, h: 28,
     onGround: false, face: 1, alive: true, sq: 1, ground: null,
