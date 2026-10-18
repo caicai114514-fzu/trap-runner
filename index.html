@@ -1381,7 +1381,7 @@ canvas.addEventListener('mousedown', function (e) {
 
   // ===== 设置弹窗内的点击 =====
   if (game.settingsOpen) {
-    var SW2 = 320, SX = (VW - SW2) / 2, SY = (VH - SW2) / 2 + (1 - (game.settingsT || 0)) * 240;
+    var SW2 = 320, SH2 = 372, SX = (VW - SW2) / 2, SY = (VH - SH2) / 2 + (1 - (game.settingsT || 0)) * 280;
     // 右上角小叉
     if (pt.x > SX + SW2 - 40 && pt.x < SX + SW2 - 12 && pt.y > SY + 12 && pt.y < SY + 40) {
       game.settingsOpen = false; game.settingsT = 0; return;
@@ -1389,7 +1389,7 @@ canvas.addEventListener('mousedown', function (e) {
     // 两个按钮（各 110x110，同一水平线）
     var BW2 = 110, GAP2 = 26;
     var bx1 = SX + SW2 / 2 - BW2 - GAP2 / 2, bx2 = SX + SW2 / 2 + GAP2 / 2;
-    var by2 = SY + SW2 / 2 - BW2 / 2 + 14;
+    var by2 = SY + 92;   // 和绘制里的 by 保持一致
     var inG = (game.state === 'play' || game.state === 'dead' || game.state === 'win');
     if (pt.x > bx1 && pt.x < bx1 + BW2 && pt.y > by2 && pt.y < by2 + BW2) {
       if (inG) { game.settingsOpen = false; game.settingsT = 0; loadSlot(CUR.w, CUR.i); }   // 重来
