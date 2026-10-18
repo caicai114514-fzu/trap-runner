@@ -1191,7 +1191,7 @@ function update(dt) {
       } else if (pl.risePhase === 'sinking') {
         pl.riseT += dt;
         pl.riseY = Math.max(0, 1 - pl.riseT / 0.3);      // 0.3 秒缩回去
-        if (pl.riseY <= 0) { pl.risePhase = 'idle'; }
+        if (pl.riseY <= 0) { pl.risePhase = 'done'; }   // 只升起一次，缩回后不再触发
       }
       continue;
     }
