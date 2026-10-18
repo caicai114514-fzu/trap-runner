@@ -1235,6 +1235,14 @@ function update(dt) {
     }
   }
 
+  // 传送+绕环期间：人死死钉在屏幕正中，不受重力也不受按键
+  if (game.ring || game.tp) {
+    game.p.x = VW / 2 - game.p.w / 2;
+    game.p.y = VH / 2 - game.p.h / 2;
+    game.p.vx = 0; game.p.vy = 0;
+    game.p.onGround = false;
+  }
+
   // ===== 3-4 传送动画：人炸成碎片 → 碎片飞到屏幕正中 → 重组成人 =====
   if (game.tp) {
     game.tp.t += dt;
