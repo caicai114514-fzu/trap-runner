@@ -1658,7 +1658,7 @@ function update(dt) {
       // 落地反弹
       if (bl.y + bl.r > 470) {
         bl.y = 470 - bl.r;
-        bl.vy = -bl.vy * 0.95;
+        bl.vy = -bl.vy;                 // 完全不衰减：每次弹回同样的高度
         bl.bounce++;
         if (bl.bounce === 1) Sound.sfxTrap();
         if (!bl.noHoming && bl.bounce >= bl.maxBounce && !bl.armed) { bl.armed = true; bl.delay = (bl.delay === undefined ? 1.4 : bl.delay); }
