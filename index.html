@@ -1608,7 +1608,7 @@ function update(dt) {
       if (sp.onPlatY !== null) reveal = !!(p.ground && Math.abs(p.ground.y - sp.onPlatY) < 6);  // 站在二楼平台上才露头
       else if (sp.atXlt !== null) reveal = (p.x + p.w / 2 < sp.atXlt);   // 玩家往左走到某点才露头
       else if (sp.atYlt !== null) reveal = (p.y < sp.atYlt);      // 只有上到高处才露头
-      else reveal = (p.x + p.w > sp.triggerX) && (!sp.needFloorDone || game.floorDone);
+      else reveal = (p.x + p.w > sp.triggerX) && (!sp.needFloorDone || (game.floorPhase || 0) >= 1);
       if (!reveal && sp.waveDelay > 0 && game.spikeWaveT !== undefined) {
         reveal = (game.spikeWaveT >= sp.waveDelay);      // 波浪：第一排触发后按延迟依次冒出
       }
