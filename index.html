@@ -1669,6 +1669,12 @@ function update(dt) {
   for (var bi = 0; bi < game.balls.length; bi++) {
     var bl = game.balls[bi];
     bl.spin += dt * 6;
+    // 玩家站到（下沉后的）球顶上 → 球重新开始弹
+    if (bl.asPlatform && bl.sunkDone &&
+        Math.abs((p.x + p.w / 2) - bl.x) < bl.r &&
+        Math.abs((p.y + p.h) - (bl.y - bl.r)) < 10) {
+      if (bl.frozen) { bl.frozen = false; bl.vy = -520; }
+    }
     if (bl.homing) {
       var bx = (p.x + p.w / 2) - bl.x, by = (p.y + p.h / 2) - bl.y;
       var bd = Math.sqrt(bx * bx + by * by) || 1;
