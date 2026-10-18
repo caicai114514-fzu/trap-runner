@@ -539,15 +539,15 @@ var LEVELS = [
     name: '3-5 · 赌命', hint: '两个按钮，只有一个是真的。',
     width: 960, spawn: [110, 200],
     goal: { x: 850, y: 180, w: 46, h: 70 },
-    gamble: { answers: [0, 1, 1, 0], riseStep: 55 },   // 四轮，每轮升 55px
+    gamble: { answers: [0, 1, 1, 0], riseStep: 55 },
     gambleButtons: [
-      { x: 55,  y: 185, w: 42, h: 20 },     // 左高台上的按钮
-      { x: 862, y: 185, w: 42, h: 20 }      // 右高台上的按钮
+      { x: 258, y: 228, w: 42, h: 20 },     // 中间地板左端（往里一点）
+      { x: 660, y: 228, w: 42, h: 20 }      // 中间地板右端（往里一点）
     ],
     platforms: [
-      { x: 0,   y: 250, w: 220, h: 220, kind: 'solid' },            // 左高台（出生）
-      { x: 740, y: 250, w: 220, h: 220, kind: 'solid' },            // 右高台（门）
-      { x: 220, y: 470, w: 520, h: 70, kind: 'solid', riser: true } // 中间地板（会上升）
+      { x: 0,   y: 250, w: 220, h: 220, kind: 'solid' },
+      { x: 740, y: 250, w: 220, h: 220, kind: 'solid' },
+      { x: 220, y: 250, w: 520, h: 70, kind: 'solid', riser: true }   // 一开始和高台齐平
     ],
     spikes: [], saws: [], arrows: []
   },
@@ -859,6 +859,7 @@ function loadLevel(i) {
   game.goalFly = null;     // 3-4 门的粒子传送（美术层）
   game.gRound = 0;         // 3-5 博弈：当前第几轮
   game.gBtns = false;      // 3-5 按钮：站到中间地板上才出现
+  game.riserSank = false;  // 3-5 地板是否已经开始下降
   game.gambleDone = false;  // 3-5 博弈结束
   game.goalDead2 = false;  // 3-4 旧门已删除（代码层，碰不到）
   game.buttonVisible = !(L.button && L.button.hidden);  // 默认显示；hidden 的按钮(2-5)等平台出现才显示
@@ -1883,11 +1884,17 @@ function update(dt) {
   // ===== 3-5 博弈：每轮左右二选一，按对地板升，按错死 =====
   var GM = L6.gamble;
   if (GM && !game.gambleDone) {
-    if (p.ground && p.ground.riser) game.gBtns = true;   // 站上中间地板，按钮才出现
+    var ris0 = null;
+    for (var rj = 0; rj < game.plats.length; rj++) if (game.plats[rj].riser) ris0 = game.plats[rj];
+    if (ris0) {
+      if (!game.riserSank && p.ground === ris0) { game.riserSank = true; game.gBtns = true; Sound.sfxTrap(); game.shake = 6; }
+      if (game.riserSank && ris0.y < 470) { ris0.y = Math.min(470, ris0.y + dt * 190); }   // 缓缓降到 470
+    }
     var gb = game.gBtns ? (L6.gambleButtons || []) : [];
     for (var gbi = 0; gbi < gb.length; gbi++) {
       var bb = gb[gbi];
-      if (p.x < bb.x + bb.w && p.x + p.w > bb.x && p.y < bb.y + bb.h && p.y + p.h > bb.y) {
+      var cx0 = p.x + p.w / 2;
+      if (p.ground && p.ground.riser && cx0 > bb.x - 8 && cx0 < bb.x + bb.w + 8) {
         var correct = true;   // ★ 临时测试：按什么都对（之后改回 GM.answers[game.gRound] === gbi）
         if (correct) {
           game.gRound++;
@@ -2445,14 +2452,17 @@ function drawButtonWall() {
 
   // 3-5 博弈按钮：站上地板后才出现
   if (L.gambleButtons && game.gBtns) {
+    var risY = 250, risH = 70;
+    for (var ryi = 0; ryi < game.plats.length; ryi++) if (game.plats[ryi].riser) { risY = game.plats[ryi].y; risH = game.plats[ryi].h; }
     for (var gbi2 = 0; gbi2 < L.gambleButtons.length; gbi2++) {
       var gb2 = L.gambleButtons[gbi2];
+      var byy = risY - gb2.h - 2;                 // 始终贴在地板表面
       ctx.fillStyle = '#e0432f';
-      ctx.fillRect(gb2.x, gb2.y, gb2.w, gb2.h);
+      ctx.fillRect(gb2.x, byy, gb2.w, gb2.h);
       ctx.fillStyle = '#ff6b52';
-      ctx.fillRect(gb2.x, gb2.y, gb2.w, 5);
+      ctx.fillRect(gb2.x, byy, gb2.w, 5);
       ctx.fillStyle = '#ffd23f';
-      ctx.beginPath(); ctx.arc(gb2.x + gb2.w / 2, gb2.y + gb2.h + 5, 3, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(gb2.x + gb2.w / 2, byy + gb2.h + 5, 3, 0, 7); ctx.fill();
     }
   }
 
