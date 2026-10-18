@@ -2247,7 +2247,8 @@ function update(dt) {
   // ===== 4-1：走到距金币终点一定位置，左2阶梯下的地板往左收，2秒后伸出 =====
   if (LEVELS[game.li].coins) {
     var lastC = LEVELS[game.li].coins[LEVELS[game.li].coins.length - 1];
-    if (lastC && p.x > lastC.x - 120 && !game.floorRetract) {
+    // 玩家走到坑口(180 附近，即金币终点 270 的左边)就收地板，初见来不及反应
+    if (lastC && p.x < 200 && p.x > 60 && !game.floorRetract) {
       game.floorRetract = true; game.floorT = 0; Sound.sfxTrap();
     }
   }
