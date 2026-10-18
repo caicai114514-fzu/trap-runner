@@ -1622,7 +1622,11 @@ function update(dt) {
         if (sp.holdT >= sp.holdTime) { sp.retracted = true; sp.shown = false; }
       }
     }
-    if (sp.shown && sp.anim < 1) sp.anim = Math.min(1, sp.anim + dt * 7);
+    if (sp.shown && sp.anim < 1 && !sp.retracting) sp.anim = Math.min(1, sp.anim + dt * 7);
+    if (sp.retracting && sp.shown) {
+      sp.anim -= dt * 7;                       // 慢慢缩回地面
+      if (sp.anim <= 0) { sp.anim = 0; sp.shown = false; sp.retracted = true; }
+    }
 
     // 瞬移：判定立刻到新位置，视觉上从旧位置快速平移过去
     if (!sp.moved && (sp.moveTo || sp.follow)) {
@@ -1657,7 +1661,7 @@ function update(dt) {
     // 全部冒出后再停 2 秒，一起收回去；整个过程只发生一次
     if (!game.spikeWaveDone && game.spikeWaveT > 1.32 + 2.0) {
       for (var _swi = 0; _swi < game.spikes.length; _swi++) {
-        if (game.spikes[_swi].waveDelay !== undefined) { game.spikes[_swi].shown = false; game.spikes[_swi].retracted = true; }
+        if (game.spikes[_swi].waveDelay !== undefined) game.spikes[_swi].retracting = true;
       }
       game.spikeWaveDone = true;
     }
