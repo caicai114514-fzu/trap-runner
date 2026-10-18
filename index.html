@@ -1800,7 +1800,7 @@ function update(dt) {
         if (bl.delay <= 0) bl.homing = true;
       }
     }
-    if (Math.abs((p.x + p.w / 2) - bl.x) < bl.r + 9 && Math.abs((p.y + p.h / 2) - bl.y) < bl.r + 11) {
+    if (!game.ring && Math.abs((p.x + p.w / 2) - bl.x) < bl.r + 9 && Math.abs((p.y + p.h / 2) - bl.y) < bl.r + 11) {
       die(); return;
     }
   }
