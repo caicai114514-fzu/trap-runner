@@ -844,7 +844,7 @@ function unlockAchievement(key) {
   for (var ai = 0; ai < ACHIEVEMENTS.length; ai++) {
     if (ACHIEVEMENTS[ai].id === key || ACHIEVEMENTS[ai].w === key) a = ACHIEVEMENTS[ai];
   }
-  if (a) { flashMsg('🏆 获得成就：' + a.name); Sound.sfxAllClear(); }
+  if (a) { if (!game.achQueue) game.achQueue = []; game.achQueue.push('🏆 获得成就：' + a.name); Sound.sfxAllClear(); }
   return true;
 }
 function giveKey(w) {
@@ -988,6 +988,7 @@ function loadLevel(i) {
   game.goalReveal = (L.fakeGoal || L.goalHidden) ? 0 : 1;   // 真门的显现进度
   game.goalX = L.goal.x;                                  // 会走的门：当前 x（重生 = 门回原位）
   game.goalDone = false; game.goalMoving = false;
+  game.achQueue = [];                        // 成就播报队列
   game.settingsOpen = false;                 // 设置弹窗是否打开
   game.resetOpen = false;                    // 重置确认弹窗
   game.resetT = 0;                           // 重置弹窗滑入动画
@@ -1644,6 +1645,11 @@ function update(dt) {
       game.tp = null;
     }
     return;    // 动画期间玩家完全不能动
+  }
+
+  // 成就播报队列：一条播完（tauntT 归零）再播下一条
+  if (game.achQueue && game.achQueue.length && game.tauntT <= 0) {
+    flashMsg(game.achQueue.shift());
   }
 
   if (game.shake > 0) game.shake = Math.max(0, game.shake - 60 * dt);
