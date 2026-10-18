@@ -3362,7 +3362,7 @@ function drawSettings(dt) {
         var iw = im.naturalWidth, ih = im.naturalHeight;
         var sc = Math.min(isz / iw, isz / ih);
         ctx.save();
-        ctx.beginPath(); ctx.arc(cx2, cy2, isz * 0.415, 0, 7); ctx.clip();   // 圆形裁剪：白底裁掉
+        ctx.beginPath(); ctx.arc(cx2, cy2, isz * 0.392, 0, 7); ctx.clip();   // 圆形裁剪：白底裁掉
         ctx.drawImage(im, cx2 - iw * sc / 2, cy2 - ih * sc / 2, iw * sc, ih * sc);
         ctx.restore();
       } else {
@@ -3394,7 +3394,7 @@ function drawSettings(dt) {
     if (dm && dm.complete && dm.naturalWidth) {
       var dsz = 150, sc2 = Math.min(dsz / dm.naturalWidth, dsz / dm.naturalHeight);
       ctx.save();
-      ctx.beginPath(); ctx.arc(VW / 2, DY + 40 + dsz / 2, dsz * 0.415, 0, 7); ctx.clip();
+      ctx.beginPath(); ctx.arc(VW / 2, DY + 40 + dsz / 2, dsz * 0.392, 0, 7); ctx.clip();
       ctx.drawImage(dm, VW / 2 - dm.naturalWidth * sc2 / 2, DY + 40, dm.naturalWidth * sc2, dm.naturalHeight * sc2);
       ctx.restore();
     }
