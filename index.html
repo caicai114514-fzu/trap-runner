@@ -581,13 +581,8 @@ var LEVELS = [
     goal: { x: 777, y: 200, w: 46, h: 70 },
     platforms: [
       { x: 0, y: 270, w: 960, h: 270, kind: 'solid' },   // 贯通大地板（上边缘在屏幕正中）
-      // ===== 天花板：中间一条横梁 + 两端向下收的阶梯 =====
-      { x: 0,   y: -40, w: 960, h: 140, kind: 'solid' }, // 顶部横梁（左右都贴到屏幕边）
-      { x: 0,   y: 100, w: 90,  h: 40, kind: 'solid' },  // 左阶梯 1（贴左边）
-      { x: 90,  y: 130, w: 90,  h: 40, kind: 'solid' },  // 左阶梯 2
-      { x: 180, y: 160, w: 600, h: 40, kind: 'solid' },  // 最下面两块板联通（180~780）
-      { x: 870, y: 100, w: 90,  h: 40, kind: 'solid' },  // 右阶梯 1（贴右边）
-      { x: 780, y: 130, w: 90,  h: 40, kind: 'solid' },  // 右阶梯 2
+      // ===== 天花板：一整块实心（0~960, 顶到屏幕外, 底 200），纯色 =====
+      { x: 0, y: -40, w: 960, h: 240, kind: 'solid', noTop: true }
 
     ],
     spikes: [], arrows: []
@@ -855,7 +850,8 @@ function loadLevel(i) {
       slideWall: !!p.slideWall,           // 3-3：会往左缩进的下半堵墙
       riser: !!p.riser,                  // 3-5：博弈对就上升的地板
       hiddenPath: !!p.hiddenPath,        // 4-1：天花板里的隐藏通道（有碰撞不绘制）
-      secretPad: !!p.secretPad           // 4-1：吃了第一枚金币就失效的隐藏跳板
+      secretPad: !!p.secretPad,          // 4-1：吃了第一枚金币就失效的隐藏跳板
+      noTop: !!p.noTop                   // 4-1：天花板纯色，不画顶部亮线
     };
   });
   game.spikes = L.spikes.map(function (s) {
@@ -2627,8 +2623,10 @@ function drawPlatforms() {
       ctx.fillStyle = p.kind === 'piston' ? PAL.piston
                     : p.kind === 'appear' ? PAL.appear : PAL.ground;
       ctx.fillRect(p.x, p.y, p.w, p.h);
-      ctx.fillStyle = p.kind === 'piston' ? PAL.pistonTop : PAL.groundTop;
-      ctx.fillRect(p.x, p.y, p.w, 4);
+      if (!p.noTop) {
+        ctx.fillStyle = p.kind === 'piston' ? PAL.pistonTop : PAL.groundTop;
+        ctx.fillRect(p.x, p.y, p.w, 4);
+      }
     }
     ctx.restore();
   }
