@@ -2431,7 +2431,7 @@ function update(dt) {
     if (co.got || co.gone || co.hidden) continue;   // 隐藏/消失的假金币：看不见、也碰不到
     if (co.chasing) {
       co.x -= MOVE * dt;                                   // 和玩家同速地向左压过来
-      if (co.chaseFrom - co.x > 450) { co.gone = true; }   // 压更远一段再消失
+      if (co.chaseFrom - co.x > 250) { co.gone = true; }   // 追够 250px 就彻底消失
       if (co.gone) continue;
     }
     if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22) {
