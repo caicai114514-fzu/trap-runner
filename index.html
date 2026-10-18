@@ -861,7 +861,8 @@ function loadLevel(i) {
       riseT: 0, risePhase: 'idle', riseY: 0,  // riseWall：升起的墙
       slideWall: !!p.slideWall,           // 3-3：会往左缩进的下半堵墙
       riser: !!p.riser,                  // 3-5：博弈对就上升的地板
-      hiddenPath: !!p.hiddenPath         // 4-1：天花板里的隐藏通道（有碰撞不绘制）
+      hiddenPath: !!p.hiddenPath,        // 4-1：天花板里的隐藏通道（有碰撞不绘制）
+      secretPad: !!p.secretPad           // 4-1：吃了第一枚金币就失效的隐藏跳板
     };
   });
   game.spikes = L.spikes.map(function (s) {
@@ -2338,10 +2339,32 @@ function update(dt) {
     var co = game.coins[ci];
     co.t += dt;
     if (co.got) continue;
+    if (co.chasing) {
+      co.x -= MOVE * dt;                                   // 和玩家同速地向左压过来
+      if (co.chaseFrom - co.x > 300) { co.gone = true; }   // 压了一段就自己消失
+      if (co.gone) continue;
+    }
     if (Math.abs(p.x + p.w / 2 - co.x) < 20 && Math.abs(p.y + p.h / 2 - co.y) < 22) {
       if (co.fake) { Sound.sfxBoom(); die(); return; }
       co.got = true; Sound.sfxCoin();
       if (co.flip) { game.flipT = 0; Sound.sfxTrap(); }     // 吃到"翻板金币"→整块地板开始翻
+      // 4-1：吃掉第一枚 → 隐藏跳板失效（后门被堵）
+      if (LEVELS[game.li].coins && game.gotCoins === undefined) game.gotCoins = 0;
+      if (LEVELS[game.li].coins) {
+        game.gotCoins = (game.gotCoins || 0) + 1;
+        if (game.gotCoins >= 1) {
+          for (var pj3 = 0; pj3 < game.plats.length; pj3++) {
+            if (game.plats[pj3].secretPad) { game.plats[pj3].state = 'gone'; game.plats[pj3].noCollide = true; }
+          }
+        }
+        // 吃满前两枚（不含最后一枚爆炸金币）→ 最后一枚开始追
+        var realTotal = LEVELS[game.li].coins.filter(function (c) { return !c.fake; }).length;
+        if (game.gotCoins >= realTotal) {
+          var lastCoin = null;
+          for (var lc = 0; lc < game.coins.length; lc++) if (game.coins[lc].fake && !game.coins[lc].got) lastCoin = game.coins[lc];
+          if (lastCoin && !lastCoin.chasing) { lastCoin.chasing = true; lastCoin.chaseFrom = lastCoin.x; }
+        }
+      }
     }
   }
 
