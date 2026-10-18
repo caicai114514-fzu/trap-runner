@@ -2491,7 +2491,7 @@ function update(dt) {
         game.gotCoins = (game.gotCoins || 0) + 1;
         if (game.gotCoins >= 1) {
           for (var pj3 = 0; pj3 < game.plats.length; pj3++) {
-            if (game.plats[pj3].secretPad) { game.plats[pj3].state = 'gone'; game.plats[pj3].noCollide = true; }
+            if (game.plats[pj3].secretPad || game.plats[pj3].hiddenPath) { game.plats[pj3].state = 'gone'; game.plats[pj3].noCollide = true; }
           }
         }
         // 吃满前两枚（不含最后一枚爆炸金币）→ 最后一枚开始追
