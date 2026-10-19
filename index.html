@@ -1236,7 +1236,8 @@ function winLevel() {
   if (CUR.w === 3 && CUR.i === 0 && game.fromHiddenPath) unlockAchievement('clever');
   // 大关最后一关通关 → 解锁成就（每个大关的最后一小关）
   var lastSlot = (CUR.w === 3) ? 0 : (LEVELS_PER_WORLD - 1);   // 第四大关只剩表魔王一关
-  if (CUR.i === lastSlot) unlockAchievement(CUR.w);
+  var firstClear = false;
+  if (CUR.i === lastSlot) firstClear = unlockAchievement(CUR.w);   // 返回 true = 首次解锁该大关成就
   // 表魔王：没经过检查点 = 走了捷径 → 弹死人话 + 解锁里魔王
   var SC = LEVELS[game.li].shortcutCheck;
   if (SC && !game.passedShortcut) {
@@ -1252,9 +1253,13 @@ function winLevel() {
   var gx = (game.goalX !== undefined) ? game.goalX : g.x;   // 会走的门：用当前真实位置
   game.winDoor = { k: 1, cx: gx + g.w / 2, cy: g.y + g.h / 2 };
   game.winFrom = { x: game.p.x, y: game.p.y };
-  if (CUR.w === 3 && CUR.i === 0) {   // 第四大关只有表魔王一关，通关即全通
-    game.state = 'complete';
-    Sound.sfxAllClear();
+  if (CUR.w === 3 && CUR.i === 0) {   // 第四大关只有表魔王一关
+    if (firstClear) {                 // 首次通关才弹"全部通关"页面
+      game.state = 'complete';
+      Sound.sfxAllClear();
+      return;
+    }
+    game.state = 'win';               // 之后再通关，走普通通关流程
     return;
   }
   game.state = 'win';
@@ -3925,9 +3930,9 @@ function drawComplete() {
   ctx.fillStyle = PAL.door;
   ctx.fillText('全 部 通 关', 0, 0);
   ctx.restore();
-  text('总死亡次数：' + game.totalDeaths + ' 次', VW / 2, VH / 2 + 8, 26, PAL.text, 'center', true);
-  text(game.totalDeaths <= 15 ? '这身手，有点东西。' :
-       game.totalDeaths <= 40 ? '坑是踩出来的，路是走出来的。' :
+  text('总死亡次数：' + save.deaths + ' 次', VW / 2, VH / 2 + 8, 26, PAL.text, 'center', true);
+  text(save.deaths <= 15 ? '这身手，有点东西。' :
+       save.deaths <= 40 ? '坑是踩出来的，路是走出来的。' :
        '……你和这个游戏，都挺倔的。', VW / 2, VH / 2 + 56, 18, PAL.text, 'center');
   // 成就：全通界面把本次新解锁的一次列出（只构建一次，固化下来）
   if (!game.completeAchLines) {
