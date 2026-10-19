@@ -3842,10 +3842,15 @@ function drawHUD() {
   }
   // 底部提示：先教操作，死两次给思路，死八次给台阶
   if (game.state === 'play') {
+    // 半透明黑底条：确保任何大关背景叠加后按键说明都清晰可读
+    ctx.save();
+    ctx.fillStyle = 'rgba(10, 6, 8, 0.62)';
+    ctx.fillRect(VW / 2 - 250, VH - 38, 500, 26);
+    ctx.restore();
     if (game.deaths === 0) {
-      text('← → / A D 移动　　空格 跳跃　　R 重来　　M 音乐', VW / 2, VH - 26, 15, PAL.dim, 'center');
+      text('← → / A D 移动　　空格 跳跃　　R 重来　　M 音乐', VW / 2, VH - 26, 15, '#ffffff', 'center', true);
     } else if (game.deaths >= 8) {
-      text('踩上会碎的板子别停，落地立刻按空格', VW / 2, VH - 26, 15, PAL.good, 'center', true);
+      text('踩上会碎的板子别停，落地立刻按空格', VW / 2, VH - 26, 15, '#ffd23f', 'center', true);
     } else if (game.deaths >= 2) {
       text('提示：踩上会碎的板子别停留，落地立刻按空格跳走', VW / 2, VH - 26, 15, '#ffb347', 'center', true);
     }
