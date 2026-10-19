@@ -391,8 +391,8 @@ var LEVELS = [
   {
     name: '1-4 · 一口气', hint: '前三块会缩，第四块是稳的。',
     width: 960, spawn: [70, 380], goal: { x: 862, y: 400, w: 46, h: 70 },
-    // 门可以被"勾引"：从第四块平台往右跳一下（人不用真过去），
-    // 门当场失效、脚下变坑，视觉上快速落下；等 2 秒再长回来。
+    // 门可以被"勾引"一次：从第四块平台往右跳一下（人不用真过去），
+    // 门当场失效、脚下变坑，视觉上快速落下；等 2 秒长回来，但长回来后再也不能被勾引。
     sinkGoal: { triggerX: 828, depth: 320, time: 0.14, riseDelay: 2.0 },
     platforms: [
       { x: 0, y: 470, w: 150, h: 70, kind: 'solid' },
@@ -1236,7 +1236,8 @@ function winLevel() {
   if (CUR.w === 3 && CUR.i === 0 && game.fromHiddenPath) unlockAchievement('clever');
   // 大关最后一关通关 → 解锁成就（每个大关的最后一小关）
   var lastSlot = (CUR.w === 3) ? 0 : (LEVELS_PER_WORLD - 1);   // 第四大关只剩表魔王一关
-  if (CUR.i === lastSlot) unlockAchievement(CUR.w);
+  var firstClear = false;
+  if (CUR.i === lastSlot) firstClear = unlockAchievement(CUR.w);   // 返回 true = 首次解锁该大关成就
   // 表魔王：没经过检查点 = 走了捷径 → 弹死人话 + 解锁里魔王
   var SC = LEVELS[game.li].shortcutCheck;
   if (SC && !game.passedShortcut) {
@@ -1252,9 +1253,13 @@ function winLevel() {
   var gx = (game.goalX !== undefined) ? game.goalX : g.x;   // 会走的门：用当前真实位置
   game.winDoor = { k: 1, cx: gx + g.w / 2, cy: g.y + g.h / 2 };
   game.winFrom = { x: game.p.x, y: game.p.y };
-  if (CUR.w === 3 && CUR.i === 0) {   // 第四大关只有表魔王一关，通关即全通
-    game.state = 'complete';
-    Sound.sfxAllClear();
+  if (CUR.w === 3 && CUR.i === 0) {   // 第四大关只有表魔王一关
+    if (firstClear) {                 // 首次通关才弹"全部通关"页面
+      game.state = 'complete';
+      Sound.sfxAllClear();
+      return;
+    }
+    game.state = 'win';               // 之后再通关，走普通通关流程
     return;
   }
   game.state = 'win';
@@ -2191,8 +2196,7 @@ function update(dt) {
       game.sinkPhase = 'sinking'; game.sinkT = 0;
       game.goalDead = true; Sound.sfxTrap();
     }
-    // 升起之后上锁：玩家得先离开触发区，门才允许再被触发（避免反复升降）
-    if (game.sinkLock && p.x + p.w / 2 < sg.triggerX - 90) game.sinkLock = false;
+    // 门只被勾引一次：升起后永久锁定，不再解锁（避免反复升降）
     if (game.sinkPhase === 'sinking') {
       game.sinkT += dt;
       game.sinkY = Math.min(1, game.sinkT / stime) * depth;
@@ -3838,10 +3842,15 @@ function drawHUD() {
   }
   // 底部提示：先教操作，死两次给思路，死八次给台阶
   if (game.state === 'play') {
+    // 半透明黑底条：确保任何大关背景叠加后按键说明都清晰可读
+    ctx.save();
+    ctx.fillStyle = 'rgba(10, 6, 8, 0.62)';
+    ctx.fillRect(VW / 2 - 250, VH - 38, 500, 26);
+    ctx.restore();
     if (game.deaths === 0) {
-      text('← → / A D 移动　　空格 跳跃　　R 重来　　M 音乐　　N 直接通关', VW / 2, VH - 26, 15, PAL.dim, 'center');
+      text('← → / A D 移动　　空格 跳跃　　R 重来　　M 音乐', VW / 2, VH - 26, 15, '#ffffff', 'center', true);
     } else if (game.deaths >= 8) {
-      text('踩上会碎的板子别停，落地立刻按空格　　按 N 直接通关', VW / 2, VH - 26, 15, PAL.good, 'center', true);
+      text('踩上会碎的板子别停，落地立刻按空格', VW / 2, VH - 26, 15, '#ffd23f', 'center', true);
     } else if (game.deaths >= 2) {
       text('提示：踩上会碎的板子别停留，落地立刻按空格跳走', VW / 2, VH - 26, 15, '#ffb347', 'center', true);
     }
@@ -3925,9 +3934,9 @@ function drawComplete() {
   ctx.fillStyle = PAL.door;
   ctx.fillText('全 部 通 关', 0, 0);
   ctx.restore();
-  text('总死亡次数：' + game.totalDeaths + ' 次', VW / 2, VH / 2 + 8, 26, PAL.text, 'center', true);
-  text(game.totalDeaths <= 15 ? '这身手，有点东西。' :
-       game.totalDeaths <= 40 ? '坑是踩出来的，路是走出来的。' :
+  text('总死亡次数：' + save.deaths + ' 次', VW / 2, VH / 2 + 8, 26, PAL.text, 'center', true);
+  text(save.deaths <= 15 ? '这身手，有点东西。' :
+       save.deaths <= 40 ? '坑是踩出来的，路是走出来的。' :
        '……你和这个游戏，都挺倔的。', VW / 2, VH / 2 + 56, 18, PAL.text, 'center');
   // 成就：全通界面把本次新解锁的一次列出（只构建一次，固化下来）
   if (!game.completeAchLines) {
