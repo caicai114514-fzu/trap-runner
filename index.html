@@ -392,7 +392,7 @@ var LEVELS = [
     name: '1-4 · 一口气', hint: '前三块会缩，第四块是稳的。',
     width: 960, spawn: [70, 380], goal: { x: 862, y: 400, w: 46, h: 70 },
     // 门可以被"勾引"：从第四块平台往右跳一下（人不用真过去），
-    // 门当场失效、脚下变坑，视觉上快速落下；等 2 秒再长回来。
+    // 门当场失效、脚下变坑，视觉上快速落下；只沉这一次，不再长回来。
     sinkGoal: { triggerX: 828, depth: 320, time: 0.14, riseDelay: 2.0 },
     platforms: [
       { x: 0, y: 470, w: 150, h: 70, kind: 'solid' },
@@ -2203,15 +2203,7 @@ function update(dt) {
       game.sinkY = Math.min(1, game.sinkT / stime) * depth;
       if (game.sinkY >= depth - 0.5) { game.sinkPhase = 'down'; game.sinkT = 0; }
     } else if (game.sinkPhase === 'down') {
-      game.sinkT += dt;
-      if (game.sinkT > (sg.riseDelay === undefined ? 3 : sg.riseDelay)) { game.sinkPhase = 'rising'; game.sinkT = 0; }
-    } else if (game.sinkPhase === 'rising') {
-      game.sinkT += dt;
-      game.sinkY = Math.max(0, (1 - Math.min(1, game.sinkT / stime)) * depth);
-      if (game.sinkY <= 0.5) {
-        game.sinkPhase = 'idle'; game.sinkY = 0; game.sinkLock = true;
-        game.goalDead = false;               // 门长回来了，判定区跟着一起回来
-      }
+      // 门沉一次就永久没入，不再升起 —— 1-4 的门只能被勾引一次
     }
     // 门下面的那块地板跟着一起沉
     for (var sfi = 0; sfi < game.plats.length; sfi++) {
